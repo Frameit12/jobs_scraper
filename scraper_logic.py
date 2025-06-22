@@ -137,6 +137,22 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     
     driver = webdriver.Chrome(options=options)
 
+    # === ADD THESE TIMEOUT SETTINGS ===
+    driver.set_page_load_timeout(30)  # 30 seconds for page load
+    driver.implicitly_wait(10)        # 10 seconds for element finding
+    driver.set_script_timeout(30)     # 30 seconds for JavaScript
+
+    # === ADD CONNECTION STABILITY ===
+    print("🔍 Testing basic connectivity first...")
+    try:
+        driver.get("https://httpbin.org/get")  # Simple test page
+        print("✅ Basic connectivity successful")
+        time.sleep(2)
+    except Exception as e:
+        print(f"❌ Basic connectivity failed: {e}")
+        driver.quit()
+        return [{"title": "Connection Failed", "company": "Error", "location": location, "link": "#", "description": f"Basic connectivity test failed: {str(e)}"}]
+
     driver.get("https://www.efinancialcareers.com/")
     time.sleep(2)
 
