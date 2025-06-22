@@ -98,26 +98,30 @@ def check_excel_files_for_searches(searches):
         search["has_excel"] = len(matching_files) > 0
     return searches
 
-
 def save_search(name, criteria):
     print(f"🔍 SAVE_SEARCH DEBUG: Attempting to save '{name}'")
-    history = load_saved_searches()
-    print(f"🔍 SAVE_SEARCH DEBUG: Loaded {len(history)} existing searches")
-    entry = {
-        "name": name,
-        "timestamp": datetime.now().strftime("%d %B %Y"),
-        "criteria": criteria,
-        "schedule": "none"
-    }
-    history.insert(0, entry)
-    history = history[:5]  # Keep only 5 most recent
-    print(f"🔍 SAVE_SEARCH DEBUG: About to write {len(history)} searches to file")
+    engine = get_db_connection()
+    if not engine:
+        print("❌ SAVE_SEARCH DEBUG: No database connection")
+        return
+    
     try:
-        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(history, f, indent=2)
-        print(f"✅ SAVE_SEARCH DEBUG: Successfully wrote to {HISTORY_FILE}")
+        with engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO saved_searches (name, timestamp, criteria, schedule, last_run_date)
+                VALUES (:name, :timestamp, :criteria, :schedule, :last_run_date)
+            """), {
+                "name": name,
+                "timestamp": datetime.now().strftime("%d %B %Y"),
+                "criteria": json.dumps(criteria),
+                "schedule": "none",
+                "last_run_date": ""
+            })
+            conn.commit()
+        print(f"✅ SAVE_SEARCH DEBUG: Successfully saved to database")
     except Exception as e:
-        print(f"❌ SAVE_SEARCH DEBUG: Failed to write file: {e}")
+        print(f"❌ SAVE_SEARCH DEBUG: Database error: {e}")
+
 
 def save_results_for_search(name, results):
     # Create folder if not exists
