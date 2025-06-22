@@ -83,26 +83,44 @@ def extract_job_details(driver, url):
     }
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
-    print("🔍 BASIC DEBUG: Function called with parameters:")
-    print(f"  - title: '{title}'")
-    print(f"  - location: '{location}'") 
-    print(f"  - max_jobs: {max_jobs}")
-    print(f"  - seniority: '{seniority}'")
-    print(f"  - seniority type: {type(seniority)}")
-    print(f"  - seniority is empty: {seniority == ''}")
-    print(f"  - seniority is None: {seniority is None}")
+    try:
+        # Your existing debug prints...
+        print("🔍 BASIC DEBUG: Function called with parameters:")
+        print(f"  - title: '{title}'")
+        print(f"  - location: '{location}'") 
+        print(f"  - max_jobs: {max_jobs}")
+        print(f"  - seniority: '{seniority}'")
+        
+        # Add basic error handling
+        if not title or not location:
+            return [{"error": "Please enter both job title and location"}]
+        
+        print("🌐 Launching browser...")
+        options = Options()
+        options.add_argument("--start-maximized")
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--remote-debugging-port=9222")
+        
+        driver = webdriver.Chrome(options=options)
+        
+        # Set a longer timeout for cloud environments
+        driver.set_page_load_timeout(30)
+        
+        # Your existing scraping code but with error handling...
+        # [Continue with your existing code]
+        
+    except Exception as e:
+        print(f"❌ Scraping error: {e}")
+        return [{"error": f"Job search temporarily unavailable. Please try again later. ({str(e)[:50]}...)"}]
+    finally:
+        try:
+            driver.quit()
+        except:
+            pass
     
-    print("🌐 Launching browser...")
-    options = Options()
-    options.add_argument("--start-maximized")
-    options.add_argument("--headless")  # Run without GUI
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--remote-debugging-port=9222")
-
-    driver = webdriver.Chrome(options=options)
-
     driver.get("https://www.efinancialcareers.com/")
     time.sleep(2)
 
