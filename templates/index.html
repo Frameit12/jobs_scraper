@@ -138,15 +138,27 @@
 
         <!-- BOTTOM ROW: Search Results full width -->
         <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
-                <svg class="w-6 h-6 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                </svg>
-                Search Results
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-slate-800 flex items-center">
+                    <svg class="w-6 h-6 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                    Search Results
+                    {% if jobs %}
+                        <span class="ml-3 px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">{{ jobs|length }} jobs found</span>
+                    {% endif %}
+                </h2>
                 {% if jobs %}
-                    <span class="ml-3 px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">{{ jobs|length }} jobs found</span>
+                <form method="POST" action="/download">
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Download Excel
+                    </button>
+                </form>
                 {% endif %}
-            </h2>
+            </div>
 
             {% if active_search_name %}
                 <p style="margin-top: -10px; color: #444;">
@@ -238,21 +250,6 @@
                     </tbody>
                 </table>
             
-            <form method="POST" action="/download" style="margin-top: 20px; text-align: right;">
-                <button type="submit" style="
-                    padding: 10px 24px;
-                    font-size: 16px;
-                    font-weight: 600;
-                    background-color: #007bff;
-                    color: white;
-                    border: none;
-                    border-radius: 6px;
-                    cursor: pointer;
-                ">
-                    📥 Download Excel
-                </button>
-            </form>
-
             {% elif jobs is defined and jobs|length == 0 %}
                 <p>No jobs found.</p>
             {% endif %}
