@@ -1,0 +1,46 @@
+[
+  {
+    "name": "AML",
+    "timestamp": "19 June 2025",
+    "criteria": {
+      "title": "AML",
+      "location": "New York",
+      "max_jobs": 5
+    },
+    "schedule": "weekly",
+    "last_run_date": "21 June 2025 15:27"
+  },
+  {
+    "name": "KYC",
+    "timestamp": "19 June 2025",
+    "criteria": {
+      "title": "KYC",
+      "location": "New York",
+      "max_jobs": 2
+    },
+    "schedule": "daily",
+    "last_run_date": "22 June 2025 06:24"
+  },
+  {
+    "name": "Front Office",
+    "timestamp": "19 June 2025",
+    "criteria": {
+      "title": "Trading",
+      "location": "New York",
+      "max_jobs": 4
+    },
+    "schedule": "weekly",
+    "last_run_date": "2025-06-20"
+  },
+  {
+    "name": "Middle Office",
+    "timestamp": "19 June 2025",
+    "criteria": {
+      "title": "Operations",
+      "location": "New York",
+      "max_jobs": 2
+    },
+    "schedule": "daily",
+    "last_run_date": "22 June 2025 06:24"
+  }
+]
