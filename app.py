@@ -653,7 +653,7 @@ def schedule():
         return render_template("schedule.html", search=selected_search, index=index)
     else:
         return "Invalid search index", 400
-
+ 
 
 @app.route("/save_schedule", methods=["POST"])
 def save_schedule():
@@ -663,13 +663,30 @@ def save_schedule():
     search_history = load_saved_searches()
 
     if 0 <= index < len(search_history):
-        search_history[index]["schedule"] = frequency
-        with open("search_history.json", "w", encoding="utf-8") as f:
-            json.dump(search_history, f, indent=2)
-        return '', 200
+        search = search_history[index]
+        engine = get_db_connection()
+        
+        if engine:
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        UPDATE saved_searches 
+                        SET schedule = :schedule 
+                        WHERE name = :name
+                    """), {
+                        "schedule": frequency,
+                        "name": search["name"]
+                    })
+                    conn.commit()
+                return '', 200
+            except Exception as e:
+                print(f"Error updating schedule: {e}")
+                return "Database error", 500
+        return "No database connection", 500
     else:
         return "Invalid search index", 400
-    
+
+
 
 @app.route("/download_scheduled/<search_name>")
 def download_scheduled(search_name):
