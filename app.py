@@ -648,7 +648,7 @@ import io
 
 @app.route("/download_selected", methods=["POST"])
 def download_selected():
-    print("🚨 FLASK ROUTE HIT! /download_selected was called!")
+    print("🚨 FLASK ROUTE HIT!! /download_selected was called!")
     selected = request.form.getlist("selected_files")
     print("✅ /download_selected triggered!")
     print("🧾 Selected files:", selected) 
