@@ -87,48 +87,56 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
         return [{"error": "Please enter both job title and location"}]
     
     try:
-        print("🔧 Testing Fix #1: Aggressive Memory Management...")
-        options = Options()
+        print("🔧 Testing Fix #2: Selenium Connection Stability...")
         
-        # Memory optimization flags
+        from selenium.webdriver.chrome.service import Service
+        from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+        
+        options = Options()
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
-        options.add_argument("--memory-pressure-off")
-        options.add_argument("--disable-background-timer-throttling")
-        options.add_argument("--disable-backgrounding-occluded-windows")
-        options.add_argument("--disable-renderer-backgrounding")
-        options.add_argument("--disable-features=TranslateUI,BlinkGenPropertyTrees")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-plugins")
-        options.add_argument("--disable-images")  # Don't load images to save memory
-        options.add_argument("--disable-javascript")  # Try without JS first
-        options.add_argument("--aggressive-cache-discard")
-        options.add_argument("--memory-pressure-off")
         
-        driver = webdriver.Chrome(options=options)
-        driver.set_page_load_timeout(30)
+        # NEW: Connection stability fixes
+        options.add_argument("--remote-debugging-port=0")  # Let Chrome pick port
+        options.add_argument("--disable-logging")
+        options.add_argument("--disable-log-level")
+        options.add_argument("--silent")
+        options.add_argument("--disable-background-networking")
         
-        print("🌐 Testing efinancialcareers navigation...")
-        driver.get("https://www.efinancialcareers.com/")
-        time.sleep(3)
+        # NEW: Force stable connection
+        caps = DesiredCapabilities.CHROME
+        caps['goog:loggingPrefs'] = {'browser': 'OFF', 'driver': 'OFF', 'performance': 'OFF'}
         
-        print(f"✅ Page loaded: {driver.title}")
+        print("🌐 Creating Chrome driver with stable connection...")
+        driver = webdriver.Chrome(options=options, desired_capabilities=caps)
+        
+        # NEW: Shorter timeout to avoid connection hanging
+        driver.set_page_load_timeout(15)
+        driver.implicitly_wait(5)
+        
+        print("🌐 Testing basic navigation...")
+        driver.get("https://httpbin.org/get")  # Simple test endpoint
+        time.sleep(2)
+        
+        page_source_length = len(driver.page_source)
+        print(f"✅ Page loaded successfully. Content length: {page_source_length}")
+        
         driver.quit()
         
         return [{
-            "title": "Fix #1 Test",
-            "company": "Memory Optimization", 
+            "title": "Fix #2 Success",
+            "company": "Connection Stable", 
             "location": location,
             "link": "#",
-            "description": f"Successfully loaded efinancialcareers with aggressive memory management. Page title: {driver.title if 'driver' in locals() else 'Unknown'}"
+            "description": f"Selenium-Chrome connection working! Page content length: {page_source_length} characters"
         }]
         
     except Exception as e:
-        print(f"❌ Fix #1 failed: {e}")
+        print(f"❌ Fix #2 failed: {e}")
         try:
             driver.quit()
         except:
             pass
-        return [{"title": "Fix #1 Failed", "company": "Error", "location": location, "link": "#", "description": f"Memory optimization failed: {str(e)[:100]}"}]
+        return [{"title": "Fix #2 Failed", "company": "Error", "location": location, "link": "#", "description": f"Connection fix failed: {str(e)[:100]}"}]
