@@ -94,22 +94,46 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     
     print("🌐 Launching browser...")
     options = Options()
-    options.add_argument("--headless")
+
+    # === 2024/2025 HEADLESS MODE ===
+    options.add_argument("--headless=new")  # Latest headless mode (Chrome 109+)
+
+    # === MEMORY CRASH PREVENTION ===
     options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-dev-shm-usage")  # Critical: Use /tmp instead of /dev/shm
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--memory-pressure-off")
+    options.add_argument("--max_old_space_size=4096")
     options.add_argument("--disable-background-timer-throttling")
     options.add_argument("--disable-backgrounding-occluded-windows")
     options.add_argument("--disable-renderer-backgrounding")
+
+    # === ADVANCED STABILITY FLAGS ===
+    options.add_argument("--single-process")  # Prevents multi-process crashes
+    options.add_argument("--disable-features=VizDisplayCompositor")
     options.add_argument("--disable-features=TranslateUI")
     options.add_argument("--disable-ipc-flooding-protection")
     options.add_argument("--disable-background-networking")
     options.add_argument("--disable-default-apps")
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-sync")
+    options.add_argument("--disable-blink-features=AutomationControlled")  # Anti-detection
     options.add_argument("--metrics-recording-only")
     options.add_argument("--no-first-run")
+
+    # === RESOURCE OPTIMIZATION ===
+    options.add_argument("--disable-logging")
+    options.add_argument("--disable-log-level")
+    options.add_argument("--silent")
+    options.add_argument("--disable-crash-reporter")
+    options.add_argument("--disable-oopr-debug-crash-dump")
+    options.add_argument("--no-crash-upload")
+    options.add_argument("--disable-client-side-phishing-detection")
+
+    # === WINDOW SIZE (Important for headless) ===
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-features=VizDisplayCompositor")
     
     driver = webdriver.Chrome(options=options)
 
