@@ -724,6 +724,33 @@ def debug_files():
     {"<br>".join([f"{d['name']}: {d['pattern']} -> {d['found_files']} (has_excel: {d['has_excel']})" for d in debug_info])}
     """
 
+@app.route("/create_test_files")
+def create_test_files():
+    import os
+    import pandas as pd
+    from datetime import datetime
+    
+    # Create the folder
+    os.makedirs("scheduled_results", exist_ok=True)
+    
+    # Get saved searches and create test Excel files for each
+    searches = load_saved_searches()
+    created_files = []
+    
+    for search in searches:
+        safe_name = search["name"].replace(" ", "_")
+        date_str = datetime.now().strftime("%d_%B_%Y")
+        filename = f"scheduled_results/{safe_name}_{date_str}.xlsx"
+        
+        # Create a simple test Excel file
+        test_data = [{"title": "Test Job", "company": "Test Company", "location": "Test Location", "link": "http://test.com", "description": "Test description"}]
+        df = pd.DataFrame(test_data)
+        df.to_excel(filename, index=False)
+        created_files.append(filename)
+    
+    return f"Created test files: {created_files}<br><br><a href='/debug'>Check debug again</a><br><a href='/'>Go back to main page</a>"
+
+
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
