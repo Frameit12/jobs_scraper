@@ -84,10 +84,9 @@ def extract_job_details(driver, url):
 
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
-    print("🔍 Building back to full scraping functionality...")
+    print("🔍 Debugging element selectors...")
     
     options = Options()
-    # === PROVEN MINIMAL CONFIG ===
     options.add_argument("--headless")
     options.add_argument("--no-sandbox") 
     options.add_argument("--disable-dev-shm-usage")
@@ -97,30 +96,54 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     driver = webdriver.Chrome(options=options)
     
     try:
-        # TEST: Can we load efinancialcareers.com homepage?
-        print("🧪 Testing efinancialcareers.com homepage...")
+        print("🧪 Loading efinancialcareers.com...")
         driver.get("https://www.efinancialcareers.com/")
-        print("✅ SUCCESS: efinancialcareers.com loaded!")
+        print("✅ SUCCESS: Page loaded!")
         
-        # TEST: Can we find search fields?
-        print("🧪 Testing search field location...")
-        title_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder='Job title, keyword or company']")
-        location_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder='Location']")
-        print("✅ SUCCESS: Found search fields!")
+        # Wait for page to fully load
+        time.sleep(5)
         
-        # TEST: Can we fill them?
-        print("🧪 Testing form filling...")
-        title_input.send_keys(title)
-        location_input.send_keys(location)
-        print("✅ SUCCESS: Filled search form!")
+        # DEBUG: Check what input elements exist
+        print("🔍 Debugging: Looking for all input elements...")
+        inputs = driver.find_elements(By.TAG_NAME, "input")
+        print(f"Found {len(inputs)} input elements:")
+        for i, inp in enumerate(inputs):
+            placeholder = inp.get_attribute("placeholder") or "No placeholder"
+            inp_type = inp.get_attribute("type") or "No type"
+            print(f"  Input {i}: placeholder='{placeholder}', type='{inp_type}'")
+        
+        # Try different selectors
+        selectors_to_try = [
+            "input[placeholder='Job title, keyword or company']",
+            "input[placeholder*='Job title']",
+            "input[placeholder*='keyword']",
+            "input[name*='title']",
+            "input[name*='search']",
+            "#search-title",
+            ".search-input"
+        ]
+        
+        found_selector = None
+        for selector in selectors_to_try:
+            try:
+                element = driver.find_element(By.CSS_SELECTOR, selector)
+                found_selector = selector
+                print(f"✅ Found element with selector: {selector}")
+                break
+            except:
+                print(f"❌ Selector failed: {selector}")
         
         driver.quit()
-        return [{"title": "efinancialcareers Test Passed", "company": "Chrome Working", "location": location, "link": "#", "description": "Successfully loaded efinancialcareers.com and found search fields"}]
+        
+        if found_selector:
+            return [{"title": "Selector Found", "company": "Success", "location": location, "link": "#", "description": f"Working selector: {found_selector}"}]
+        else:
+            return [{"title": "No Selector Found", "company": "Debug Needed", "location": location, "link": "#", "description": f"Found {len(inputs)} inputs total. Check debug output in logs."}]
         
     except Exception as e:
-        print(f"❌ Test failed at: {str(e)}")
+        print(f"❌ Error: {str(e)}")
         try:
             driver.quit()
         except:
             pass
-        return [{"title": "efinancialcareers Test Failed", "company": "Error", "location": location, "link": "#", "description": f"Failed: {str(e)}"}]
+        return [{"title": "Debug Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
