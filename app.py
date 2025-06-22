@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 import os
 import glob
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.baackground import BackgroundScheduler
 import atexit
 import smtplib
 from email.message import EmailMessage
@@ -60,19 +60,34 @@ def load_config():
 config = load_config()
 init_database()
 
-
 def load_saved_searches():
-    if os.path.exists(HISTORY_FILE):
-        try:
-            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                searches = json.load(f)
-                for s in searches:
-                    if "schedule" not in s:
-                        s["schedule"] = "none"
-                return searches
-        except (FileNotFoundError, json.JSONDecodeError):
-            return []
-    return []
+    engine = get_db_connection()
+    if not engine:
+        return []
+    
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT name, timestamp, criteria, schedule, last_run_date 
+                FROM saved_searches 
+                ORDER BY id DESC 
+                LIMIT 5
+            """))
+            
+            searches = []
+            for row in result:
+                search = {
+                    "name": row[0],
+                    "timestamp": row[1], 
+                    "criteria": row[2],
+                    "schedule": row[3] or "none",
+                    "last_run_date": row[4] or ""
+                }
+                searches.append(search)
+            return searches
+    except Exception as e:
+        print(f"Database error in load_saved_searches: {e}")
+        return []
 
 def check_excel_files_for_searches(searches):
     """Helper function to check which searches have Excel files"""
