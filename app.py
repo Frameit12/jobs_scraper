@@ -58,6 +58,7 @@ def load_config():
         return json.load(f)
 
 config = load_config()
+init_database()
 
 
 def load_saved_searches():
