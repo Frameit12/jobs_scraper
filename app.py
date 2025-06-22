@@ -811,6 +811,20 @@ def debug_full_file():
     except Exception as e:
         return f"Error reading file: {e}"
 
+@app.route("/test_db")
+def test_db():
+    try:
+        engine = get_db_connection()
+        print(f"Engine result: {engine}")
+        if engine:
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT 1"))
+                return "Database connection works!"
+        else:
+            return "No database engine created"
+    except Exception as e:
+        return f"Database error: {e}"
+
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
