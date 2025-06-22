@@ -93,9 +93,10 @@ def load_saved_searches():
             result = conn.execute(text("""
                 SELECT name, timestamp, criteria, schedule, last_run_date 
                 FROM saved_searches 
+                WHERE user_id= :user_id
                 ORDER BY id DESC 
                 LIMIT 5
-            """))
+            """), {"user_id": get_current_user_id()})
             
             searches = []
             for row in result:
@@ -186,13 +187,14 @@ def save_search(name, criteria):
             print("🔍 SAVE_SEARCH DEBUG: Connection established")
             conn.execute(text("""
                 INSERT INTO saved_searches (name, timestamp, criteria, schedule, last_run_date)
-                VALUES (:name, :timestamp, :criteria, :schedule, :last_run_date)
+                VALUES (:name, :timestamp, :criteria, :schedule, :last_run_date, :user_id)
             """), {
                 "name": name,
                 "timestamp": datetime.now().strftime("%d %B %Y"),
                 "criteria": json.dumps(criteria),
                 "schedule": "none",
-                "last_run_date": ""
+                "last_run_date": "",
+                "user_id" : get_current_user_id()
             })
             conn.commit()
             print("🔍 SAVE_SEARCH DEBUG: SQL executed successfully")
