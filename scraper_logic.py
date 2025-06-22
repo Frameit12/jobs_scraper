@@ -84,7 +84,7 @@ def extract_job_details(driver, url):
 
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
-    print("🔍 Debugging element selectors...")
+    print("🔍 Deep debugging: What page are we actually getting?")
     
     options = Options()
     options.add_argument("--headless")
@@ -98,47 +98,30 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     try:
         print("🧪 Loading efinancialcareers.com...")
         driver.get("https://www.efinancialcareers.com/")
-        print("✅ SUCCESS: Page loaded!")
         
-        # Wait for page to fully load
-        time.sleep(5)
+        # Wait longer for dynamic content
+        time.sleep(10)
         
-        # DEBUG: Check what input elements exist
-        print("🔍 Debugging: Looking for all input elements...")
-        inputs = driver.find_elements(By.TAG_NAME, "input")
-        print(f"Found {len(inputs)} input elements:")
-        for i, inp in enumerate(inputs):
-            placeholder = inp.get_attribute("placeholder") or "No placeholder"
-            inp_type = inp.get_attribute("type") or "No type"
-            print(f"  Input {i}: placeholder='{placeholder}', type='{inp_type}'")
+        # DEBUG: Check what we actually got
+        actual_url = driver.current_url
+        page_title = driver.title
+        page_source_length = len(driver.page_source)
         
-        # Try different selectors
-        selectors_to_try = [
-            "input[placeholder='Job title, keyword or company']",
-            "input[placeholder*='Job title']",
-            "input[placeholder*='keyword']",
-            "input[name*='title']",
-            "input[name*='search']",
-            "#search-title",
-            ".search-input"
-        ]
+        print(f"🔍 Current URL: {actual_url}")
+        print(f"🔍 Page title: {page_title}")
+        print(f"🔍 Page source length: {page_source_length}")
+        print(f"🔍 First 500 chars of page source:")
+        print(driver.page_source[:500])
         
-        found_selector = None
-        for selector in selectors_to_try:
-            try:
-                element = driver.find_element(By.CSS_SELECTOR, selector)
-                found_selector = selector
-                print(f"✅ Found element with selector: {selector}")
-                break
-            except:
-                print(f"❌ Selector failed: {selector}")
+        # Check if we're blocked or redirected
+        if "blocked" in page_title.lower() or "access denied" in page_source_length or page_source_length < 1000:
+            status = "Likely blocked or redirected"
+        else:
+            status = "Page loaded normally"
         
         driver.quit()
         
-        if found_selector:
-            return [{"title": "Selector Found", "company": "Success", "location": location, "link": "#", "description": f"Working selector: {found_selector}"}]
-        else:
-            return [{"title": "No Selector Found", "company": "Debug Needed", "location": location, "link": "#", "description": f"Found {len(inputs)} inputs total. Check debug output in logs."}]
+        return [{"title": "Page Debug Info", "company": status, "location": location, "link": "#", "description": f"URL: {actual_url}, Title: {page_title}, Length: {page_source_length}"}]
         
     except Exception as e:
         print(f"❌ Error: {str(e)}")
