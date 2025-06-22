@@ -748,6 +748,15 @@ def debug_files():
     
     return f"<pre>{json.dumps(file_info, indent=2)}</pre>"
 
+@app.route("/debug_full_file")
+def debug_full_file():
+    try:
+        with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            content = f.read()
+        return f"<pre>{content}</pre>"
+    except Exception as e:
+        return f"Error reading file: {e}"
+
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
