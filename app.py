@@ -100,13 +100,19 @@ def check_excel_files_for_searches(searches):
 
 def save_search(name, criteria):
     print(f"🔍 SAVE_SEARCH DEBUG: Attempting to save '{name}'")
+    print(f"🔍 SAVE_SEARCH DEBUG: Criteria: {criteria}")
+    
     engine = get_db_connection()
+    print(f"🔍 SAVE_SEARCH DEBUG: Engine: {engine}")
+    
     if not engine:
         print("❌ SAVE_SEARCH DEBUG: No database connection")
         return
     
+    print("🔍 SAVE_SEARCH DEBUG: About to execute SQL")
     try:
         with engine.connect() as conn:
+            print("🔍 SAVE_SEARCH DEBUG: Connection established")
             conn.execute(text("""
                 INSERT INTO saved_searches (name, timestamp, criteria, schedule, last_run_date)
                 VALUES (:name, :timestamp, :criteria, :schedule, :last_run_date)
@@ -118,6 +124,7 @@ def save_search(name, criteria):
                 "last_run_date": ""
             })
             conn.commit()
+            print("🔍 SAVE_SEARCH DEBUG: SQL executed successfully")
         print(f"✅ SAVE_SEARCH DEBUG: Successfully saved to database")
     except Exception as e:
         print(f"❌ SAVE_SEARCH DEBUG: Database error: {e}")
