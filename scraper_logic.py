@@ -82,30 +82,45 @@ def extract_job_details(driver, url):
         "description": description
     }
 
+
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
-    print("🔍 DEBUGGING: Using minimal Chrome configuration...")
+    print("🔍 Building back to full scraping functionality...")
     
     options = Options()
-    # === MINIMAL PROVEN CONFIGURATION ===
-    options.add_argument("--headless")  # Back to basic headless
+    # === PROVEN MINIMAL CONFIG ===
+    options.add_argument("--headless")
     options.add_argument("--no-sandbox") 
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     
-    print("🌐 Attempting Chrome startup with minimal config...")
+    driver = webdriver.Chrome(options=options)
     
     try:
-        driver = webdriver.Chrome(options=options)
-        print("✅ SUCCESS: Chrome started with minimal config!")
+        # TEST: Can we load efinancialcareers.com homepage?
+        print("🧪 Testing efinancialcareers.com homepage...")
+        driver.get("https://www.efinancialcareers.com/")
+        print("✅ SUCCESS: efinancialcareers.com loaded!")
         
-        # Simple test
-        driver.get("https://httpbin.org/get")
-        print("✅ SUCCESS: Loaded test page!")
+        # TEST: Can we find search fields?
+        print("🧪 Testing search field location...")
+        title_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder='Job title, keyword or company']")
+        location_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder='Location']")
+        print("✅ SUCCESS: Found search fields!")
+        
+        # TEST: Can we fill them?
+        print("🧪 Testing form filling...")
+        title_input.send_keys(title)
+        location_input.send_keys(location)
+        print("✅ SUCCESS: Filled search form!")
         
         driver.quit()
-        return [{"title": "Minimal Config Success", "company": "Chrome Working", "location": location, "link": "#", "description": "Chrome started successfully with basic configuration"}]
+        return [{"title": "efinancialcareers Test Passed", "company": "Chrome Working", "location": location, "link": "#", "description": "Successfully loaded efinancialcareers.com and found search fields"}]
         
     except Exception as e:
-        print(f"❌ FAILED even with minimal config: {e}")
-        return [{"title": "Minimal Config Failed", "company": "Error", "location": location, "link": "#", "description": f"Even basic Chrome config failed: {str(e)}"}]
+        print(f"❌ Test failed at: {str(e)}")
+        try:
+            driver.quit()
+        except:
+            pass
+        return [{"title": "efinancialcareers Test Failed", "company": "Error", "location": location, "link": "#", "description": f"Failed: {str(e)}"}]
