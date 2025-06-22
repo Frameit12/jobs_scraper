@@ -46,6 +46,15 @@ def load_saved_searches():
             return []
     return []
 
+def check_excel_files_for_searches(searches):
+    """Helper function to check which searches have Excel files"""
+    for search in searches:
+        safe_name = search["name"].replace(" ", "_")
+        pattern = os.path.join("scheduled_results", f"{safe_name}_*.xlsx")
+        matching_files = glob.glob(pattern)
+        search["has_excel"] = len(matching_files) > 0
+    return searches
+
 def save_search(name, criteria):
     history = load_saved_searches()
     entry = {
@@ -322,12 +331,7 @@ def index():
                 save_search(search_name, criteria)
                 info = f"✅ Search saved as: {search_name}"
             
-            saved_searches = load_saved_searches()
-            for search in saved_searches:
-                safe_name = search["name"].replace(" ", "_")
-                pattern = os.path.join("scheduled_results", f"{safe_name}_*.xlsx")
-                search["has_excel"] = len(glob.glob(pattern)) > 0
-
+            saved_searches = check_excel_files_for_searches(load_saved_searches())
             return render_template("index.html", info=info, jobs=last_results, title=title, location=location, max_jobs=max_jobs, saved_searches=saved_searches)
             
         print(f"🔍 FLASK DEBUG: About to call scraper with seniority='{seniority}', type={type(seniority)}")
@@ -361,17 +365,7 @@ def index():
         last_search_name = title if title else "Job_Search"
         return render_template("index.html", jobs=jobs, title=title, location=location, max_jobs=max_jobs, saved_searches=load_saved_searches())
     
-    saved_searches = load_saved_searches()
-    for search in saved_searches:
-        safe_name = search["name"].replace(" ", "_")
-        pattern = os.path.join("scheduled_results", f"{safe_name}_*.xlsx")
-        matching_files = glob.glob(pattern)
-        search["has_excel"] = len(matching_files) > 0
-        print(f"🔍 DEBUG: Search '{search['name']}' -> pattern: {pattern}")
-        print(f"🔍 DEBUG: Found files: {matching_files}")
-        print(f"🔍 DEBUG: has_excel = {search['has_excel']}")
-
-
+    saved_searches = check_excel_files_for_searches(load_saved_searches())
     print("✅ Saved searches and their Excel status:")
     for s in saved_searches:
         print(f"- {s['name']}: has_excel = {s.get('has_excel')}")
@@ -381,17 +375,7 @@ def index():
 
 @app.route("/load_search/<int:index>")
 def load_saved_search(index):
-    
-    import os
-    import glob
-
-    searches = load_saved_searches()
-    for search in searches:
-        safe_name = search["name"].replace(" ", "_")
-        pattern = os.path.join("scheduled_results", f"{safe_name}_*.xlsx")
-        matching_files = glob.glob(pattern)
-        search["has_excel"] = len(matching_files) > 0
-
+    searches = check_excel_files_for_searches(load_saved_searches())
 
     if 0 <= index < len(searches):
         criteria = searches[index]["criteria"]
@@ -588,7 +572,7 @@ def rename_saved_search(index):
             title="",
             location="",
             max_jobs=10,
-            saved_searches=load_saved_searches(),
+            saved_searches=check_excel_files_for_searches(load_saved_searches()),
             active_search_name=f"{last_search_name} – {datetime.now().strftime('%d %B %Y')}",
             timestamp=datetime.now().strftime("%d %B %Y")
         )
@@ -643,13 +627,7 @@ def api_saved_searches():
 
 @app.route("/saved_searches_partial")
 def saved_searches_partial():
-    import os
-    import glob
-    searches = load_saved_searches()
-    for search in searches:
-        safe_name = search["name"].replace(" ", "_")
-        pattern = os.path.join("scheduled_results", f"{safe_name}_*.xlsx")
-        search["has_excel"] = len(glob.glob(pattern)) > 0
+    searches = check_excel_files_for_searches(load_saved_searches())
     return render_template("partials/saved_searches.html", saved_searches=searches)
 
 
@@ -771,4 +749,3 @@ if __name__ == "__main__":
         atexit.register(lambda: scheduler.shutdown())
 
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-
