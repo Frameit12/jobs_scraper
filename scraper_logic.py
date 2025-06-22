@@ -105,16 +105,17 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
         # DEBUG: Check what we actually got
         actual_url = driver.current_url
         page_title = driver.title
-        page_source_length = len(driver.page_source)
+        page_source = driver.page_source
+        page_source_length = len(page_source)
         
         print(f"🔍 Current URL: {actual_url}")
         print(f"🔍 Page title: {page_title}")
         print(f"🔍 Page source length: {page_source_length}")
         print(f"🔍 First 500 chars of page source:")
-        print(driver.page_source[:500])
+        print(page_source[:500])
         
-        # Check if we're blocked or redirected
-        if "blocked" in page_title.lower() or "access denied" in page_source_length or page_source_length < 1000:
+        # Check if we're blocked or redirected  
+        if "blocked" in page_title.lower() or "access denied" in page_source.lower() or page_source_length < 1000:
             status = "Likely blocked or redirected"
         else:
             status = "Page loaded normally"
