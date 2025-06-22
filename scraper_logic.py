@@ -83,20 +83,84 @@ def extract_job_details(driver, url):
     }
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
-    print("🔍 Testing what data we actually get in Railway environment...")
+    print("🔍 REAL SCRAPING TEST: Function called with parameters:")
+    print(f"  - title: '{title}'")
+    print(f"  - location: '{location}'") 
+    print(f"  - max_jobs: {max_jobs}")
+    print(f"  - seniority: '{seniority}'")
     
-    # Test with the data pattern that's probably happening
-    test_jobs = [
-        {"title": "Complete Job", "company": "Test Corp", "location": location, "link": "#", "description": "This job has a description"},
-        {"title": "Incomplete Job", "company": "Test Corp", "location": location, "link": "#"},  # Missing description
-        {"title": "Another Job", "company": "Banking Inc", "location": location, "link": "#", "description": ""}  # Empty description
-    ]
+    if not title or not location:
+        return [{"error": "Please enter both job title and location"}]
     
-    print(f"🔍 Returning {len(test_jobs)} test jobs with different data completeness")
-    for i, job in enumerate(test_jobs):
-        print(f"Job {i+1} keys: {list(job.keys())}")
-        print(f"Job {i+1} description present: {'description' in job}")
-        if 'description' in job:
-            print(f"Job {i+1} description length: {len(job['description'])}")
-    
-    return test_jobs
+    try:
+        print("🌐 Launching browser...")
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        
+        driver = webdriver.Chrome(options=options)
+        driver.set_page_load_timeout(45)
+        
+        print("🌐 Navigating to efinancialcareers...")
+        driver.get("https://www.efinancialcareers.com/")
+        time.sleep(5)
+        
+        print("📝 Filling search form...")
+        title_input = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Job title, keyword or company']"))
+        )
+        title_input.send_keys(title)
+        
+        location_input = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Location']"))
+        )
+        location_input.send_keys(location)
+        
+        search_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
+        search_button.click()
+        
+        print("⏳ Waiting for search results...")
+        time.sleep(8)
+        
+        # Get job cards
+        job_cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+        print(f"🔍 Found {len(job_cards)} job cards")
+        
+        # Take just first 2 jobs for testing
+        results = []
+        for i, card in enumerate(job_cards[:2]):
+            try:
+                job_title = card.text.strip()
+                job_link = card.get_attribute("href")
+                
+                print(f"📋 Processing job {i+1}: {job_title}")
+                
+                # For now, create basic job data (we'll add description extraction later)
+                job = {
+                    "title": job_title if job_title else f"Job {i+1}",
+                    "company": "Company Name", # We'll extract this later
+                    "location": location,
+                    "link": job_link if job_link else "#",
+                    "description": f"Job description for {job_title}" # Placeholder for now
+                }
+                
+                results.append(job)
+                print(f"✅ Added job {i+1}")
+                
+            except Exception as e:
+                print(f"❌ Error processing job {i+1}: {e}")
+                continue
+                
+        driver.quit()
+        print(f"🎉 Successfully scraped {len(results)} jobs")
+        return results
+        
+    except Exception as e:
+        print(f"❌ Scraping failed: {e}")
+        try:
+            driver.quit()
+        except:
+            pass
+        return [{"title": "Error", "company": "System", "location": location, "link": "#", "description": f"Scraping failed: {str(e)[:100]}"}]
