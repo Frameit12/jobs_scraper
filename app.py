@@ -435,6 +435,10 @@ def send_email_with_attachment(subject, body, attachment_path, config):
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+        
     global last_results
     jobs = []
     if request.method == "POST":
