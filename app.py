@@ -330,7 +330,7 @@ def index():
                     "seniority": request.form.get("seniority", "")
                 }
                 if form_location:
-                    formatted_name = f"{search_name} - {location}"
+                    formatted_name = f"{search_name} - {form_location}"
                 else:
                     formatted_name = search_name
                 save_search(formatted_name, criteria)                
