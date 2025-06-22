@@ -121,6 +121,54 @@ def check_excel_files_for_searches(searches):
         search["has_excel"] = len(matching_files) > 0
     return searches
 
+def create_user(username, password):
+    engine = get_db_connection()
+    if not engine:
+        return False
+    
+    try:
+        password_hash = generate_password_hash(password)
+        with engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO users (username, password_hash)
+                VALUES (:username, :password_hash)
+            """), {
+                "username": username,
+                "password_hash": password_hash
+            })
+            conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        return False
+
+def verify_user(username, password):
+    engine = get_db_connection()
+    if not engine:
+        return None
+    
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, password_hash FROM users WHERE username = :username
+            """), {"username": username})
+            
+            user = result.fetchone()
+            if user and check_password_hash(user[1], password):
+                return user[0]  # Return user_id
+        return None
+    except Exception as e:
+        print(f"Error verifying user: {e}")
+        return None
+
+def get_current_user_id():
+    return session.get('user_id')
+
+def require_login():
+    if not get_current_user_id():
+        return redirect('/login')
+    return None
+
 def save_search(name, criteria):
     print(f"🔍 SAVE_SEARCH DEBUG: Attempting to save '{name}'")
     print(f"🔍 SAVE_SEARCH DEBUG: Criteria: {criteria}")
