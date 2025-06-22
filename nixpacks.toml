@@ -1,0 +1,6 @@
+[phases.setup]
+aptPkgs = ["chromium", "chromium-driver"]
+
+[variables]
+CHROME_BIN = "/usr/bin/chromium"
+CHROMEDRIVER_PATH = "/usr/bin/chromedriver"
