@@ -76,19 +76,6 @@ def save_search(name, criteria):
     except Exception as e:
         print(f"❌ SAVE_SEARCH DEBUG: Failed to write file: {e}")
 
-    history = load_saved_searches()
-    entry = {
-        "name": name,
-        "timestamp": datetime.now().strftime("%d %B %Y"),
-        "criteria": criteria,
-        "schedule": "none"
-    }
-    history.insert(0, entry)
-    history = history[:5]  # Keep only 5 most recent
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(history, f, indent=2)
-
-
 def save_results_for_search(name, results):
     # Create folder if not exists
     os.makedirs("scheduled_results", exist_ok=True)
