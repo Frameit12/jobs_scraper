@@ -13,7 +13,34 @@ import smtplib
 from email.message import EmailMessage
 from zipfile import ZipFile
 from openpyxl import Workbook
+import os
+import psycopg2
+from sqlalchemy import create_engine, text
+import json
 
+# Database setup
+def get_db_connection():
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        engine = create_engine(database_url)
+        return engine
+    return None
+
+def init_database():
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS saved_searches (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    timestamp VARCHAR(50) NOT NULL,
+                    criteria JSONB NOT NULL,
+                    schedule VARCHAR(50) DEFAULT 'none',
+                    last_run_date VARCHAR(50) DEFAULT ''
+                )
+            """))
+            conn.commit()
 
 
 
