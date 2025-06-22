@@ -329,7 +329,7 @@ def index():
                     "max_jobs": max_jobs,
                     "seniority": request.form.get("seniority", "")
                 }
-                if form_ocation:
+                if form_location:
                     formatted_name = f"{search_name} - {location}"
                 else:
                     formatted_name = search_name
