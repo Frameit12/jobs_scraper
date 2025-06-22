@@ -322,14 +322,14 @@ def index():
             if not search_name:
                 info = "⚠️ Please enter a name for your saved search."
             else:
+                form_location = request.form.get("location", "").strip()
                 criteria = {
-                    "title": title,
-                    "location": location,
+                    "title": request.form.get("title", ""),
+                    "location": form_location,
                     "max_jobs": max_jobs,
-                    "seniority": seniority
+                    "seniority": request.form.get("seniority", "")
                 }
-                location = request.form.get("location", "").strip()
-                if location:
+                if form_ocation:
                     formatted_name = f"{search_name} - {location}"
                 else:
                     formatted_name = search_name
