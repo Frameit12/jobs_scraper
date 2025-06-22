@@ -825,6 +825,16 @@ def test_db():
     except Exception as e:
         return f"Database error: {e}"
 
+@app.route("/debug_env")
+def debug_env():
+    import os
+    db_vars = {}
+    for key, value in os.environ.items():
+        if any(word in key.upper() for word in ['DATABASE', 'POSTGRES', 'PG']):
+            db_vars[key] = value[:20] + "..." if len(value) > 20 else value
+    return f"<pre>{json.dumps(db_vars, indent=2)}</pre>"
+
+
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
         scheduler = BackgroundScheduler()
