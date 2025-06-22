@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>eFinancialCareers Job Search Results</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
+        }        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            vertical-align: top;
+        }
+        .description-container {
+            max-height: 120px;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .description-container.expanded {
+            max-height: none;
+        }
+        .toggle {
+            color: blue;
+            cursor: pointer;
+        }
+        input.column-filter {
+            width: 100%;
+            padding: 4px;
+            box-sizing: border-box;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <div class="bg-slate-800 text-white p-6 mb-8">
+        <div class="max-w-7xl mx-auto">
+            <h1 class="text-3xl font-bold">FinanceJobs Pro</h1>
+            <p class="text-slate-300 mt-2">Professional job search for finance careers</p>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6">
+        <!-- TOP ROW: Search form and saved searches side by side -->
+        <div class="grid grid-cols-2 gap-8 mb-8">
+            
+            <!-- LEFT CARD: Search Filters -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
+                    <svg class="w-6 h-6 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.707A1 1 0 013 7V4z"></path>
+                    </svg>
+                    Search Filters
+                </h2>
+                
+                <form method="POST">
+                    <div style="margin-bottom: 10px;">
+                        <label for="title" style="display: block; font-weight: bold;">Job Title or Keyword:</label>
+                        <input type="text" id="title" name="title" value="{{ title }}" placeholder="e.g. Risk & Control" style="width: 100%; padding: 8px;">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label for="location" style="display: block; font-weight: bold;">Location:</label>
+                        <input type="text" id="location" name="location" value="{{ location }}" placeholder="e.g. New York" style="width: 100%; padding: 8px;">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                      <label for="seniority" style="display: block; font-weight: bold;">Seniority Level:</label>
+                      <select id="seniority" name="seniority" style="width: 100%; padding: 8px;">
+                        <option value="">All Levels</option>
+                        <option value="intern" {{ 'selected' if seniority == 'intern' else '' }}>Intern/Graduate</option>
+                        <option value="junior" {{ 'selected' if seniority == 'junior' else '' }}>Junior</option>
+                        <option value="analyst" {{ 'selected' if seniority == 'analyst' else '' }}>Analyst</option>
+                        <option value="associate" {{ 'selected' if seniority == 'associate' else '' }}>Associate/Mid Level</option>
+                        <option value="avp" {{ 'selected' if seniority == 'avp' else '' }}>AVP/Senior</option>
+                        <option value="vp" {{ 'selected' if seniority == 'vp' else '' }}>Vice President/Principal</option>
+                        <option value="svp" {{ 'selected' if seniority == 'svp' else '' }}>Senior Vice President/Head Of</option>
+                        <option value="director" {{ 'selected' if seniority == 'director' else '' }}>Director</option>
+                        <option value="md" {{ 'selected' if seniority == 'md' else '' }}>Managing Director</option>
+                        <option value="csuite" {{ 'selected' if seniority == 'csuite' else '' }}>C Suite</option>
+                      </select>
+                    </div>  
+
+                    <div style="margin-bottom: 10px;">
+                        <label for="max_jobs" style="display: block; font-weight: bold;">
+                          Number of Search Results:
+                          <span style="font-size: 12px; font-style: italic; color: #555;">(Max: 50)</span>
+                        </label>
+                        <input type="number" id="max_jobs" name="max_jobs" min="1" max="50" value="{{ max_jobs }}" style="width: 100px; padding: 8px;">
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <label for="search_name" style="display: block; font-weight: bold;">Name this search:</label>
+                        <input type="text" id="search_name" name="search_name" placeholder="e.g., NY AI Jobs" style="padding: 8px; width: 100%;">
+                        {% if info %}
+                            <p style="color: red; font-size: 14px; margin-top: 4px;">{{ info }}</p>
+                        {% endif %}
+                    </div>
+
+                    <button type="submit" name="action" value="run" class="btn btn-primary" style="padding: 10px 20px;">🔍 Run Search</button>
+                    <button type="submit" name="action" value="save" class="btn btn-secondary" style="padding: 10px 20px; margin-left: 10px;">💾 Save This Search</button>
+                </form>
+            </div>
+
+            <!-- RIGHT CARD: Saved Searches -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
+                    <svg class="w-6 h-6 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                    </svg>
+                    Saved Searches
+                </h2>
+                
+                <p style="font-size: 12px; color: #666; margin-bottom: 16px;">
+                  Only the 5 most recent searches are shown.
+                </p>
+                
+                <div id="saved-searches-list">
+                  {% include 'partials/saved_searches.html' %}
+                </div>
+
+                <form method="POST" action="/download_selected" id="multi-download-form">
+                  <button type="submit"
+                          style="margin-top: 12px; padding: 6px 12px; font-size: 14px; background-color: #002060; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                      📥 Download Selected Files
+                  </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- BOTTOM ROW: Search Results full width -->
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center">
+                <svg class="w-6 h-6 mr-3 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                </svg>
+                Search Results
+            </h2>
+
+            {% if active_search_name %}
+                <p style="margin-top: -10px; color: #444;">
+                    Showing results from saved search: <strong style="color: #002060;">{{ active_search_name }} - {{ timestamp }}</strong>
+                </p>
+            {% endif %}
+
+            {% if jobs %}
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Job Title</th>
+                        <th>Company</th>
+                        <th>Location</th>
+                        <th>Job Description</th>
+                        <th>Link</th>
+                    </tr>
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        <th><input class="column-filter" type="text" placeholder="Filter Company..." onkeyup="filterTable(2, this.value)"></th>
+                        <th><input class="column-filter" type="text" placeholder="Filter Location..." onkeyup="filterTable(3, this.value)"></th>
+                        <th><input class="column-filter" type="text" placeholder="Filter Description..." onkeyup="filterTable(4, this.value)"></th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in jobs %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ job.title }}</td>
+                        <td>{{ job.company }}</td>
+                        <td>{{ job.location }}</td>
+                        <td>
+                            <div class="description-container">
+                                {{ job.formatted_description | safe }}
+                            </div>
+                            {% if job.description|length > 1000 %}
+                            <div>
+                                <a class="toggle" onclick="toggleMore(this)">Show more</a>
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td><a href="{{ job.link }}" target="_blank">View Job</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <form method="POST" action="/download" style="margin-top: 20px; text-align: right;">
+                <button type="submit" style="
+                    padding: 10px 24px;
+                    font-size: 16px;
+                    font-weight: 600;
+                    background-color: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    cursor: pointer;
+                ">
+                    📥 Download Excel
+                </button>
+            </form>
+
+            {% elif jobs is defined and jobs|length == 0 %}
+                <p>No jobs found.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function toggleMore(el) {
+            const container = el.closest('td').querySelector('.description-container');
+            container.classList.toggle('expanded');
+            el.textContent = container.classList.contains('expanded') ? 'Show less' : 'Show more';
+        }
+
+        function filterTable(colIndex, query) {
+            const table = document.getElementById("resultsTable");
+            const rows = table.getElementsByTagName("tbody")[0].getElementsByTagName("tr");
+            query = query.toLowerCase().trim();
+
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const cell = rows[i].getElementsByTagName("td")[colIndex];
+                const text = cell.innerText || cell.textContent;
+                row.style.display = text.toLowerCase().includes(query) ? "" : "none"; 
+            }
+        }
+    </script>
+
+    <script>
+      function toggleRename(index) {
+        const form = document.getElementById("rename-form-" + index);
+        form.style.display = form.style.display === "none" ? "block" : "none";
+      }
+    </script>
+
+    <script>
+    function toggleSchedule(index) {
+      const el = document.getElementById('schedule-form-' + index);
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function saveSchedule(index, frequency) {
+      fetch('/save_schedule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `search_index=${index}&frequency=${frequency}`
+      })
+      .then(response => {
+        if (response.ok) {
+          const confirm = document.getElementById('confirm-' + index);
+          confirm.style.display = 'inline';
+          setTimeout(() => confirm.style.display = 'none', 1500);
+
+          // Refresh the saved searches to show updated frequency
+          setTimeout(() => {
+            refreshSavedSearches();
+          }, 500);  
+        } else {
+          alert('Failed to save schedule.');
+        }
+      });
+    }
+    </script>
+
+    <script>
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.innerHTML = `<strong>✅ Download Ready</strong><br><span style="font-size: 12px;">${message}</span>`;
+      toast.style.background = "#e6ffed";
+      toast.style.color = "#006400";
+      toast.style.padding = "10px 16px";
+      toast.style.marginTop = "10px";
+      toast.style.borderRadius = "8px";
+      toast.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.1)";
+      toast.style.fontFamily = "'Open Sans', sans-serif";
+      toast.style.fontSize = "13px";
+      toast.style.opacity = "0";
+      toast.style.transition = "opacity 0.4s ease";
+      
+      const container = document.getElementById('toast-container');
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = "1";
+      }, 100);
+
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 500);
+      }, 4000);
+    }
+    </script>
+
+    <script>
+      const dismissMessages = new Set();
+      let checkedSearches = new Set();
+
+      function dismissDownloadMsg(index) {
+        dismissMessages.add(index);
+        const el = document.getElementById('download-msg-' + index);
+        if (el) el.style.display = 'none';
+      }
+
+      function refreshSavedSearches() {
+        checkedSearches.clear();
+        document.querySelectorAll('.download-checkbox:checked').forEach(cb => {
+          checkedSearches.add(cb.value);
+        });
+
+        const checkedValues = Array.from(document.querySelectorAll('.download-checkbox:checked'))
+                                 .map(cb => cb.value);
+        
+        fetch('/saved_searches_partial')
+          .then(response => response.text())
+          .then(html => {
+            const container = document.getElementById('saved-searches-list');
+            container.innerHTML = html;
+
+            checkedSearches.forEach(name => {
+              const restored = container.querySelector(`.download-checkbox[value="${name}"]`);
+              if (restored) restored.checked = true;
+            });
+
+            dismissMessages.forEach(index => {
+              const el = document.getElementById('download-msg-' + index);
+              if (el) el.style.display = 'none';
+            });
+          })
+          .catch(error => console.error('Error refreshing saved searches:', error));
+      }
+    </script>
+
+    <script>
+    function deleteSearch(index) {
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/delete_saved_search';
+
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'index';
+      input.value = index;
+
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
+    }
+    </script>
+
+    <script>
+    document.getElementById('multi-download-form').addEventListener('submit', function(e) {
+      this.querySelectorAll('input[name="selected_files"]').forEach(input => input.remove());
+      
+      const checkedBoxes = document.querySelectorAll('.download-checkbox:checked');
+      
+      checkedBoxes.forEach(checkbox => {
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'selected_files';
+        hiddenInput.value = checkbox.value;
+        this.appendChild(hiddenInput);
+      });
+      
+      console.log('Form submitting with', checkedBoxes.length, 'selected files');
+    });
+    </script>
+
+</body>
+</html>
