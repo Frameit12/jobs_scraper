@@ -55,7 +55,27 @@ def check_excel_files_for_searches(searches):
         search["has_excel"] = len(matching_files) > 0
     return searches
 
+
 def save_search(name, criteria):
+    print(f"🔍 SAVE_SEARCH DEBUG: Attempting to save '{name}'")
+    history = load_saved_searches()
+    print(f"🔍 SAVE_SEARCH DEBUG: Loaded {len(history)} existing searches")
+    entry = {
+        "name": name,
+        "timestamp": datetime.now().strftime("%d %B %Y"),
+        "criteria": criteria,
+        "schedule": "none"
+    }
+    history.insert(0, entry)
+    history = history[:5]  # Keep only 5 most recent
+    print(f"🔍 SAVE_SEARCH DEBUG: About to write {len(history)} searches to file")
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2)
+        print(f"✅ SAVE_SEARCH DEBUG: Successfully wrote to {HISTORY_FILE}")
+    except Exception as e:
+        print(f"❌ SAVE_SEARCH DEBUG: Failed to write file: {e}")
+
     history = load_saved_searches()
     entry = {
         "name": name,
@@ -745,6 +765,35 @@ def clean_test_files():
         except:
             pass
     return f"Deleted {deleted_count} test files. <br><br><a href='/debug'>Check debug again</a><br><a href='/'>Go back to main page</a>"
+
+
+@app.route("/debug_files")
+def debug_files():
+    import os
+    import stat
+    
+    file_info = {}
+    
+    if os.path.exists(HISTORY_FILE):
+        file_stats = os.stat(HISTORY_FILE)
+        file_info = {
+            "exists": True,
+            "size": file_stats.st_size,
+            "permissions": oct(file_stats.st_mode),
+            "modified": datetime.fromtimestamp(file_stats.st_mtime).strftime("%d %B %Y %H:%M:%S")
+        }
+        
+        # Try to read the current content
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                content = f.read()
+                file_info["content_preview"] = content[:500]
+        except Exception as e:
+            file_info["read_error"] = str(e)
+    else:
+        file_info = {"exists": False}
+    
+    return f"<pre>{json.dumps(file_info, indent=2)}</pre>"
 
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
