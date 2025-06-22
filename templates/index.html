@@ -183,48 +183,49 @@
                 </form>
             </div>
 
-            <table id="resultsTable">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Job Title</th>
-                        <th>Company</th>
-                        <th>Location</th>
-                        <th>Job Description</th>
-                        <th>Link</th>
-                    </tr>
-                    <tr>
-                        <th></th>
-                        <th></th>
-                        <th><input class="column-filter" type="text" placeholder="Filter Company..." onkeyup="filterTable(2, this.value)"></th>
-                        <th><input class="column-filter" type="text" placeholder="Filter Location..." onkeyup="filterTable(3, this.value)"></th>
-                        <th><input class="column-filter" type="text" placeholder="Filter Description..." onkeyup="filterTable(4, this.value)"></th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for job in jobs %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td>{{ job.title }}</td>
-                        <td>{{ job.company }}</td>
-                        <td>{{ job.location }}</td>
-                        <td>
-                            <div class="description-container">
-                                {{ job.formatted_description | safe }}
-                            </div>
-                            {% if job.description|length > 1000 %}
-                            <div>
-                                <a class="toggle" onclick="toggleMore(this)">Show more</a>
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td><a href="{{ job.link }}" target="_blank">View Job</a></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
+            <div style="overflow-x: auto; margin-bottom: 20px;">
+                <table id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Job Title</th>
+                            <th>Company</th>
+                            <th>Location</th>
+                            <th>Job Description</th>
+                            <th>Link</th>
+                        </tr>
+                        <tr>
+                            <th></th>
+                            <th></th>
+                            <th><input class="column-filter" type="text" placeholder="Filter Company..." onkeyup="filterTable(2, this.value)"></th>
+                            <th><input class="column-filter" type="text" placeholder="Filter Location..." onkeyup="filterTable(3, this.value)"></th>
+                            <th><input class="column-filter" type="text" placeholder="Filter Description..." onkeyup="filterTable(4, this.value)"></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in jobs %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ job.title }}</td>
+                            <td>{{ job.company }}</td>
+                            <td>{{ job.location }}</td>
+                            <td>
+                                <div class="description-container">
+                                    {{ job.formatted_description | safe }}
+                                </div>
+                                {% if job.description|length > 1000 %}
+                                <div>
+                                    <a class="toggle" onclick="toggleMore(this)">Show more</a>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td><a href="{{ job.link }}" target="_blank">View Job</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
             <form method="POST" action="/download" style="margin-top: 20px; text-align: right;">
                 <button type="submit" style="
                     padding: 10px 24px;
