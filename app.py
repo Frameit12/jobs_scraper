@@ -693,6 +693,36 @@ def download_selected():
     zip_buffer.seek(0)
     return send_file(zip_buffer, as_attachment=True, download_name="Selected_Results.zip", mimetype="application/zip")
 
+@app.route("/debug")
+def debug_files():
+    import os
+    import glob
+    
+    # Check if scheduled_results folder exists
+    folder_exists = os.path.exists("scheduled_results")
+    folder_contents = os.listdir("scheduled_results") if folder_exists else []
+    
+    searches = load_saved_searches()
+    debug_info = []
+    
+    for search in searches:
+        safe_name = search["name"].replace(" ", "_")
+        pattern = os.path.join("scheduled_results", f"{safe_name}_*.xlsx")
+        matching_files = glob.glob(pattern)
+        debug_info.append({
+            "name": search["name"],
+            "pattern": pattern,
+            "found_files": matching_files,
+            "has_excel": len(matching_files) > 0
+        })
+    
+    return f"""
+    <h3>Debug Info:</h3>
+    <p>Folder exists: {folder_exists}</p>
+    <p>Folder contents: {folder_contents}</p>
+    <h4>Search patterns:</h4>
+    {"<br>".join([f"{d['name']}: {d['pattern']} -> {d['found_files']} (has_excel: {d['has_excel']})" for d in debug_info])}
+    """
 
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
