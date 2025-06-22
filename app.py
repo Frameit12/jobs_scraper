@@ -331,8 +331,17 @@ def index():
             return render_template("index.html", info=info, jobs=last_results, title=title, location=location, max_jobs=max_jobs, saved_searches=saved_searches)
             
         print(f"🔍 FLASK DEBUG: About to call scraper with seniority='{seniority}', type={type(seniority)}")
-        jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
-
+        
+        try:
+            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
+        except Exception as e:
+            print(f"❌ SCRAPING ERROR: {str(e)}")
+            print(f"❌ ERROR TYPE: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
+            jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
+        
+       
         for job in jobs:
             print("🔍 RAW job keys:", list(job.keys()))
             print("📌 Raw company before any changes:", job.get("company", "❌ MISSING"))
@@ -392,8 +401,15 @@ def load_saved_search(index):
         except (ValueError, TypeError):
             max_jobs = 50
 
-        jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
-
+        try:
+            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
+        except Exception as e:
+            print(f"❌ LOAD SEARCH ERROR: {str(e)}")
+            print(f"❌ ERROR TYPE: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
+            jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
+        
         global last_results
         last_results = jobs
 
