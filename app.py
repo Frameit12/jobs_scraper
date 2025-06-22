@@ -341,7 +341,7 @@ def index():
             if not job.get("company"):
                 job["company"] = "[Not Found]"
 
-            job["formatted_description"] = job["description"]
+            job["formatted_description"] = job.get("description", "Description not available")
 
             print("✅ Final company value:", job["company"])
             print("📦 FORMATTED DESCRIPTION SENT TO TEMPLATE:\n", job["formatted_description"][:500])
