@@ -11,12 +11,24 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
         th, td {
             border: 1px solid #ccc;
             padding: 8px;
             vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
+
+        /* Column width controls */
+        th:nth-child(1), td:nth-child(1) { width: 5%; }    /* # */
+        th:nth-child(2), td:nth-child(2) { width: 20%; }   /* Job Title */
+        th:nth-child(3), td:nth-child(3) { width: 15%; }   /* Company */
+        th:nth-child(4), td:nth-child(4) { width: 12%; }   /* Location */
+        th:nth-child(5), td:nth-child(5) { width: 40%; }   /* Job Description */
+        th:nth-child(6), td:nth-child(6) { width: 8%; }    /* Link */
+        
         .description-container {
             max-height: 120px;
             overflow: hidden;
@@ -183,8 +195,8 @@
                 </form>
             </div>
 
-            <div style="overflow-x: auto; margin-bottom: 20px;">
-                <table id="resultsTable">
+            
+                <table id="resultsTable" style="table-layout: fixed; margin-bottom: 20px;">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -225,7 +237,7 @@
                         {% endfor %}
                     </tbody>
                 </table>
-            </div>
+            
             <form method="POST" action="/download" style="margin-top: 20px; text-align: right;">
                 <button type="submit" style="
                     padding: 10px 24px;
