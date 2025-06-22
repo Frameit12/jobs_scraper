@@ -508,7 +508,49 @@ def index():
         print(f"- {s['name']}: has_excel = {s.get('has_excel')}")
 
     return render_template("index.html", title="", location="", max_jobs=10, saved_searches=saved_searches)
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        
+        if not username or not password:
+            return render_template("login.html", error="Please enter both username and password")
+        
+        user_id = verify_user(username, password)
+        if user_id:
+            session['user_id'] = user_id
+            session['username'] = username
+            return redirect("/")
+        else:
+            return render_template("login.html", error="Invalid username or password")
     
+    return render_template("login.html")
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        
+        if not username or not password:
+            return render_template("signup.html", error="Please enter both username and password")
+        
+        if len(password) < 6:
+            return render_template("signup.html", error="Password must be at least 6 characters")
+        
+        if create_user(username, password):
+            return render_template("login.html", success="Account created! Please log in.")
+        else:
+            return render_template("signup.html", error="Username already exists")
+    
+    return render_template("signup.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 
 @app.route("/load_search/<int:index>")
 def load_saved_search(index):
