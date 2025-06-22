@@ -365,7 +365,12 @@ def index():
     for search in saved_searches:
         safe_name = search["name"].replace(" ", "_")
         pattern = os.path.join("scheduled_results", f"{safe_name}_*.xlsx")
-        search["has_excel"] = len(glob.glob(pattern)) > 0
+        matching_files = glob.glob(pattern)
+        search["has_excel"] = len(matching_files) > 0
+        print(f"🔍 DEBUG: Search '{search['name']}' -> pattern: {pattern}")
+        print(f"🔍 DEBUG: Found files: {matching_files}")
+        print(f"🔍 DEBUG: has_excel = {search['has_excel']}")
+
 
     print("✅ Saved searches and their Excel status:")
     for s in saved_searches:
