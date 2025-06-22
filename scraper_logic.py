@@ -22,7 +22,7 @@ def wait_for_full_description(driver, selector, min_length=500, timeout=15):
 
 def extract_job_details(driver, url):
     driver.get(url)
-    print(f"\n🌐 Visiting: {url}")
+    print(f"\n Visiting: {url}")
 
     try:
         title = WebDriverWait(driver, 10).until(
@@ -83,57 +83,158 @@ def extract_job_details(driver, url):
     }
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
-    if not title or not location:
-        return [{"error": "Please enter both job title and location"}]
+    print("🔍 BASIC DEBUG: Function called with parameters:")
+    print(f"  - title: '{title}'")
+    print(f"  - location: '{location}'") 
+    print(f"  - max_jobs: {max_jobs}")
+    print(f"  - seniority: '{seniority}'")
+    print(f"  - seniority type: {type(seniority)}")
+    print(f"  - seniority is empty: {seniority == ''}")
+    print(f"  - seniority is None: {seniority is None}")
     
-    try:
-        print("🔧 Testing Fix #2: Selenium Connection Stability...")
-        
-        from selenium.webdriver.chrome.service import Service
-        
-        
-        options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        
-        # NEW: Connection stability fixes
-        options.add_argument("--remote-debugging-port=0")  # Let Chrome pick port
-        options.add_argument("--disable-logging")
-        options.add_argument("--disable-log-level")
-        options.add_argument("--silent")
-        options.add_argument("--disable-background-networking")
-        
-                
-        print("🌐 Creating Chrome driver with stable connection...")
-        driver = webdriver.Chrome(options=options)
-        
-        # NEW: Shorter timeout to avoid connection hanging
-        driver.set_page_load_timeout(15)
-        driver.implicitly_wait(5)
-        
-        print("🌐 Testing basic navigation...")
-        driver.get("https://httpbin.org/get")  # Simple test endpoint
-        time.sleep(2)
-        
-        page_source_length = len(driver.page_source)
-        print(f"✅ Page loaded successfully. Content length: {page_source_length}")
-        
-        driver.quit()
-        
-        return [{
-            "title": "Fix #2 Success",
-            "company": "Connection Stable", 
-            "location": location,
-            "link": "#",
-            "description": f"Selenium-Chrome connection working! Page content length: {page_source_length} characters"
-        }]
-        
-    except Exception as e:
-        print(f"❌ Fix #2 failed: {e}")
+    print("🌐 Launching browser...")
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox") 
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    driver = webdriver.Chrome(options=options)
+
+    driver.get("https://www.efinancialcareers.com/")
+    time.sleep(2)
+
+    print("⌨️ Filling job title and location...")
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Job title, keyword or company']"))
+    ).send_keys(title)
+
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Location']"))
+    ).send_keys(location)
+
+    driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+    time.sleep(5)
+
+    # ADD THIS SINGLE DEBUG LINE:
+    print(f"🔍 SENIORITY RECEIVED: '{seniority}' (type: {type(seniority)})")
+
+    # Handle seniority filtering if specified
+    if seniority:
+        print(f"🎯 DEBUG Step 1: Seniority parameter received: '{seniority}'")
+        print(f"🎯 DEBUG Step 1: Seniority type: {type(seniority)}")
+        print(f"🎯 DEBUG Step 1: Seniority is truthy: {bool(seniority)}")
+        print(f"🎯 Applying seniority filter: {seniority}")
+
         try:
-            driver.quit()
-        except:
-            pass
-        return [{"title": "Fix #2 Failed", "company": "Error", "location": location, "link": "#", "description": f"Connection fix failed: {str(e)[:100]}"}]
+            # Wait for search results page to fully load
+            print("⏳ Waiting for search results page to load...")
+            WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title"))
+            )
+            time.sleep(3)  # Extra wait to ensure filters are loaded
+        
+            # Click the Seniority dropdown
+            print("🔽 Opening seniority filter...")
+
+            # Find the specific seniority button by looking for "Seniority" text
+            filter_buttons = driver.find_elements(By.CSS_SELECTOR, "efc-filter-button")
+            seniority_btn = None
+            for btn in filter_buttons:
+                if "Seniority" in btn.text:
+                    seniority_btn = btn.find_element(By.TAG_NAME, "button")
+                    break
+        
+            if seniority_btn:
+                seniority_btn.click()
+                time.sleep(2)
+
+                # Map your UI values to eFinancialCareers VALUE attributes
+                seniority_mapping = {
+                    'intern': 'INTERN_GRADUATE',
+                    'junior': 'JUNIOR', 
+                    'analyst': 'ANALYST',
+                    'associate': 'ASSOCIATE_MID_LEVEL',
+                    'avp': 'AVP_SENIOR',
+                    'vp': 'VP_PRINCIPAL',
+                    'svp': 'SVP_HEAD_OF',
+                    'director': 'DIRECTOR',
+                    'md': 'MANAGING_DIRECTOR',
+                    'csuite': 'C_SUITE'
+                }
+
+                checkbox_value = seniority_mapping.get(seniority)
+                if checkbox_value:
+                    print(f"☑️ Looking for checkbox with value: {checkbox_value}")
+                    # Use the exact ID pattern from the HTML
+                    checkbox = driver.find_element(By.ID, f"seniority{checkbox_value}")
+        
+                    if not checkbox.is_selected():
+                        checkbox.click()
+                        time.sleep(2)
+                        print(f"✅ Clicked checkbox for {checkbox_value}")
+            
+                        # Wait for filtered results to load
+                        print("⏳ Waiting for filtered results to reload...")
+                        WebDriverWait(driver, 15).until(
+                            EC.presence_of_element_located((By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title"))
+                        )
+                        time.sleep(3)
+            else:
+                raise Exception("Seniority button not found")
+                
+            print("✅ Seniority filter applied successfully")
+        except Exception as e:
+            print(f"⚠️ Could not apply seniority filter: {e}")
+
+    print("🔄 Clicking 'Show more' to load up to max_jobs...")
+    for _ in range(5):
+        cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+        if len(cards) >= max_jobs + 10:  # buffer in case some jobs are invalid
+            break
+        try:
+            show_more = WebDriverWait(driver, 5).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Show more')]"))
+            )
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", show_more)
+            show_more.click()
+            time.sleep(3)
+        except Exception:
+            break
+
+    print("⏳ Waiting for job cards to load...")
+    job_links = []
+    cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+    print(f"🔍 Total cards collected: {len(cards)}")
+
+    for card in cards:
+        try:
+            href = card.get_attribute("href")
+            if href:
+                job_links.append(href)
+        except Exception:
+            continue
+
+    print(f"🔍 Found {len(job_links)} job links.\n")
+
+    # ✅ Collect only valid jobs until we reach max_jobs
+    job_results = []
+    for url in job_links:
+        job = extract_job_details(driver, url)
+
+        if (
+            job["title"] == "[Not Found]" or
+            job["location"] == "[Not Found]" or
+            job["description"] == "[Not Found or Incomplete]"
+        ):
+            print("⛔ Skipping invalid job.")
+            continue
+
+        job_results.append(job)
+        print(f"✅ Collected: {len(job_results)} / {max_jobs}")
+        time.sleep(2)
+
+        if len(job_results) >= max_jobs:
+            break
+
+    driver.quit()
+    return job_results
