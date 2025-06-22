@@ -86,20 +86,36 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     import subprocess
     import os
     
-    print("🔍 DIAGNOSTIC: Checking Chrome installation...")
+    print("🔍 DIAGNOSTIC STARTED: Checking Chrome installation...")
+    
+    diagnostic_results = []
     
     # Test 1: Check if Chrome binary exists
     try:
-        result = subprocess.run(['which', 'google-chrome'], capture_output=True, text=True)
-        print(f"✅ Chrome binary location: {result.stdout.strip()}")
+        result = subprocess.run(['which', 'google-chrome'], capture_output=True, text=True, timeout=10)
+        chrome_location = result.stdout.strip()
+        print(f"✅ Chrome binary location: {chrome_location}")
+        diagnostic_results.append(f"Chrome location: {chrome_location}")
     except Exception as e:
         print(f"❌ Chrome binary check failed: {e}")
+        diagnostic_results.append(f"Chrome location ERROR: {str(e)}")
     
     # Test 2: Check Chrome version
     try:
-        result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True)
-        print(f"✅ Chrome version: {result.stdout.strip()}")
+        result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True, timeout=10)
+        chrome_version = result.stdout.strip()
+        print(f"✅ Chrome version: {chrome_version}")
+        diagnostic_results.append(f"Chrome version: {chrome_version}")
     except Exception as e:
         print(f"❌ Chrome version check failed: {e}")
+        diagnostic_results.append(f"Chrome version ERROR: {str(e)}")
     
-    return [{"title": "Diagnostic Test", "company": "System Check", "location": "Testing", "link": "#", "description": "Check Railway logs for diagnostic results"}]
+    print("🔍 DIAGNOSTIC COMPLETE")
+    
+    return [{
+        "title": "Chrome Diagnostic", 
+        "company": "System Check", 
+        "location": "Railway Server", 
+        "link": "#", 
+        "description": " | ".join(diagnostic_results)
+    }]
