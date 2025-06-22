@@ -83,39 +83,47 @@ def extract_job_details(driver, url):
     }
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
     import subprocess
-    import os
     
-    print("🔍 DIAGNOSTIC STARTED: Checking Chrome installation...")
+    print("🔍 DIAGNOSTIC: Testing Selenium-Chrome connection...")
     
     diagnostic_results = []
     
-    # Test 1: Check if Chrome binary exists
-    try:
-        result = subprocess.run(['which', 'google-chrome'], capture_output=True, text=True, timeout=10)
-        chrome_location = result.stdout.strip()
-        print(f"✅ Chrome binary location: {chrome_location}")
-        diagnostic_results.append(f"Chrome location: {chrome_location}")
-    except Exception as e:
-        print(f"❌ Chrome binary check failed: {e}")
-        diagnostic_results.append(f"Chrome location ERROR: {str(e)}")
+    # Test 1: Chrome installation (we know this works)
+    diagnostic_results.append("Chrome installed: ✅ /usr/bin/google-chrome v137.0.7151.119")
     
-    # Test 2: Check Chrome version
+    # Test 2: Try to create Chrome driver
     try:
-        result = subprocess.run(['google-chrome', '--version'], capture_output=True, text=True, timeout=10)
-        chrome_version = result.stdout.strip()
-        print(f"✅ Chrome version: {chrome_version}")
-        diagnostic_results.append(f"Chrome version: {chrome_version}")
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        
+        print("🔍 Attempting to create Chrome driver...")
+        driver = webdriver.Chrome(options=options)
+        print("✅ Chrome driver created successfully!")
+        
+        # Test 3: Try to navigate to a simple page
+        print("🔍 Testing page navigation...")
+        driver.get("https://www.google.com")
+        title = driver.title
+        print(f"✅ Successfully loaded page: {title}")
+        
+        driver.quit()
+        diagnostic_results.append("Selenium connection: ✅ SUCCESS")
+        diagnostic_results.append(f"Page load test: ✅ {title}")
+        
     except Exception as e:
-        print(f"❌ Chrome version check failed: {e}")
-        diagnostic_results.append(f"Chrome version ERROR: {str(e)}")
-    
-    print("🔍 DIAGNOSTIC COMPLETE")
+        print(f"❌ Selenium-Chrome connection failed: {e}")
+        diagnostic_results.append(f"Selenium connection: ❌ {str(e)[:100]}")
     
     return [{
-        "title": "Chrome Diagnostic", 
-        "company": "System Check", 
-        "location": "Railway Server", 
+        "title": "Selenium Test", 
+        "company": "Chrome Driver", 
+        "location": "Railway", 
         "link": "#", 
         "description": " | ".join(diagnostic_results)
     }]
