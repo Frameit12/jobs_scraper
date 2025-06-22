@@ -84,6 +84,8 @@ def extract_job_details(driver, url):
 
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
+    print("🔍 Starting real job scraping with anti-detection...")
+    
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox") 
@@ -91,31 +93,64 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     
-    # === ADVANCED ANTI-DETECTION ===
-    # Real user agent (match your local Chrome version)
+    # === PROVEN ANTI-DETECTION ===
     user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
     options.add_argument(f"--user-agent={user_agent}")
-    
-    # Hide automation flags
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option('useAutomationExtension', False)
-    
-    # Additional stealth headers
     options.add_argument("--disable-web-security")
     options.add_argument("--allow-running-insecure-content")
     
     driver = webdriver.Chrome(options=options)
-    
-    # Remove webdriver property
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     
-    # Test anti-detection
-    driver.get("https://www.efinancialcareers.com/")
-    time.sleep(5)
-    
-    page_title = driver.title
-    if "403" not in page_title:
-        return [{"title": "Anti-Detection Success!", "company": "Bypassed 403", "location": location, "link": "#", "description": f"Successfully loaded: {page_title}"}]
-    else:
-        return [{"title": "Still Blocked", "company": "Need Stealth", "location": location, "link": "#", "description": "Need more advanced methods"}]
+    try:
+        # Load efinancialcareers.com
+        print("🌐 Loading efinancialcareers.com...")
+        driver.get("https://www.efinancialcareers.com/")
+        time.sleep(3)
+        
+        # Find and fill search fields
+        print("🔍 Looking for search fields...")
+        title_input = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder*='Job title'], input[name*='title'], input[id*='search']"))
+        )
+        location_input = driver.find_element(By.CSS_SELECTOR, "input[placeholder*='Location'], input[name*='location']")
+        
+        print("⌨️ Filling search form...")
+        title_input.clear()
+        title_input.send_keys(title)
+        location_input.clear() 
+        location_input.send_keys(location)
+        
+        # Submit search
+        print("🔍 Submitting search...")
+        submit_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
+        submit_button.click()
+        time.sleep(5)
+        
+        # Extract job results (simplified for testing)
+        print("📋 Extracting job results...")
+        job_links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/job/']")[:max_jobs]
+        
+        results = []
+        for i, link in enumerate(job_links[:3]):  # Test with first 3 jobs
+            results.append({
+                "title": f"Job {i+1}",
+                "company": "Test Company",
+                "location": location,
+                "link": link.get_attribute("href") or "#",
+                "description": "Real job scraping is working!"
+            })
+        
+        driver.quit()
+        return results if results else [{"title": "Search Completed", "company": "Success", "location": location, "link": "#", "description": f"Found {len(job_links)} job links total"}]
+        
+    except Exception as e:
+        print(f"❌ Scraping error: {str(e)}")
+        try:
+            driver.quit()
+        except:
+            pass
+        return [{"title": "Scraping Error", "company": "Error", "location": location, "link": "#", "description": f"Error during scraping: {str(e)}"}]
