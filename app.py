@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 import os
 import glob
-from apscheduler.schedulers.baackground import BackgroundScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 import smtplib
 from email.message import EmailMessage
