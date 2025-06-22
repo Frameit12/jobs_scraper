@@ -84,8 +84,6 @@ def extract_job_details(driver, url):
 
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
-    print("🔍 Deep debugging: What page are we actually getting?")
-    
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox") 
@@ -93,41 +91,31 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1920,1080")
     
+    # === ADVANCED ANTI-DETECTION ===
+    # Real user agent (match your local Chrome version)
+    user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+    options.add_argument(f"--user-agent={user_agent}")
+    
+    # Hide automation flags
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    
+    # Additional stealth headers
+    options.add_argument("--disable-web-security")
+    options.add_argument("--allow-running-insecure-content")
+    
     driver = webdriver.Chrome(options=options)
     
-    try:
-        print("🧪 Loading efinancialcareers.com...")
-        driver.get("https://www.efinancialcareers.com/")
-        
-        # Wait longer for dynamic content
-        time.sleep(10)
-        
-        # DEBUG: Check what we actually got
-        actual_url = driver.current_url
-        page_title = driver.title
-        page_source = driver.page_source
-        page_source_length = len(page_source)
-        
-        print(f"🔍 Current URL: {actual_url}")
-        print(f"🔍 Page title: {page_title}")
-        print(f"🔍 Page source length: {page_source_length}")
-        print(f"🔍 First 500 chars of page source:")
-        print(page_source[:500])
-        
-        # Check if we're blocked or redirected  
-        if "blocked" in page_title.lower() or "access denied" in page_source.lower() or page_source_length < 1000:
-            status = "Likely blocked or redirected"
-        else:
-            status = "Page loaded normally"
-        
-        driver.quit()
-        
-        return [{"title": "Page Debug Info", "company": status, "location": location, "link": "#", "description": f"URL: {actual_url}, Title: {page_title}, Length: {page_source_length}"}]
-        
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        try:
-            driver.quit()
-        except:
-            pass
-        return [{"title": "Debug Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
+    # Remove webdriver property
+    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    
+    # Test anti-detection
+    driver.get("https://www.efinancialcareers.com/")
+    time.sleep(5)
+    
+    page_title = driver.title
+    if "403" not in page_title:
+        return [{"title": "Anti-Detection Success!", "company": "Bypassed 403", "location": location, "link": "#", "description": f"Successfully loaded: {page_title}"}]
+    else:
+        return [{"title": "Still Blocked", "company": "Need Stealth", "location": location, "link": "#", "description": "Need more advanced methods"}]
