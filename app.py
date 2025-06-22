@@ -328,8 +328,13 @@ def index():
                     "max_jobs": max_jobs,
                     "seniority": seniority
                 }
-                save_search(search_name, criteria)
-                info = f"✅ Search saved as: {search_name}"
+                location = request.form.get("location", "").strip()
+                if location:
+                    formatted_name = f"{search_name} - {location}"
+                else:
+                    formatted_name = search_name
+                save_search(formatted_name, criteria)                
+                info = f"✅ Search saved as: {formatted_name}"
             
             saved_searches = check_excel_files_for_searches(load_saved_searches())
             return render_template("index.html", info=info, jobs=last_results, title=title, location=location, max_jobs=max_jobs, saved_searches=saved_searches)
