@@ -142,6 +142,36 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     driver.implicitly_wait(10)        # 10 seconds for element finding
     driver.set_script_timeout(30)     # 30 seconds for JavaScript
 
+    try:
+        # TEST 1: Can we start Chrome?
+        print("✅ TEST 1 PASSED: Chrome started successfully")
+        
+        # TEST 2: Can we load a simple page?
+        print("🧪 TEST 2: Loading simple page...")
+        driver.get("https://httpbin.org/get")
+        print("✅ TEST 2 PASSED: Simple page loaded")
+        
+        # TEST 3: Can we load Google?
+        print("🧪 TEST 3: Loading Google...")
+        driver.get("https://www.google.com")
+        print("✅ TEST 3 PASSED: Google loaded")
+        
+        # TEST 4: Can we load efinancialcareers homepage?
+        print("🧪 TEST 4: Loading efinancialcareers homepage...")
+        driver.get("https://www.efinancialcareers.com/")
+        print("✅ TEST 4 PASSED: efinancialcareers homepage loaded")
+        
+        driver.quit()
+        return [{"title": "All Tests Passed", "company": "Success", "location": location, "link": "#", "description": "Chrome can load all test pages successfully"}]
+        
+    except Exception as e:
+        print(f"❌ TEST FAILED at step: {str(e)}")
+        try:
+            driver.quit()
+        except:
+            pass
+        return [{"title": "Test Failed", "company": "Error", "location": location, "link": "#", "description": f"Failed at: {str(e)}"}]
+    
     # === ADD CONNECTION STABILITY ===
     print("🔍 Testing basic connectivity first...")
     try:
