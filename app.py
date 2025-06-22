@@ -750,6 +750,18 @@ def create_test_files():
     
     return f"Created test files: {created_files}<br><br><a href='/debug'>Check debug again</a><br><a href='/'>Go back to main page</a>"
 
+@app.route("/clean_test_files")
+def clean_test_files():
+    import os, glob
+    files = glob.glob("scheduled_results/*.xlsx")
+    deleted_count = 0
+    for f in files:
+        try:
+            os.remove(f)
+            deleted_count += 1
+        except:
+            pass
+    return f"Deleted {deleted_count} test files. <br><br><a href='/debug'>Check debug again</a><br><a href='/'>Go back to main page</a>"
 
 if __name__ == "__main__":
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
