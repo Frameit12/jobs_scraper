@@ -83,84 +83,52 @@ def extract_job_details(driver, url):
     }
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None):
-    print("🔍 REAL SCRAPING TEST: Function called with parameters:")
-    print(f"  - title: '{title}'")
-    print(f"  - location: '{location}'") 
-    print(f"  - max_jobs: {max_jobs}")
-    print(f"  - seniority: '{seniority}'")
-    
     if not title or not location:
         return [{"error": "Please enter both job title and location"}]
     
     try:
-        print("🌐 Launching browser...")
+        print("🔧 Testing Fix #1: Aggressive Memory Management...")
         options = Options()
+        
+        # Memory optimization flags
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
+        options.add_argument("--memory-pressure-off")
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--disable-features=TranslateUI,BlinkGenPropertyTrees")
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-plugins")
+        options.add_argument("--disable-images")  # Don't load images to save memory
+        options.add_argument("--disable-javascript")  # Try without JS first
+        options.add_argument("--aggressive-cache-discard")
+        options.add_argument("--memory-pressure-off")
         
         driver = webdriver.Chrome(options=options)
-        driver.set_page_load_timeout(45)
+        driver.set_page_load_timeout(30)
         
-        print("🌐 Navigating to efinancialcareers...")
+        print("🌐 Testing efinancialcareers navigation...")
         driver.get("https://www.efinancialcareers.com/")
-        time.sleep(5)
+        time.sleep(3)
         
-        print("📝 Filling search form...")
-        title_input = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Job title, keyword or company']"))
-        )
-        title_input.send_keys(title)
-        
-        location_input = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Location']"))
-        )
-        location_input.send_keys(location)
-        
-        search_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-        search_button.click()
-        
-        print("⏳ Waiting for search results...")
-        time.sleep(8)
-        
-        # Get job cards
-        job_cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
-        print(f"🔍 Found {len(job_cards)} job cards")
-        
-        # Take just first 2 jobs for testing
-        results = []
-        for i, card in enumerate(job_cards[:2]):
-            try:
-                job_title = card.text.strip()
-                job_link = card.get_attribute("href")
-                
-                print(f"📋 Processing job {i+1}: {job_title}")
-                
-                # For now, create basic job data (we'll add description extraction later)
-                job = {
-                    "title": job_title if job_title else f"Job {i+1}",
-                    "company": "Company Name", # We'll extract this later
-                    "location": location,
-                    "link": job_link if job_link else "#",
-                    "description": f"Job description for {job_title}" # Placeholder for now
-                }
-                
-                results.append(job)
-                print(f"✅ Added job {i+1}")
-                
-            except Exception as e:
-                print(f"❌ Error processing job {i+1}: {e}")
-                continue
-                
+        print(f"✅ Page loaded: {driver.title}")
         driver.quit()
-        print(f"🎉 Successfully scraped {len(results)} jobs")
-        return results
+        
+        return [{
+            "title": "Fix #1 Test",
+            "company": "Memory Optimization", 
+            "location": location,
+            "link": "#",
+            "description": f"Successfully loaded efinancialcareers with aggressive memory management. Page title: {driver.title if 'driver' in locals() else 'Unknown'}"
+        }]
         
     except Exception as e:
-        print(f"❌ Scraping failed: {e}")
+        print(f"❌ Fix #1 failed: {e}")
         try:
             driver.quit()
         except:
             pass
-        return [{"title": "Error", "company": "System", "location": location, "link": "#", "description": f"Scraping failed: {str(e)[:100]}"}]
+        return [{"title": "Fix #1 Failed", "company": "Error", "location": location, "link": "#", "description": f"Memory optimization failed: {str(e)[:100]}"}]
