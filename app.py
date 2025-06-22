@@ -17,6 +17,8 @@ import os
 import psycopg2
 from sqlalchemy import create_engine, text
 import json
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask import session
 
 # Database setup
 def get_db_connection():
@@ -65,6 +67,7 @@ def init_users_table():
 init_users_table()
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
 
 HISTORY_FILE = "search_history.json"
 
