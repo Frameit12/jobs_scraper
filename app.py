@@ -42,7 +42,27 @@ def init_database():
             """))
             conn.commit()
 
+def init_users_table():
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(255) UNIQUE NOT NULL,
+                    password_hash VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            
+            # Add user_id column to saved_searches table
+            conn.execute(text("""
+                ALTER TABLE saved_searches 
+                ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)
+            """))
+            conn.commit()
 
+init_users_table()
 
 app = Flask(__name__)
 
