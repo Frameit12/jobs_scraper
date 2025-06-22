@@ -90,7 +90,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
         print("🔧 Testing Fix #2: Selenium Connection Stability...")
         
         from selenium.webdriver.chrome.service import Service
-        from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+        
         
         options = Options()
         options.add_argument("--headless")
@@ -105,12 +105,9 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
         options.add_argument("--silent")
         options.add_argument("--disable-background-networking")
         
-        # NEW: Force stable connection
-        caps = DesiredCapabilities.CHROME
-        caps['goog:loggingPrefs'] = {'browser': 'OFF', 'driver': 'OFF', 'performance': 'OFF'}
-        
+                
         print("🌐 Creating Chrome driver with stable connection...")
-        driver = webdriver.Chrome(options=options, desired_capabilities=caps)
+        driver = webdriver.Chrome(options=options)
         
         # NEW: Shorter timeout to avoid connection hanging
         driver.set_page_load_timeout(15)
