@@ -1,0 +1,8 @@
+Flask==3.0.3
+selenium==4.23.1
+beautifulsoup4==4.12.3
+bleach==6.1.0
+pandas==2.2.2
+openpyxl==3.1.5
+APScheduler==3.10.4
+xlsxwriter==3.2.0

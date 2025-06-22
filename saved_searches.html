@@ -1,0 +1,78 @@
+{% if saved_searches %}
+<ul>
+  {% for search in saved_searches %}
+    <li style="margin-bottom: 10px;">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <a href="{{ url_for('load_saved_search', index=loop.index0) }}"
+             style="font-weight: bold; text-decoration: none; color: #002060;">
+            {{ search.name }} - {{ search.criteria.location }}
+          </a><br>
+          <small>{{ search.timestamp }}</small>
+          {% if search.last_run_date %}
+              <span style="font-size: 12px; color: #555;">Last run: {{ search.last_run_date }}</span><br>
+          {% endif %}
+          {% if search.schedule != 'none' %}
+              <span style="font-size: 12px; color: #666; margin-left: 6px;">
+                ({{ search.schedule.capitalize() }})
+              </span>
+          {% endif %}
+        </div>
+
+        <div style="display: flex; align-items: center;">
+
+          {% if search.has_excel %}
+            <div style="display: flex; flex-direction: column; align-items: flex-start;">
+              <label style="display: flex; align-items: center; gap: 6px;">
+                <input type="checkbox" name="selected_files" value="{{ search.name }}" class="download-checkbox">
+                <a href="{{ url_for('download_scheduled', search_name=search.name) }}"
+                   title="Download latest results" style="text-decoration: none;">📥</a>
+              </label>
+
+              <span id="download-msg-{{ loop.index0 }}"
+                    style="margin-left: 4px; color: green; font-size: 11px;"
+                    data-index="{{ loop.index0 }}">
+                ✅ Download Ready
+                <button onclick="dismissDownloadMsg({{ loop.index0 }})"
+                        style="background: none; border: none; color: #999; cursor: pointer; font-size: 11px; margin-left: 6px;">✖</button>
+              </span>
+            </div>
+          {% endif %}
+
+          <button onclick="toggleSchedule({{ loop.index0 }})"
+                  style="background: none; border: none; cursor: pointer;" title="Schedule">⏰</button>
+
+          <button onclick="toggleRename({{ loop.index0 }})"
+                  style="background: none; border: none; cursor: pointer; margin-left: 6px;" title="Rename">✏️</button>
+
+          <!-- ✅ Replaced inner form with JS-based delete -->
+          <button type="button"
+                  style="background: none; border: none; cursor: pointer;" title="Delete"
+                  onclick="deleteSearch({{ loop.index0 }})">🗑️</button>
+        </div>
+      </div>
+
+      <!-- Schedule Dropdown -->
+      <div id="schedule-form-{{ loop.index0 }}" style="display:none; margin-top: 6px;">
+        <select onchange="saveSchedule({{ loop.index0 }}, this.value)">
+          <option value="none" {% if search.schedule == 'none' %}selected{% endif %}>None</option>
+          <option value="daily" {% if search.schedule == 'daily' %}selected{% endif %}>Daily</option>
+          <option value="weekly" {% if search.schedule == 'weekly' %}selected{% endif %}>Weekly</option>
+          <option value="monthly" {% if search.schedule == 'monthly' %}selected{% endif %}>Monthly</option>
+        </select>
+        <span id="confirm-{{ loop.index0 }}" style="margin-left: 10px; color: green; display: none;">✓ Saved</span>
+      </div>
+
+      <!-- Rename Form -->
+      <form method="POST" action="/rename/{{ loop.index0 }}"
+            id="rename-form-{{ loop.index0 }}" style="display: none; margin-top: 6px;">
+        <input type="text" name="new_name" placeholder="New name" required
+               style="font-size: 12px; padding: 2px 6px; width: 80%;">
+        <button type="submit" style="font-size: 12px; padding: 2px 6px;">Save</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>No saved searches yet.</p>
+{% endif %}

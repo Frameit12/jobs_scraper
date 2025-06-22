@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Schedule Search</title>
+</head>
+<body>
+    <h2>Schedule "{{ search.name }}"</h2>
+
+    <form method="POST" action="/save_schedule">
+        <input type="hidden" name="search_index" value="{{ index }}">
+
+        <label for="frequency">Run this search:</label>
+        <select name="frequency" id="frequency">
+            <option value="none">Don't Schedule</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+        </select>
+
+        <br><br>
+        <button type="submit">Save Schedule</button>
+    </form>
+</body>
+</html>
