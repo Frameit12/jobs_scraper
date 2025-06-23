@@ -400,6 +400,8 @@ print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
 try:
     scheduler = BackgroundScheduler()
     print("🚀 SCHEDULER DEBUG: BackgroundScheduler created")
+    def test_scheduler():
+        print("🧪 TEST: Scheduler called a function!")
     scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
     print("🚀 SCHEDULER DEBUG: Job added to scheduler")
     scheduler.start()
