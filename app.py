@@ -324,6 +324,10 @@ def run_scheduled_searches():
     print("🕓 Checking scheduled searches...")
 
     search_history = []
+    engine = get_db_connection()
+    if not engine:
+        print("❌ No database connection in scheduler")
+        return
     try:
         with engine.connect() as conn:
             result = conn.execute(text("""
