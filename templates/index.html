@@ -74,6 +74,46 @@
     </div>
 
     <div class="max-w-7xl mx-auto px-6">
+          
+        <!-- How It Works Section -->
+        <div class="mb-8">
+            <div class="bg-blue-50 border border-blue-200 rounded-xl overflow-hidden">
+                <button 
+                    onclick="toggleHelp()" 
+                    class="w-full px-6 py-4 text-left bg-blue-100 hover:bg-blue-200 transition-colors flex items-center justify-between"
+                >    
+                    <span class="text-lg font-semibold text-blue-800">📖 How it works - Click to expand</span>
+                    <svg id="help-arrow" class="w-5 h-5 text-blue-600 transform transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="help-content" class="hidden px-6 py-6 bg-white">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="text-center">
+                            <div class="text-3xl mb-3">1️⃣</div>
+                            <h5 class="font-bold text-slate-800 mb-2">Search</h5>
+                            <p class="text-sm text-slate-600">Enter job title, location, and run your search</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl mb-3">2️⃣</div>
+                            <h5 class="font-bold text-slate-800 mb-2">Save</h5>
+                            <p class="text-sm text-slate-600">Save good searches with a name for later use</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl mb-3">3️⃣</div>
+                            <h5 class="font-bold text-slate-800 mb-2">Schedule</h5>
+                            <p class="text-sm text-slate-600">Set daily/weekly/monthly automation using the ⏰ icon</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl mb-3">4️⃣</div>
+                            <h5 class="font-bold text-slate-800 mb-2">Get Emails</h5>
+                            <p class="text-sm text-slate-600">Receive Excel files with fresh job results automatically</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- TOP ROW: Search form and saved searches side by side -->
         <div class="grid grid-cols-2 gap-8 mb-8">
             
@@ -447,5 +487,20 @@
     });
     </script>
 
+    <script>
+    function toggleHelp() {
+        const content = document.getElementById('help-content');
+        const arrow = document.getElementById('help-arrow');
+    
+        if (content.classList.contains('hidden')) {
+            content.classList.remove('hidden');
+            arrow.style.transform = 'rotate(180deg)';
+        } else {
+            content.classList.add('hidden');
+            arrow.style.transform = 'rotate(0deg)';
+        }
+    }
+    </script>
+    
 </body>
 </html>
