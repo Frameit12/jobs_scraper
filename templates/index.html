@@ -461,39 +461,42 @@
     </script>
 
     <script>
-    document.getElementById('multi-download-form').addEventListener('submit', function(e) {
-      e.preventDefault(); // Stop form submission immediately
-      
-      // Capture checked values RIGHT NOW before anything can change them
-      const checkedValues = [];
-      document.querySelectorAll('.download-checkbox:checked').forEach(checkbox => {
-        checkedValues.push(checkbox.value);
-      });
-      
-      console.log('Captured values:', checkedValues);
-      
-      // Clear existing hidden inputs
-      this.querySelectorAll('input[name="selected_files"]').forEach(input => input.remove());
-      
-      // Add hidden inputs for each captured value
-      checkedValues.forEach(value => {
-        const hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = 'selected_files';
-        hiddenInput.value = value;
-        this.appendChild(hiddenInput);
-      });
-      
-      console.log('Form submitting with', checkedValues.length, 'selected files');
-      
-      // Now submit the form
-      this.submit();
+    // Use event delegation - attach to parent that never gets replaced
+    document.addEventListener('submit', function(e) {
+      // Only handle our specific form
+      if (e.target && e.target.id === 'multi-download-form') {
+        e.preventDefault();
+    
+        const checkedValues = [];
+        document.querySelectorAll('.download-checkbox:checked').forEach(checkbox => {
+          checkedValues.push(checkbox.value);
+        });
+    
+        console.log('DELEGATION - Captured values:', checkedValues);
+    
+        if (checkedValues.length === 0) {
+          alert('Please select at least one file to download.');
+          return;
+        }
+    
+        e.target.querySelectorAll('input[name="selected_files"]').forEach(input => input.remove());
+    
+        checkedValues.forEach(value => {
+          const hiddenInput = document.createElement('input');
+          hiddenInput.type = 'hidden';
+          hiddenInput.name = 'selected_files';
+          hiddenInput.value = value;
+          e.target.appendChild(hiddenInput);
+        });
+    
+        console.log('DELEGATION - Form submitting with', checkedValues.length, 'selected files');
+        e.target.submit();
+      }
     });
-        
     </script>
-
+       
     <script>
-    document.querySelector('form').addEventListener('submit', function(e) {
+    document.querySelector('form:not(#multi-download-form)').addEventListener('submit', function(e) {
         // Only show spinner for Run Search, not Save Search
         if (e.submitter && e.submitter.value === 'run') {
             document.getElementById('loading-spinner').style.display = 'inline-block';
