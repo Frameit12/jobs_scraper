@@ -415,7 +415,7 @@ try:
     print("🚀 SCHEDULER DEBUG: BackgroundScheduler created")
     def test_scheduler():
         print("🧪 TEST: Scheduler called a function!")
-    # scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
+    scheduler.add_job(func=run_scheduled_searches, trigger="cron", hour=5, minute=0) # Runs daily at 9am
     print("🚀 SCHEDULER DEBUG: Job added to scheduler")
     scheduler.start()
     print("🚀 SCHEDULER DEBUG: Scheduler started successfully!") 
