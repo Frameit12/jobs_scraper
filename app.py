@@ -1049,5 +1049,34 @@ def test_manual_run():
     except Exception as e:
         return f"Error: {e}"
 
+@app.route("/debug_excel_detection")
+def debug_excel_detection():
+    searches = load_saved_searches()
+    searches_with_files = check_excel_files_for_searches(searches)
+    
+    # Check what files actually exist
+    all_files = glob.glob("scheduled_results/*.xlsx")
+    
+    debug_info = {
+        "files_on_disk": all_files,
+        "search_results": []
+    }
+    
+    for search in searches_with_files:
+        safe_name = search["name"].replace(" ", "_")
+        pattern = f"scheduled_results/{safe_name}_*.xlsx"
+        matching_files = glob.glob(pattern)
+        
+        debug_info["search_results"].append({
+            "original_name": search["name"],
+            "safe_name": safe_name,
+            "pattern": pattern,
+            "files_found": matching_files,
+            "has_excel": search.get("has_excel", False)
+        })
+    
+    return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
