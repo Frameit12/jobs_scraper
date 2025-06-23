@@ -414,33 +414,31 @@
         if (el) el.style.display = 'none';
       }
 
-      function refreshSavedSearches() {
-        checkedSearches.clear();
-        document.querySelectorAll('.download-checkbox:checked').forEach(cb => {
-          checkedSearches.add(cb.value);
-        });
+        function refreshSavedSearches() {
+          // Capture checked values BEFORE destroying the form
+          const checkedValues = Array.from(document.querySelectorAll('.download-checkbox:checked'))
+                           .map(cb => cb.value);
+  
+          fetch('/saved_searches_partial')
+            .then(response => response.text())
+            .then(html => {
+              const container = document.getElementById('saved-searches-list');
+              container.innerHTML = html;
 
-        const checkedValues = Array.from(document.querySelectorAll('.download-checkbox:checked'))
-                                 .map(cb => cb.value);
-        
-        fetch('/saved_searches_partial')
-          .then(response => response.text())
-          .then(html => {
-            const container = document.getElementById('saved-searches-list');
-            container.innerHTML = html;
+              // Restore checked state
+              checkedValues.forEach(name => {
+                const restored = container.querySelector(`.download-checkbox[value="${name}"]`);
+                if (restored) restored.checked = true;
+              });
 
-            checkedSearches.forEach(name => {
-              const restored = container.querySelector(`.download-checkbox[value="${name}"]`);
-              if (restored) restored.checked = true;
-            });
-
-            dismissMessages.forEach(index => {
-              const el = document.getElementById('download-msg-' + index);
-              if (el) el.style.display = 'none';
-            });
-          })
-          .catch(error => console.error('Error refreshing saved searches:', error));
-      }
+              dismissMessages.forEach(index => {
+                const el = document.getElementById('download-msg-' + index);
+                if (el) el.style.display = 'none';
+              });
+            })
+            .catch(error => console.error('Error refreshing saved searches:', error));
+        }      
+              
     </script>
 
     <script>
