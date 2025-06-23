@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 import os
 import glob
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.background import flask
 import atexit
 import smtplib
 from email.message import EmailMessage
@@ -72,9 +72,16 @@ def init_users_table():
             conn.commit()
 
 init_users_table()
-
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
+
+# Initialize scheduler when Flask app starts
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
+scheduler.start()
+atexit.register(lambda: scheduler.shutdown())
+
+
 
 HISTORY_FILE = "search_history.json"
 
@@ -981,12 +988,6 @@ def debug_env():
             db_vars[key] = value[:20] + "..." if len(value) > 20 else value
     return f"<pre>{json.dumps(db_vars, indent=2)}</pre>"
 
-
-# Initialize scheduler regardless of how the app starts
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
-scheduler.start()
-atexit.register(lambda: scheduler.shutdown())
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
