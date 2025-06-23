@@ -47,6 +47,22 @@
             box-sizing: border-box;
             font-size: 12px;
         }
+        .spinner-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ccc;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 5px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
@@ -107,6 +123,10 @@
                     </div>
 
                     <button type="submit" name="action" value="run" class="btn btn-primary" style="padding: 10px 20px;">🔍 Run Search</button>
+                    <span id="loading-spinner" style="display: none; margin-left: 10px;">
+                        <div class="spinner-icon"></div>
+                        <small>Searching...</small>
+                    </span>
                 </form>
             </div>
 
@@ -415,6 +435,15 @@
       });
       
       console.log('Form submitting with', checkedBoxes.length, 'selected files');
+    });
+    </script>
+
+    <script>
+    document.querySelector('form').addEventListener('submit', function(e) {
+        // Only show spinner for Run Search, not Save Search
+        if (e.submitter && e.submitter.value === 'run') {
+            document.getElementById('loading-spinner').style.display = 'inline-block';
+        }
     });
     </script>
 
