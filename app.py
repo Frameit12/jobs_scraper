@@ -323,7 +323,29 @@ def save_results_to_excel(search_name, results):
 def run_scheduled_searches():
     print("🕓 Checking scheduled searches...")
 
-    search_history = load_saved_searches()
+    search_history = []
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT name, timestamp, criteria, schedule, last_run_date, user_id
+                FROM saved_searches 
+                WHERE schedule != 'none'
+                ORDER BY id DESC
+            """))
+        
+            for row in result:
+                search = {
+                    "name": row[0],
+                    "timestamp": row[1], 
+                    "criteria": row[2],
+                    "schedule": row[3] or "none",
+                    "last_run_date": row[4] or "",
+                    "user_id": row[5]
+                }
+                search_history.append(search)
+    except Exception as e:
+        print(f"❌ Database error in scheduler: {e}")
+        return
     today_str = datetime.now().strftime("%d %B %Y")
     weekday = datetime.now().weekday()
     day = datetime.now().day
