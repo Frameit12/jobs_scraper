@@ -457,41 +457,63 @@
       form.submit();
     }
     </script>
-
+   
     <script>
-    // Use event delegation - attach to parent that never gets replaced
-    document.addEventListener('submit', function(e) {
-      // Only handle our specific form
-      if (e.target && e.target.id === 'multi-download-form') {
-        e.preventDefault();
+    // Complete download solution
+    (function() {
+      function handleDownloadForm() {
+        const form = document.getElementById('multi-download-form');
+        if (!form) return;
     
-        const checkedValues = [];
-        document.querySelectorAll('.download-checkbox:checked').forEach(checkbox => {
-          checkedValues.push(checkbox.value);
+        // Remove any existing listeners
+        const newForm = form.cloneNode(true);
+        form.parentNode.replaceChild(newForm, form);
+    
+        // Add our listener
+        newForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+      
+          const checkedBoxes = document.querySelectorAll('.download-checkbox:checked');
+          const values = Array.from(checkedBoxes).map(cb => cb.value);
+      
+          console.log('NEW SOLUTION - Captured values:', values);
+      
+          if (values.length === 0) {
+            alert('Please select files to download');
+            return;
+          }
+      
+          // Create form data manually
+          const formData = new FormData();
+          values.forEach(value => formData.append('selected_files', value));
+      
+          // Submit via fetch
+          fetch('/download_selected', {
+            method: 'POST',
+            body: formData
+          }).then(response => response.blob())
+            .then(blob => {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'Selected_Results.zip';
+              a.click();
+            });
         });
-    
-        console.log('DELEGATION - Captured values:', checkedValues);
-    
-        if (checkedValues.length === 0) {
-          alert('Please select at least one file to download.');
-          return;
-        }
-    
-        e.target.querySelectorAll('input[name="selected_files"]').forEach(input => input.remove());
-    
-        checkedValues.forEach(value => {
-          const hiddenInput = document.createElement('input');
-          hiddenInput.type = 'hidden';
-          hiddenInput.name = 'selected_files';
-          hiddenInput.value = value;
-          e.target.appendChild(hiddenInput);
-        });
-    
-        console.log('DELEGATION - Form submitting with', checkedValues.length, 'selected files');
-        e.target.submit();
       }
-    });
+  
+      // Run on page load and after any DOM changes
+      handleDownloadForm();
+  
+      // Re-run after saved searches refresh
+      const originalRefresh = window.refreshSavedSearches;
+      window.refreshSavedSearches = function() {
+        if (originalRefresh) originalRefresh.apply(this, arguments);
+        setTimeout(handleDownloadForm, 100);
+      };
+    })();
     </script>
+   
        
     <script>
     document.querySelector('form:not(#multi-download-form)').addEventListener('submit', function(e) {
