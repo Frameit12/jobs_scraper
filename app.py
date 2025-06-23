@@ -1027,5 +1027,14 @@ def check_files():
     files = glob.glob("scheduled_results/*.xlsx")
     return f"Excel files found: {files}"
 
+
+@app.route("/test_manual_run")
+def test_manual_run():
+    try:
+        run_scheduled_searches()
+        return "Manual test completed - check logs and /check_files"
+    except Exception as e:
+        return f"Error: {e}"
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
