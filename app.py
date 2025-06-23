@@ -373,13 +373,6 @@ def run_scheduled_searches():
         with open("search_history.json", "w", encoding="utf-8") as f:
             json.dump(search_history, f, indent=2)
 
-
-# Add scheduler initialization right after the function
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
-scheduler.start()
-atexit.register(lambda: scheduler.shutdown())
-
 # Add scheduler initialization right after the function
 print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
 try:
