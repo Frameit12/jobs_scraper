@@ -1019,6 +1019,11 @@ def debug_env():
             db_vars[key] = value[:20] + "..." if len(value) > 20 else value
     return f"<pre>{json.dumps(db_vars, indent=2)}</pre>"
 
+@app.route("/check_files")
+def check_files():
+    import os, glob
+    files = glob.glob("scheduled_results/*.xlsx")
+    return f"Excel files found: {files}"
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
