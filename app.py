@@ -75,13 +75,6 @@ init_users_table()
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
 
-# Initialize scheduler when Flask app starts
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
-scheduler.start()
-atexit.register(lambda: scheduler.shutdown())
-
-
 
 HISTORY_FILE = "search_history.json"
 
@@ -379,6 +372,13 @@ def run_scheduled_searches():
     if updated:
         with open("search_history.json", "w", encoding="utf-8") as f:
             json.dump(search_history, f, indent=2)
+
+
+# Add scheduler initialization right after the function
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
+scheduler.start()
+atexit.register(lambda: scheduler.shutdown())
 
 
 def format_description(desc):
