@@ -396,8 +396,17 @@ def run_scheduled_searches():
             print(f"💾 Saved {len(results)} results to Excel for {search['name']}")
 
     if updated:
-        with open("search_history.json", "w", encoding="utf-8") as f:
-            json.dump(search_history, f, indent=2)
+    # Update the database with new last_run_date
+        with engine.connect() as conn:
+            conn.execute(text("""
+                UPDATE saved_searches 
+                SET last_run_date = :last_run_date 
+                WHERE name = :name
+            """), {
+                "last_run_date": search["last_run_date"],
+                "name": search["name"]
+            })
+            conn.commit()
 
 # Add scheduler initialization right after the function
 print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
