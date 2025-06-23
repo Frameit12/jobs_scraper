@@ -406,10 +406,10 @@ try:
     print("🚀 SCHEDULER DEBUG: BackgroundScheduler created")
     def test_scheduler():
         print("🧪 TEST: Scheduler called a function!")
-    scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
+    # scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
     print("🚀 SCHEDULER DEBUG: Job added to scheduler")
     scheduler.start()
-    print("🚀 SCHEDULER DEBUG: Scheduler started successfully!")
+    print("🚀 SCHEDULER DEBUG: Scheduler started successfully!") 
     atexit.register(lambda: scheduler.shutdown())
     print("🚀 SCHEDULER DEBUG: Exit handler registered")
 except Exception as e:
