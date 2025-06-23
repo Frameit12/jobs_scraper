@@ -462,20 +462,34 @@
 
     <script>
     document.getElementById('multi-download-form').addEventListener('submit', function(e) {
+      e.preventDefault(); // Stop form submission immediately
+      
+      // Capture checked values RIGHT NOW before anything can change them
+      const checkedValues = [];
+      document.querySelectorAll('.download-checkbox:checked').forEach(checkbox => {
+        checkedValues.push(checkbox.value);
+      });
+      
+      console.log('Captured values:', checkedValues);
+      
+      // Clear existing hidden inputs
       this.querySelectorAll('input[name="selected_files"]').forEach(input => input.remove());
       
-      const checkedBoxes = document.querySelectorAll('.download-checkbox:checked');
-      
-      checkedBoxes.forEach(checkbox => {
+      // Add hidden inputs for each captured value
+      checkedValues.forEach(value => {
         const hiddenInput = document.createElement('input');
         hiddenInput.type = 'hidden';
         hiddenInput.name = 'selected_files';
-        hiddenInput.value = checkbox.value;
+        hiddenInput.value = value;
         this.appendChild(hiddenInput);
       });
       
-      console.log('Form submitting with', checkedBoxes.length, 'selected files');
+      console.log('Form submitting with', checkedValues.length, 'selected files');
+      
+      // Now submit the form
+      this.submit();
     });
+        
     </script>
 
     <script>
