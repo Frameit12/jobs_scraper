@@ -971,11 +971,11 @@ def debug_env():
     return f"<pre>{json.dumps(db_vars, indent=2)}</pre>"
 
 
-if __name__ == "__main__":
-    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
-        scheduler.start()
-        atexit.register(lambda: scheduler.shutdown())
+# Initialize scheduler regardless of how the app starts
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
+scheduler.start()
+atexit.register(lambda: scheduler.shutdown())
 
+if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
