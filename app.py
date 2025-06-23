@@ -52,9 +52,16 @@ def init_users_table():
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     username VARCHAR(255) UNIQUE NOT NULL,
+                    email VARCHAR(255) UNIQUE NOT NULL,
                     password_hash VARCHAR(255) NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
+            """))
+            
+            # Add email column to existing users table if it doesn't exist
+            conn.execute(text("""
+                ALTER TABLE users 
+                ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE
             """))
             
             # Add user_id column to saved_searches table
@@ -122,7 +129,8 @@ def check_excel_files_for_searches(searches):
         search["has_excel"] = len(matching_files) > 0
     return searches
 
-def create_user(username, password):
+
+def create_user(username, email, password):
     engine = get_db_connection()
     if not engine:
         return False
@@ -131,10 +139,11 @@ def create_user(username, password):
         password_hash = generate_password_hash(password)
         with engine.connect() as conn:
             conn.execute(text("""
-                INSERT INTO users (username, password_hash)
-                VALUES (:username, :password_hash)
+                INSERT INTO users (username, email, password_hash)
+                VALUES (:username, :email, :password_hash)
             """), {
                 "username": username,
+                "email": email,
                 "password_hash": password_hash
             })
             conn.commit()
@@ -142,6 +151,7 @@ def create_user(username, password):
     except Exception as e:
         print(f"Error creating user: {e}")
         return False
+        
 
 def verify_user(username, password):
     engine = get_db_connection()
@@ -538,18 +548,19 @@ def login():
 def signup():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
         password = request.form.get("password", "")
         
-        if not username or not password:
-            return render_template("signup.html", error="Please enter both username and password")
+        if not username or not email or not password:
+            return render_template("signup.html", error="Please fill in all fields")
         
         if len(password) < 6:
             return render_template("signup.html", error="Password must be at least 6 characters")
         
-        if create_user(username, password):
+        if create_user(username, email, password):
             return render_template("login.html", success="Account created! Please log in.")
         else:
-            return render_template("signup.html", error="Username already exists")
+            return render_template("signup.html", error="Username or email already exists")
     
     return render_template("signup.html")
 
