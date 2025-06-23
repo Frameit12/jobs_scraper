@@ -186,7 +186,7 @@ def save_search(name, criteria):
         with engine.connect() as conn:
             print("🔍 SAVE_SEARCH DEBUG: Connection established")
             conn.execute(text("""
-                INSERT INTO saved_searches (name, timestamp, criteria, schedule, last_run_date)
+                INSERT INTO saved_searches (name, timestamp, criteria, schedule, last_run_date, user_id)
                 VALUES (:name, :timestamp, :criteria, :schedule, :last_run_date, :user_id)
             """), {
                 "name": name,
