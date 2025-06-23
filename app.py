@@ -380,6 +380,22 @@ scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
 
+# Add scheduler initialization right after the function
+print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
+try:
+    scheduler = BackgroundScheduler()
+    print("🚀 SCHEDULER DEBUG: BackgroundScheduler created")
+    scheduler.add_job(func=run_scheduled_searches, trigger="interval", minutes=1)
+    print("🚀 SCHEDULER DEBUG: Job added to scheduler")
+    scheduler.start()
+    print("🚀 SCHEDULER DEBUG: Scheduler started successfully!")
+    atexit.register(lambda: scheduler.shutdown())
+    print("🚀 SCHEDULER DEBUG: Exit handler registered")
+except Exception as e:
+    print(f"❌ SCHEDULER DEBUG: Failed to start scheduler: {e}")
+    import traceback
+    traceback.print_exc()
+
 
 def format_description(desc):
     import re
