@@ -1036,7 +1036,62 @@ def settings():
                     username=current_username, email=current_email,
                     error="Error changing password")
     
+   
+        elif action == "delete_account":
+            # Handle account deletion
+            try:
+                with engine.connect() as conn:
+                    # Start a transaction to ensure all deletions succeed together
+                    trans = conn.begin()
+                    
+                    try:
+                        # Delete user's saved searches
+                        conn.execute(text("""
+                            DELETE FROM saved_searches WHERE user_id = :user_id
+                        """), {"user_id": user_id})
+                        
+                        # Delete user's scheduled files
+                        conn.execute(text("""
+                            DELETE FROM scheduled_files WHERE user_id = :user_id
+                        """), {"user_id": user_id})
+                        
+                        # Delete user's password reset tokens
+                        conn.execute(text("""
+                            DELETE FROM password_reset_tokens WHERE user_id = :user_id
+                        """), {"user_id": user_id})
+                        
+                        # Finally, delete the user account
+                        conn.execute(text("""
+                            DELETE FROM users WHERE id = :user_id
+                        """), {"user_id": user_id})
+                        
+                        # Commit the transaction
+                        trans.commit()
+                        
+                        # Clear the session
+                        session.clear()
+                        
+                        # Redirect to a confirmation page
+                        return render_template("account_deleted.html")
+                        
+                    except Exception as e:
+                        # If any deletion fails, roll back the transaction
+                        trans.rollback()
+                        print(f"Error during account deletion: {e}")
+                        return render_template("settings.html", 
+                            username=current_username, email=current_email,
+                            error="Error deleting account. Please try again later.")
+                            
+            except Exception as e:
+                print(f"Database error during account deletion: {e}")
+                return render_template("settings.html", 
+                    username=current_username, email=current_email,
+                    error="Database error. Please try again later.")   
+    
+    
     return render_template("settings.html", username=current_username, email=current_email)
+
+
 
 
 @app.route("/logout")
