@@ -785,7 +785,7 @@ def forgot_password():
                     
                     if token:
                         # Send reset email
-                        reset_url = f"http://localhost:5000/reset-password/{token}"  # Update with your domain
+                        reset_url = f"{request.host_url}reset-password/{token}"
                         subject = "Password Reset - Find Me A Job"
                         body = f"""Hello {username},
 
