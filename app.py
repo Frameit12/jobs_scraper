@@ -72,7 +72,6 @@ def init_users_table():
             conn.commit()
 
 init_users_table()
-init_files_table()
 
 def init_files_table():
     engine = get_db_connection()
@@ -90,6 +89,8 @@ def init_files_table():
                 )
             """))
             conn.commit()
+
+init_files_table()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
