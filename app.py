@@ -476,18 +476,19 @@ def run_scheduled_searches():
             updated = True
             print(f"💾 Saved {len(results)} results to Excel for {search['name']}")
 
-    if updated:
-    # Update the database with new last_run_date
-        with engine.connect() as conn:
-            conn.execute(text("""
-                UPDATE saved_searches 
-                SET last_run_date = :last_run_date 
-                WHERE name = :name
-            """), {
-                "last_run_date": search["last_run_date"],
-                "name": search["name"]
-            })
-            conn.commit()
+            # Update database immediately for this search
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    UPDATE saved_searches 
+                    SET last_run_date = :last_run_date 
+                    WHERE name = :name AND user_id = :user_id
+                """), {
+                    "last_run_date": search["last_run_date"],
+                    "name": search["name"],
+                    "user_id": search["user_id"]
+                })
+                conn.commit()
+
 
 # Add scheduler initialization right after the function
 print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
