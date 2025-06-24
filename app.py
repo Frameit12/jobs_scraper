@@ -842,6 +842,88 @@ Find Me A Job Team"""
             return render_template("forgot_password.html", error="Database error. Please try again later.")
     
     return render_template("forgot_password.html")
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    engine = get_db_connection()
+    if not engine:
+        return render_template("reset_password.html", error="Database connection error", token=token)
+    
+    # Validate token
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT r.id, r.user_id, r.expires_at, r.used, u.username 
+                FROM password_reset_tokens r
+                JOIN users u ON r.user_id = u.id
+                WHERE r.token = :token
+            """), {"token": token})
+            token_data = result.fetchone()
+            
+            if not token_data:
+                return render_template("reset_password.html", 
+                    error="Invalid reset link. Please request a new password reset.", token=token)
+            
+            token_id, user_id, expires_at, used, username = token_data
+            
+            # Check if token is expired or used
+            from datetime import datetime
+            if used:
+                return render_template("reset_password.html", 
+                    error="This reset link has already been used. Please request a new password reset.", token=token)
+            
+            if datetime.now() > expires_at:
+                return render_template("reset_password.html", 
+                    error="This reset link has expired. Please request a new password reset.", token=token)
+            
+            # Token is valid, process password reset
+            if request.method == "POST":
+                new_password = request.form.get("new_password", "")
+                confirm_password = request.form.get("confirm_password", "")
+                
+                if not new_password or not confirm_password:
+                    return render_template("reset_password.html", 
+                        error="Please fill in both password fields", token=token, username=username)
+                
+                if new_password != confirm_password:
+                    return render_template("reset_password.html", 
+                        error="Passwords do not match", token=token, username=username)
+                
+                if len(new_password) < 6:
+                    return render_template("reset_password.html", 
+                        error="Password must be at least 6 characters", token=token, username=username)
+                
+                # Update password and mark token as used
+                try:
+                    password_hash = generate_password_hash(new_password)
+                    
+                    # Update password
+                    conn.execute(text("""
+                        UPDATE users SET password_hash = :password_hash WHERE id = :user_id
+                    """), {"password_hash": password_hash, "user_id": user_id})
+                    
+                    # Mark token as used
+                    conn.execute(text("""
+                        UPDATE password_reset_tokens SET used = TRUE WHERE id = :token_id
+                    """), {"token_id": token_id})
+                    
+                    conn.commit()
+                    
+                    return render_template("reset_password.html", 
+                        success="Password successfully reset! You can now log in with your new password.",
+                        token=token, username=username)
+                        
+                except Exception as e:
+                    print(f"Error updating password: {e}")
+                    return render_template("reset_password.html", 
+                        error="Error updating password. Please try again.", token=token, username=username)
+            
+            # GET request - show reset form
+            return render_template("reset_password.html", token=token, username=username)
+            
+    except Exception as e:
+        print(f"Database error: {e}")
+        return render_template("reset_password.html", error="Database error. Please try again later.", token=token)
+
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
