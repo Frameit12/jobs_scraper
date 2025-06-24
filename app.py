@@ -72,6 +72,25 @@ def init_users_table():
             conn.commit()
 
 init_users_table()
+init_files_table()
+
+def init_files_table():
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS scheduled_files (
+                    id SERIAL PRIMARY KEY,
+                    search_name VARCHAR(255) NOT NULL,
+                    user_id INTEGER REFERENCES users(id),
+                    file_data BYTEA NOT NULL,
+                    filename VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(search_name, user_id)
+                )
+            """))
+            conn.commit()
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
 
@@ -122,13 +141,35 @@ def load_saved_searches():
 
 def check_excel_files_for_searches(searches):
     """Helper function to check which searches have Excel files"""
+    engine = get_db_connection()
+    
     for search in searches:
-        safe_name = search["name"].replace(" ", "_")
-        pattern = os.path.join("scheduled_results", f"{safe_name}_*.xlsx")
-        matching_files = glob.glob(pattern)
-        search["has_excel"] = len(matching_files) > 0
+        schedule = search.get("schedule", "none")
+        
+        # For scheduled searches, check database
+        if schedule != "none" and engine:
+            try:
+                with engine.connect() as conn:
+                    result = conn.execute(text("""
+                        SELECT COUNT(*) FROM scheduled_files 
+                        WHERE search_name = :search_name AND user_id = :user_id
+                    """), {
+                        "search_name": search["name"],
+                        "user_id": 1  # Using user_id = 1 for scheduled searches
+                    })
+                    count = result.fetchone()[0]
+                    search["has_excel"] = count > 0
+            except Exception as e:
+                print(f"Database error checking files: {e}")
+                search["has_excel"] = False
+        else:
+            # For non-scheduled searches, check filesystem (fallback)
+            safe_name = search["name"].replace(" ", "_")
+            pattern = os.path.join("scheduled_results", f"{safe_name}_*.xlsx")
+            matching_files = glob.glob(pattern)
+            search["has_excel"] = len(matching_files) > 0
+    
     return searches
-
 
 def create_user(username, email, password):
     engine = get_db_connection()
@@ -319,6 +360,44 @@ def save_results_to_excel(search_name, results):
 
     print(f"💾 Saved results to: {filename}")
 
+def store_excel_in_database(search_name, file_path):
+    """Store Excel file in database for scheduled searches"""
+    engine = get_db_connection()
+    if not engine:
+        print("❌ No database connection for file storage")
+        return
+    
+    try:
+        # Read the Excel file as binary data
+        with open(file_path, 'rb') as f:
+            file_data = f.read()
+        
+        filename = os.path.basename(file_path)
+        user_id = 1  # For now, we'll use user_id = 1 for scheduled searches
+        
+        with engine.connect() as conn:
+            # Delete old file if exists, then insert new one
+            conn.execute(text("""
+                DELETE FROM scheduled_files 
+                WHERE search_name = :search_name AND user_id = :user_id
+            """), {"search_name": search_name, "user_id": user_id})
+            
+            # Insert new file
+            conn.execute(text("""
+                INSERT INTO scheduled_files (search_name, user_id, file_data, filename)
+                VALUES (:search_name, :user_id, :file_data, :filename)
+            """), {
+                "search_name": search_name,
+                "user_id": user_id, 
+                "file_data": file_data,
+                "filename": filename
+            })
+            conn.commit()
+        
+        print(f"✅ Stored Excel file in database for: {search_name}")
+        
+    except Exception as e:
+        print(f"❌ Error storing file in database: {e}")
 
 def run_scheduled_searches():
     print("🕓 Checking scheduled searches...")
@@ -385,6 +464,7 @@ def run_scheduled_searches():
             safe_name = search["name"].replace(" ", "_")
             date_str = datetime.now().strftime("%d_%B_%Y")
             output_path = os.path.join("scheduled_results", f"{safe_name}_{date_str}.xlsx")
+            store_excel_in_database(search["name"], output_path)
 
             # 📧 Email the file if jobs exist
             subject = f"Scheduled Results for {search['name']} ({schedule})"
@@ -869,22 +949,42 @@ def save_schedule():
     else:
         return "Invalid search index", 400
 
-
-
 @app.route("/download_scheduled/<search_name>")
 def download_scheduled(search_name):
-    import glob
-    import os
-
-    folder = "scheduled_results"
-    pattern = os.path.join(folder, f"{search_name.replace(' ', '_')}_*.xlsx")
-    matching_files = sorted(glob.glob(pattern), reverse=True)
-
-    if not matching_files:
-        return f"No file found for scheduled search: {search_name}", 404
-
-    latest_file = matching_files[0]
-    return send_file(latest_file, as_attachment=True)
+    engine = get_db_connection()
+    if not engine:
+        return "Database connection error", 500
+    
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT file_data, filename FROM scheduled_files 
+                WHERE search_name = :search_name AND user_id = :user_id
+            """), {
+                "search_name": search_name,
+                "user_id": 1  # Using user_id = 1 for scheduled searches
+            })
+            
+            row = result.fetchone()
+            if not row:
+                return f"No file found for scheduled search: {search_name}", 404
+            
+            file_data, filename = row
+            
+            # Create BytesIO object from database binary data
+            file_buffer = BytesIO(file_data)
+            file_buffer.seek(0)
+            
+            return send_file(
+                file_buffer,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                download_name=filename,
+                as_attachment=True
+            )
+            
+    except Exception as e:
+        print(f"Error downloading scheduled file: {e}")
+        return "Error downloading file", 500
 
 @app.route("/api/saved_searches")
 def api_saved_searches():
