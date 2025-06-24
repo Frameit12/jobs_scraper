@@ -915,12 +915,14 @@ def download_selected():
      
      # Case B: Zip selected results
     files_to_zip = []
-    for name in selected:
-        filename = f"{name}_{today_str}.xlsx"
+        for name in selected:
+        # Convert spaces to underscores to match filename format
+        safe_name = name.replace(" ", "_")
+        filename = f"{safe_name}_{today_str}.xlsx"
         filepath = os.path.join("scheduled_results", filename)
         if os.path.exists(filepath):
-            files_to_zip.append(filepath)   
-        
+            files_to_zip.append(filepath)
+     
     if not files_to_zip:
         print("❌ No matching files found on disk.")
         return redirect("/")
