@@ -915,7 +915,7 @@ def download_selected():
      
      # Case B: Zip selected results
     files_to_zip = []
-        for name in selected:
+    for name in selected:
         # Convert spaces to underscores to match filename format
         safe_name = name.replace(" ", "_")
         filename = f"{safe_name}_{today_str}.xlsx"
