@@ -1265,43 +1265,76 @@ def download():
 
 @app.route("/delete_saved_search", methods=["POST"])
 def delete_saved_search():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+        
     index = int(request.form.get("index", -1))
     if index >= 0:
+        # Get current saved searches from database
         searches = load_saved_searches()
+        
         if 0 <= index < len(searches):
-            deleted = searches.pop(index)
-            with open("search_history.json", "w", encoding="utf-8") as f:
-                json.dump(searches, f, indent=2)
-            print(f"🗑️ Deleted saved search: {deleted['name']}")
+            search_to_delete = searches[index]
+            
+            engine = get_db_connection()
+            if engine:
+                try:
+                    with engine.connect() as conn:
+                        conn.execute(text("""
+                            DELETE FROM saved_searches 
+                            WHERE name = :name AND user_id = :user_id
+                        """), {
+                            "name": search_to_delete["name"],
+                            "user_id": get_current_user_id()
+                        })
+                        conn.commit()
+                        
+                    print(f"🗑️ Deleted saved search: {search_to_delete['name']}")
+                    
+                except Exception as e:
+                    print(f"❌ Error deleting search: {e}")
+                    
     return redirect("/")
 
 @app.route("/rename/<int:index>", methods=["POST"])
 def rename_saved_search(index):
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+        
     new_name = request.form.get("new_name", "").strip()
     if not new_name:
         return redirect("/")
 
-    try:
-        with open("search_history.json", "r", encoding="utf-8") as f:
-            saved_searches = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        saved_searches = []
+    # Get current saved searches from database
+    searches = load_saved_searches()
+    
+    if 0 <= index < len(searches):
+        old_search = searches[index]
+        
+        engine = get_db_connection()
+        if engine:
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        UPDATE saved_searches 
+                        SET name = :new_name 
+                        WHERE name = :old_name AND user_id = :user_id
+                    """), {
+                        "new_name": new_name,
+                        "old_name": old_search["name"],
+                        "user_id": get_current_user_id()
+                    })
+                    conn.commit()
+                    
+                print(f"✅ Renamed search from '{old_search['name']}' to '{new_name}'")
+                
+            except Exception as e:
+                print(f"❌ Error renaming search: {e}")
+                
+    return redirect("/")
 
-    if 0 <= index < len(saved_searches):
-        saved_searches[index]["name"] = new_name
-        with open("search_history.json", "w", encoding="utf-8") as f:
-            json.dump(saved_searches, f, indent=2)
-
-        return render_template(
-            "index.html",
-            jobs=last_results,
-            title="",
-            location="",
-            max_jobs=10,
-            saved_searches=check_excel_files_for_searches(load_saved_searches()),
-            active_search_name=f"{last_search_name} – {datetime.now().strftime('%d %B %Y')}",
-            timestamp=datetime.now().strftime("%d %B %Y")
-        )
 
 @app.route("/schedule", methods=["POST"])
 def schedule():
