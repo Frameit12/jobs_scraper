@@ -1180,6 +1180,31 @@ def debug_excel_detection():
     
     return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
 
+@app.route("/debug_database_files")
+def debug_database_files():
+    engine = get_db_connection()
+    if not engine:
+        return "No database connection"
+    
+    try:
+        with engine.connect() as conn:
+            # Check what files exist in database
+            result = conn.execute(text("SELECT search_name, user_id, filename, created_at FROM scheduled_files"))
+            files = []
+            for row in result:
+                files.append({
+                    "search_name": row[0],
+                    "user_id": row[1], 
+                    "filename": row[2],
+                    "created_at": str(row[3])
+                })
+            
+            # Check current user ID
+            current_user = get_current_user_id()
+            
+            return f"<pre>Current User ID: {current_user}\n\nFiles in database:\n{json.dumps(files, indent=2)}</pre>"
+    except Exception as e:
+        return f"Error: {e}"
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
