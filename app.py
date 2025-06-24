@@ -92,6 +92,63 @@ def init_files_table():
 
 init_files_table()
 
+
+def init_password_reset_table():
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    token VARCHAR(255) UNIQUE NOT NULL,
+                    expires_at TIMESTAMP NOT NULL,
+                    used BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+
+init_password_reset_table()
+
+def generate_reset_token():
+    import secrets
+    return secrets.token_urlsafe(32)
+
+def create_password_reset_token(user_id):
+    engine = get_db_connection()
+    if not engine:
+        return None
+    
+    token = generate_reset_token()
+    # Token expires in 1 hour
+    from datetime import datetime, timedelta
+    expires_at = datetime.now() + timedelta(hours=1)
+    
+    try:
+        with engine.connect() as conn:
+            # First, invalidate any existing tokens for this user
+            conn.execute(text("""
+                UPDATE password_reset_tokens 
+                SET used = TRUE 
+                WHERE user_id = :user_id AND used = FALSE
+            """), {"user_id": user_id})
+            
+            # Create new token
+            conn.execute(text("""
+                INSERT INTO password_reset_tokens (user_id, token, expires_at)
+                VALUES (:user_id, :token, :expires_at)
+            """), {
+                "user_id": user_id,
+                "token": token,
+                "expires_at": expires_at
+            })
+            conn.commit()
+        return token
+    except Exception as e:
+        print(f"Error creating reset token: {e}")
+        return None
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
 
@@ -698,6 +755,93 @@ def signup():
             return render_template("signup.html", error="Username or email already exists")
     
     return render_template("signup.html")
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        
+        if not email:
+            return render_template("forgot_password.html", error="Please enter your email address")
+        
+        # Look up user by email
+        engine = get_db_connection()
+        if not engine:
+            return render_template("forgot_password.html", error="Database connection error")
+        
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT id, username FROM users WHERE email = :email
+                """), {"email": email})
+                user = result.fetchone()
+                
+                if user:
+                    user_id = user[0]
+                    username = user[1]
+                    
+                    # Create reset token
+                    token = create_password_reset_token(user_id)
+                    
+                    if token:
+                        # Send reset email
+                        reset_url = f"http://localhost:5000/reset-password/{token}"  # Update with your domain
+                        subject = "Password Reset - Find Me A Job"
+                        body = f"""Hello {username},
+
+You requested a password reset for your Find Me A Job account.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you didn't request this password reset, please ignore this email.
+
+Best regards,
+Find Me A Job Team"""
+                        
+                        # Use existing email configuration
+                        try:
+                            smtp_server = config["email_settings"]["smtp_server"]
+                            smtp_port = config["email_settings"]["smtp_port"]
+                            sender_email = config["email_settings"]["sender_email"]
+                            sender_password = config["email_settings"]["sender_password"]
+                            
+                            import smtplib
+                            from email.message import EmailMessage
+                            
+                            msg = EmailMessage()
+                            msg["Subject"] = subject
+                            msg["From"] = sender_email
+                            msg["To"] = email
+                            msg.set_content(body)
+                            
+                            with smtplib.SMTP(smtp_server, smtp_port) as smtp:
+                                smtp.starttls()
+                                smtp.login(sender_email, sender_password)
+                                smtp.send_message(msg)
+                                
+                            return render_template("forgot_password.html", 
+                                success="Password reset instructions have been sent to your email")
+                                
+                        except Exception as e:
+                            print(f"Error sending email: {e}")
+                            return render_template("forgot_password.html", 
+                                error="Error sending email. Please try again later.")
+                    else:
+                        return render_template("forgot_password.html", 
+                            error="Error creating reset token. Please try again later.")
+                else:
+                    # Don't reveal whether email exists or not (security)
+                    return render_template("forgot_password.html", 
+                        success="If an account with that email exists, password reset instructions have been sent")
+                        
+        except Exception as e:
+            print(f"Database error: {e}")
+            return render_template("forgot_password.html", error="Database error. Please try again later.")
+    
+    return render_template("forgot_password.html")
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
