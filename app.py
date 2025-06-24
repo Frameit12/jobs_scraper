@@ -698,6 +698,120 @@ def signup():
     
     return render_template("signup.html")
 
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+    
+    engine = get_db_connection()
+    if not engine:
+        return "Database connection error", 500
+    
+    # Get current user info
+    user_id = get_current_user_id()
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT username, email FROM users WHERE id = :user_id
+            """), {"user_id": user_id})
+            user = result.fetchone()
+            
+            if not user:
+                return redirect("/logout")
+                
+            current_username = user[0]
+            current_email = user[1]
+    except Exception as e:
+        print(f"Error fetching user data: {e}")
+        return "Error loading settings", 500
+    
+    if request.method == "POST":
+        action = request.form.get("action")
+        
+        if action == "update_profile":
+            # Handle profile updates
+            new_username = request.form.get("username", "").strip()
+            new_email = request.form.get("email", "").strip()
+            
+            if not new_username or not new_email:
+                return render_template("settings.html", 
+                    username=current_username, email=current_email,
+                    error="Please fill in all fields")
+            
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        UPDATE users SET username = :username, email = :email 
+                        WHERE id = :user_id
+                    """), {
+                        "username": new_username,
+                        "email": new_email,
+                        "user_id": user_id
+                    })
+                    conn.commit()
+                    
+                    # Update session
+                    session['username'] = new_username
+                    
+                return render_template("settings.html", 
+                    username=new_username, email=new_email,
+                    success="Profile updated successfully!")
+            except Exception as e:
+                return render_template("settings.html", 
+                    username=current_username, email=current_email,
+                    error="Username or email already exists")
+        
+        elif action == "change_password":
+            # Handle password change
+            current_password = request.form.get("current_password", "")
+            new_password = request.form.get("new_password", "")
+            confirm_password = request.form.get("confirm_password", "")
+            
+            if not current_password or not new_password or not confirm_password:
+                return render_template("settings.html", 
+                    username=current_username, email=current_email,
+                    error="Please fill in all password fields")
+            
+            if new_password != confirm_password:
+                return render_template("settings.html", 
+                    username=current_username, email=current_email,
+                    error="New passwords don't match")
+            
+            if len(new_password) < 6:
+                return render_template("settings.html", 
+                    username=current_username, email=current_email,
+                    error="Password must be at least 6 characters")
+            
+            # Verify current password
+            if not verify_user(current_username, current_password):
+                return render_template("settings.html", 
+                    username=current_username, email=current_email,
+                    error="Current password is incorrect")
+            
+            try:
+                password_hash = generate_password_hash(new_password)
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        UPDATE users SET password_hash = :password_hash 
+                        WHERE id = :user_id
+                    """), {
+                        "password_hash": password_hash,
+                        "user_id": user_id
+                    })
+                    conn.commit()
+                    
+                return render_template("settings.html", 
+                    username=current_username, email=current_email,
+                    success="Password changed successfully!")
+            except Exception as e:
+                return render_template("settings.html", 
+                    username=current_username, email=current_email,
+                    error="Error changing password")
+    
+    return render_template("settings.html", username=current_username, email=current_email)
+
+
 @app.route("/logout")
 def logout():
     session.clear()
