@@ -213,7 +213,7 @@ def check_excel_files_for_searches(searches):
                         WHERE search_name = :search_name AND user_id = :user_id
                     """), {
                         "search_name": search["name"],
-                        "user_id": 1  # Using user_id = 1 for scheduled searches
+                        "user_id": get_current_user_id()
                     })
                     count = result.fetchone()[0]
                     search["has_excel"] = count > 0
@@ -1392,7 +1392,7 @@ def download_scheduled(search_name):
                 WHERE search_name = :search_name AND user_id = :user_id
             """), {
                 "search_name": search_name,
-                "user_id": 1  # Using user_id = 1 for scheduled searches
+                "user_id": get_current_user_id()
             })
             
             row = result.fetchone()
