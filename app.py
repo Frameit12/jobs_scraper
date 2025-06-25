@@ -1472,8 +1472,8 @@ def download_selected():
     
         
     if not files_data:
-    print("❌ No matching files found in database.")
-    return redirect("/")
+        print("❌ No matching files found in database.")
+        return redirect("/")
 
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w') as zipf:
