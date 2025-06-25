@@ -418,7 +418,7 @@ def save_results_to_excel(search_name, results):
 
     print(f"💾 Saved results to: {filename}")
 
-def store_excel_in_database(search_name, file_path):
+def store_excel_in_database(search_name, file_path,user_id):
     """Store Excel file in database for scheduled searches"""
     engine = get_db_connection()
     if not engine:
@@ -431,8 +431,7 @@ def store_excel_in_database(search_name, file_path):
             file_data = f.read()
         
         filename = os.path.basename(file_path)
-        user_id = 1  # For now, we'll use user_id = 1 for scheduled searches
-        
+       
         with engine.connect() as conn:
             # Delete old file if exists, then insert new one
             conn.execute(text("""
@@ -522,7 +521,7 @@ def run_scheduled_searches():
             safe_name = search["name"].replace(" ", "_")
             date_str = datetime.now().strftime("%d_%B_%Y")
             output_path = os.path.join("scheduled_results", f"{safe_name}_{date_str}.xlsx")
-            store_excel_in_database(search["name"], output_path)
+            store_excel_in_database(search["name"], output_path, search["user_id"])
 
             # 📧 Email the file if jobs exist
             subject = f"Scheduled Results for {search['name']} ({schedule})"
@@ -1365,10 +1364,11 @@ def save_schedule():
                     conn.execute(text("""
                         UPDATE saved_searches 
                         SET schedule = :schedule 
-                        WHERE name = :name
+                        WHERE name = :name AND user_id =:user_id
                     """), {
                         "schedule": frequency,
                         "name": search["name"]
+                        "user_id": get_current_user_id()
                     })
                     conn.commit()
                 return '', 200
