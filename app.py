@@ -1444,28 +1444,46 @@ def download_selected():
         return redirect("/")
      
      # Case B: Zip selected results
-    files_to_zip = []
-    for name in selected:
-        # Convert spaces to underscores to match filename format
-        safe_name = name.replace(" ", "_")
-        filename = f"{safe_name}_{today_str}.xlsx"
-        filepath = os.path.join("scheduled_results", filename)
-        if os.path.exists(filepath):
-            files_to_zip.append(filepath)
-     
-    if not files_to_zip:
-        print("❌ No matching files found on disk.")
-        return redirect("/")
+    # Get files from database instead of filesystem
+    files_data = []
+    engine = get_db_connection()
+
+    if engine:
+        try:
+            with engine.connect() as conn:
+                for name in selected:
+                    result = conn.execute(text("""
+                        SELECT file_data, filename FROM scheduled_files 
+                        WHERE search_name = :search_name AND user_id = :user_id
+                    """), {
+                        "search_name": name,
+                        "user_id": get_current_user_id()
+                    })
+                
+                    row = result.fetchone()
+                    if row:
+                        files_data.append({
+                            "filename": row[1],
+                            "data": row[0]
+                        })
+        except Exception as e:
+            print(f"❌ Database error: {e}")
+            return redirect("/")
+    
+        
+    if not files_data:
+    print("❌ No matching files found in database.")
+    return redirect("/")
 
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, 'w') as zipf:
-        for f in files_to_zip:
-            zipf.write(f, arcname=os.path.basename(f))
+        for file_info in files_data:
+            # Add the binary data directly to the zip
+            zipf.writestr(file_info["filename"], file_info["data"])
 
     zip_buffer.seek(0)
     return send_file(zip_buffer, as_attachment=True, download_name="Selected_Results.zip", mimetype="application/zip")
-
-
+    
 @app.route("/create_test_files")
 def create_test_files():
     import os
