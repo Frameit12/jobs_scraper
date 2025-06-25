@@ -1364,7 +1364,7 @@ def save_schedule():
                     conn.execute(text("""
                         UPDATE saved_searches 
                         SET schedule = :schedule 
-                        WHERE name = :name AND user_id =:user_id
+                        WHERE name = :name AND user_id = :user_id
                     """), {
                         "schedule": frequency,
                         "name": search["name"],
