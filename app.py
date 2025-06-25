@@ -469,7 +469,7 @@ def run_scheduled_searches():
             result = conn.execute(text("""
                 SELECT name, timestamp, criteria, schedule, last_run_date, user_id
                 FROM saved_searches 
-                WHERE schedule != 'none'
+                WHERE schedule != 'none' AND user_id IS NOT NULL
                 ORDER BY id DESC
             """))
         
