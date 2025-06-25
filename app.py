@@ -1367,7 +1367,7 @@ def save_schedule():
                         WHERE name = :name AND user_id =:user_id
                     """), {
                         "schedule": frequency,
-                        "name": search["name"]
+                        "name": search["name"],
                         "user_id": get_current_user_id()
                     })
                     conn.commit()
