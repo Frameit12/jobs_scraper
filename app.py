@@ -603,7 +603,7 @@ def clean_description_for_excel(html):
     )
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
-def send_email_with_attachment(subject, body, attachment_path, config):
+def send_email_with_attachment(subject, body, attachment_path, config, user_email=None):
     try:
         smtp_server = config["email_settings"]["smtp_server"]
         smtp_port = config["email_settings"]["smtp_port"]
