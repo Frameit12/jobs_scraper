@@ -709,7 +709,7 @@ def index():
         last_results = jobs
         global last_search_name
         last_search_name = title if title else "Job_Search"
-        return render_template("index.html", jobs=jobs, title=title, location=location, max_jobs=max_jobs, saved_searches=load_saved_searches())
+        , jobs=jobs, title=title, location=location, max_jobs=max_jobs, saved_searches=load_saved_searches())
     
     saved_searches = check_excel_files_for_searches(load_saved_searches())
     print("✅ Saved searches and their Excel status:")
@@ -1138,6 +1138,7 @@ def load_saved_search(index):
             title=title,
             location=location,
             max_jobs=max_jobs,
+            seniority=seniority,
             saved_searches=searches,
             criteria = searches[index]["criteria"],
             name = searches[index]["name"],
