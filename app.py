@@ -686,47 +686,33 @@ def index():
         
         try:
             jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
+            
+            # Process job descriptions (this was missing!)
+            for job in jobs:
+                if not job.get("company"):
+                    job["company"] = "[Not Found]"
+
+                # Clean and decode HTML entities in description
+                import html
+                raw_description = job.get("description", "Description not available")
+                decoded_description = html.unescape(raw_description)
+                cleaned_description = (
+                    decoded_description.replace("<u>", "")
+                                      .replace("</u>", "")
+                                      .replace("<strong>", "")
+                                      .replace("</strong>", "")
+                                      .replace("<b>", "")
+                                      .replace("</b>", "")
+                )
+                job["formatted_description"] = cleaned_description
+                
         except Exception as e:
-            print(f"❌ SCRAPING ERROR: {str(e)}")
+            print(f"❌ LOAD SEARCH ERROR: {str(e)}")
             print(f"❌ ERROR TYPE: {type(e).__name__}")
             import traceback
             traceback.print_exc()
             jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
-        
-       
-        for job in jobs:
-            print("🔍 RAW job keys:", list(job.keys()))
-            print("📌 Raw company before any changes:", job.get("company", "❌ MISSING"))
-            description = job.get("description", "")
-            if "<u>" in description:
-                print("🚨 FOUND <u> TAGS in raw description!")
-                print("🔍 RAW DESCRIPTION WITH <u> TAGS:", repr(description[:500]))
-            else:
-                print("🔍 RAW DESCRIPTION:", repr(description[:200]))
-
-            # Ensure the company name is included for rendering
-            if not job.get("company"):
-                job["company"] = "[Not Found]"
-
-            # Clean and decode HTML entities in description
-            import html
-            raw_description = job.get("description", "Description not available")
-            # First decode HTML entities like &lt; back to 
-            decoded_description = html.unescape(raw_description)
-            # Then clean unwanted HTML tags
-            cleaned_description = (
-                decoded_description.replace("<u>", "")
-                                  .replace("</u>", "")
-                                  .replace("<strong>", "")
-                                  .replace("</strong>", "")
-                                  .replace("<b>", "")
-                                  .replace("</b>", "")
-            )
-            job["formatted_description"] = cleaned_description
-
-            print("✅ Final company value:", job["company"])
-            print("📦 FORMATTED DESCRIPTION SENT TO TEMPLATE:\n", job["formatted_description"][:500])
-
+                    
         
         last_results = jobs
         global last_search_name
@@ -1133,21 +1119,43 @@ def load_saved_search(index):
         seniority=criteria.get("seniority", "")
         max_jobs = criteria.get("max_jobs", 10)
         try:
-            max_jobs = int(rmax_jobs)
+            max_jobs = int(max_jobs)
             if max_jobs <= 0 or max_jobs > 50:
                 max_jobs = 10
         except (ValueError, TypeError):
             max_jobs = 10
 
+        
         try:
             jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
+    
+            # Process job descriptions (this was missing!)
+            for job in jobs:
+                if not job.get("company"):
+                    job["company"] = "[Not Found]"
+
+                # Clean and decode HTML entities in description
+                import html
+                raw_description = job.get("description", "Description not available")
+                decoded_description = html.unescape(raw_description)
+                cleaned_description = (
+                    decoded_description.replace("<u>", "")
+                                      .replace("</u>", "")
+                                      .replace("<strong>", "")
+                                      .replace("</strong>", "")
+                                      .replace("<b>", "")
+                                      .replace("</b>", "")
+                )
+                job["formatted_description"] = cleaned_description
+        
         except Exception as e:
             print(f"❌ LOAD SEARCH ERROR: {str(e)}")
             print(f"❌ ERROR TYPE: {type(e).__name__}")
             import traceback
             traceback.print_exc()
-            jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
+        jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
         
+              
         global last_results
         last_results = jobs
 
@@ -1169,15 +1177,7 @@ def load_saved_search(index):
         )
     else:
         return redirect("/")
-
-        try:
-            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
-            # Add debug logging
-            for i, job in enumerate(jobs):
-                print(f"🔍 DEBUG Job {i}: description length = {len(job.get('description', ''))}")
-                print(f"🔍 DEBUG Job {i}: formatted_description = {job.get('formatted_description', 'MISSING')[:100]}")
-        except Exception as e:
-            # rest of error handling...
+    
 
 @app.route('/download', methods=['POST'])
 def download():
