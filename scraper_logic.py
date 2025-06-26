@@ -130,6 +130,24 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
     time.sleep(5)
 
+    # DEBUG: Check what we actually got after the search
+    print("🔍 DEBUG: Checking search results after initial search...")
+    try:
+        # Look for the job count indicator
+        result_text = driver.find_element(By.XPATH, "//*[contains(text(), 'job in')]").text
+        print(f"📊 Results found on page: {result_text}")
+    
+        # Count actual job cards
+        initial_cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+        print(f"📋 Job cards found: {len(initial_cards)}")
+    
+        # Check if "No more jobs!" exists immediately
+        no_more_msg = driver.find_elements(By.XPATH, "//*[contains(text(), 'No more jobs!')]")
+        print(f"🔚 'No more jobs!' message present: {len(no_more_msg) > 0}")
+    
+    except Exception as e:
+        print(f"⚠️ DEBUG: Could not get initial search info: {e}")
+    
     print(f"🔍 SENIORITY RECEIVED: '{seniority}' (type: {type(seniority)})")
 
     # Handle seniority filtering if specified
