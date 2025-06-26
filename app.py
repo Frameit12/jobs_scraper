@@ -1131,13 +1131,13 @@ def load_saved_search(index):
         title = criteria.get("title", "")
         location = criteria.get("location", "")
         seniority=criteria.get("seniority", "")
-        raw_max_jobs = request.form.get("max_jobs", "")
+        max_jobs = criteria.get("max_jobs", 10)
         try:
-            max_jobs = int(raw_max_jobs)
+            max_jobs = int(rmax_jobs)
             if max_jobs <= 0 or max_jobs > 50:
-                max_jobs = 50
+                max_jobs = 10
         except (ValueError, TypeError):
-            max_jobs = 50
+            max_jobs = 10
 
         try:
             jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
@@ -1169,6 +1169,15 @@ def load_saved_search(index):
         )
     else:
         return redirect("/")
+
+        try:
+            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
+            # Add debug logging
+            for i, job in enumerate(jobs):
+                print(f"🔍 DEBUG Job {i}: description length = {len(job.get('description', ''))}")
+                print(f"🔍 DEBUG Job {i}: formatted_description = {job.get('formatted_description', 'MISSING')[:100]}")
+        except Exception as e:
+            # rest of error handling...
 
 @app.route('/download', methods=['POST'])
 def download():
