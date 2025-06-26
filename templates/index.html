@@ -550,6 +550,25 @@
     </script>
 
     <script>
+    // Show spinner when clicking saved search links
+    document.addEventListener('DOMContentLoaded', function() {
+        // Find all saved search links (they have URLs like /load_search/0, /load_search/1, etc.)
+        const savedSearchLinks = document.querySelectorAll('a[href*="/load_search/"]');
+    
+        savedSearchLinks.forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                // Show the same spinner as for new searches
+                const spinner = document.getElementById('loading-spinner');
+                if (spinner) {
+                    spinner.style.display = 'inline-block';
+                }
+            });
+        });
+    });
+    </script>
+
+    
+    <script>
     function toggleHelp() {
         const content = document.getElementById('help-content');
         const arrow = document.getElementById('help-arrow');
