@@ -678,7 +678,7 @@ def index():
                 info = f"✅ Search saved as: {formatted_name}"
             
             saved_searches = check_excel_files_for_searches(load_saved_searches())
-            return render_template("index.html", info=info, jobs=last_results, title=title, location=location, max_jobs=max_jobs, saved_searches=saved_searches)
+            return render_template("index.html", info=info, jobs=last_results, title=title, location=location, max_jobs=max_jobs, seniority=seniority, saved_searches=saved_searches)
             
         print(f"🔍 FLASK DEBUG: About to call scraper with seniority='{seniority}', type={type(seniority)}")
         
