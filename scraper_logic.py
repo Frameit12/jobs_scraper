@@ -83,7 +83,7 @@ def extract_job_details(driver, url):
     }
 
 
-def scrape_jobs(title, location, max_jobs=10, seniority=None):
+def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
     print("🔍 BASIC DEBUG: Function called with parameters:")
     print(f"  - title: '{title}'")
     print(f"  - location: '{location}'") 
@@ -115,7 +115,8 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
     # === REST OF YOUR EXACT WORKING LOGIC ===
-    driver.get("https://www.efinancialcareers.com/")
+    base_url = "https://www.efinancialcareers.com/" if region == "US" else "https://www.efinancialcareers.co.uk/"
+    driver.get(base_url)
     time.sleep(2)
 
     print("⌨️ Filling job title and location...")
