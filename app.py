@@ -697,6 +697,7 @@ def index():
         for job in jobs:
             print("🔍 RAW job keys:", list(job.keys()))
             print("📌 Raw company before any changes:", job.get("company", "❌ MISSING"))
+            print("🔍 RAW DESCRIPTION:", repr(job.get("description", "")[:200]))
 
             # Ensure the company name is included for rendering
             if not job.get("company"):
