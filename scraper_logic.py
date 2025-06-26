@@ -279,7 +279,6 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
 
     print(f"🔍 Found {len(job_links)} job links.\n")
 
-
     # ✅ Collect only valid jobs until we reach max_jobs
     job_results = []
     for url in job_links:
@@ -293,25 +292,14 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
             print("⛔ Skipping invalid job.")
             continue
 
-        # Check if job actually matches our search criteria
-        title_matches = title.lower() in job["title"].lower() or any(word in job["title"].lower() for word in title.lower().split())
-        location_matches = location.lower() in job["location"].lower()
-    
-        print(f"🔍 Job relevance check:")
-        print(f"   Title: '{job['title']}' - Matches: {title_matches}")
-        print(f"   Location: '{job['location']}' - Matches: {location_matches}")
-    
-        if title_matches and location_matches:
-            job_results.append(job)
-            print(f"✅ Collected relevant job: {len(job_results)} / {max_jobs}")
-        else:
-            print(f"⛔ Skipping irrelevant job: '{job['title']}'")
-    
+        job_results.append(job)
+        print(f"✅ Collected: {len(job_results)} / {max_jobs}")
         time.sleep(2)
 
         if len(job_results) >= max_jobs:
             break
-
+    
+    
     driver.quit()
     return job_results
 
