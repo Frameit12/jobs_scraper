@@ -233,35 +233,56 @@ def detect_user_region(request):
     """Detect if user is in UK based on IP address"""
     print(f"🧪 REGION DEBUG: Function called with request args: {request.args}")
 
-    # TEMPORARY TEST: Force UK region
-    print("🧪 TEMPORARY: Forcing UK region for testing")
-    return "UK"
-    
+    # TEST OVERRIDE: Check for manual region parameter
     test_region = request.args.get('test_region')
     print(f"🧪 REGION DEBUG: test_region parameter = '{test_region}'")
+    
     if test_region and test_region.upper() in ['UK', 'US']:
         print(f"🧪 TEST MODE: Using manual region override: {test_region}")
         return test_region.upper()
+
+    # STEP 1: Debug IP detection
+    print("🔍 STEP 1: Checking IP detection...")
+    http_x_forwarded = request.environ.get('HTTP_X_FORWARDED_FOR', 'NOT_FOUND')
+    remote_addr = request.environ.get('REMOTE_ADDR', 'NOT_FOUND')
+    print(f"🔍 HTTP_X_FORWARDED_FOR = '{http_x_forwarded}'")
+    print(f"🔍 REMOTE_ADDR = '{remote_addr}'")
     
+    user_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', ''))
+    if ',' in user_ip:
+        user_ip = user_ip.split(',')[0].strip()
+    
+    print(f"🔍 Final selected IP = '{user_ip}'")
+
+    # STEP 2: Test API call
+    print("🔍 STEP 2: Testing API call...")
     try:
         import requests
-        # Get user's IP address
-        user_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', ''))
-        if ',' in user_ip:
-            user_ip = user_ip.split(',')[0].strip()
+        api_url = f"http://ip-api.com/json/{user_ip}"
+        print(f"🔍 API URL = '{api_url}'")
         
-        # Use a free IP geolocation service
-        response = requests.get(f"http://ip-api.com/json/{user_ip}", timeout=3)
+        response = requests.get(api_url, timeout=10)
+        print(f"🔍 API Response Status = {response.status_code}")
+        print(f"🔍 API Response Headers = {dict(response.headers)}")
+        print(f"🔍 API Response Text = '{response.text}'")
+        
         if response.status_code == 200:
             data = response.json()
-            country_code = data.get('countryCode', '')
-            print(f"🌍 Detected country: {country_code} for IP: {user_ip}")
+            print(f"🔍 API Response JSON = {data}")
+            country_code = data.get('countryCode', 'NOT_FOUND')
+            country_name = data.get('country', 'NOT_FOUND')
+            print(f"🔍 Country Code = '{country_code}'")
+            print(f"🔍 Country Name = '{country_name}'")
             return "UK" if country_code == "GB" else "US"
+        else:
+            print(f"❌ API returned non-200 status: {response.status_code}")
     except Exception as e:
-        print(f"❌ Region detection failed: {e}")
+        print(f"❌ Exception during API call: {type(e).__name__}: {e}")
+        import traceback
+        print(f"❌ Full traceback: {traceback.format_exc()}")
     
     # Default to US if detection fails
-    print("🌍 REGION DEBUG: Defaulting to US")
+    print("🔍 STEP 3: Defaulting to US")
     return "US"
 
 
