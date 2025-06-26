@@ -204,6 +204,24 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
                 raise Exception("Seniority button not found")
                 
             print("✅ Seniority filter applied successfully")
+            
+            # DEBUG: Save the actual page we're on after filtering
+            print("🔍 DEBUG: Saving filtered page source...")
+            with open("filtered_results_debug.html", "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+
+            # DEBUG: Check current URL
+            print(f"🌐 Current URL after filtering: {driver.current_url}")
+
+            # DEBUG: Look for the specific job count text
+            try:
+                job_count_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'Operational Risk job in New York')]")
+                for elem in job_count_elements:
+                    print(f"📊 Found job count text: '{elem.text}'")
+            except Exception as e:
+                print(f"⚠️ Could not find job count text: {e}")
+
+      
         except Exception as e:
             print(f"⚠️ Could not apply seniority filter: {e}")
 
