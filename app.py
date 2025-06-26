@@ -233,9 +233,9 @@ def detect_user_region(request):
     """Detect if user is in UK based on IP address"""
     
     test_region = request.args.get('test_region')
-    if test_region in ['UK', 'US']:
+    if test_region and test_region.upper() in ['UK', 'US']:
         print(f"🧪 TEST MODE: Using manual region override: {test_region}")
-        return test_region
+        return test_region.upper()
     
     try:
         import requests
