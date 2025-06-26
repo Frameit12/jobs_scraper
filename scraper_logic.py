@@ -138,7 +138,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
         print(f"📊 Results found on page: {result_text}")
     
         # Count actual job cards
-        initial_cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+        initial_cards = driver.find_elements(By.CSS_SELECTOR, "[data-cy='job-result'] a.font-subtitle-3-medium.job-title")
         print(f"📋 Job cards found: {len(initial_cards)}")
     
         # Check if "No more jobs!" exists immediately
@@ -227,7 +227,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
 
     print("🔄 Checking if more jobs are available...")
     # Get initial job count after filtering
-    cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+    cards = driver.find_elements(By.CSS_SELECTOR, "[data-cy='job-result'] a.font-subtitle-3-medium.job-title")
     print(f"🔍 Jobs found after filtering: {len(cards)}")
 
     # Check if there are more jobs available before trying to load them
@@ -250,7 +250,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
             time.sleep(3)
         
             # Check if we got more jobs
-            new_cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+            new_cards = driver.find_elements(By.CSS_SELECTOR, "[data-cy='job-result'] a.font-subtitle-3-medium.job-title")
             if len(new_cards) == len(cards):  # No new jobs loaded
                 print("🔚 No new jobs loaded after clicking 'Show more'")
                 break
@@ -266,7 +266,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
 
     print("⏳ Waiting for job cards to load...")
     job_links = []
-    cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+    cards = driver.find_elements(By.CSS_SELECTOR, "[data-cy='job-result'] a.font-subtitle-3-medium.job-title")
     print(f"🔍 Total cards collected: {len(cards)}")
 
     for card in cards:
