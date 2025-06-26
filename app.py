@@ -229,6 +229,29 @@ def check_excel_files_for_searches(searches):
     
     return searches
 
+def detect_user_region(request):
+    """Detect if user is in UK based on IP address"""
+    try:
+        import requests
+        # Get user's IP address
+        user_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', ''))
+        if ',' in user_ip:
+            user_ip = user_ip.split(',')[0].strip()
+        
+        # Use a free IP geolocation service
+        response = requests.get(f"http://ip-api.com/json/{user_ip}", timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            country_code = data.get('countryCode', '')
+            print(f"🌍 Detected country: {country_code} for IP: {user_ip}")
+            return "UK" if country_code == "GB" else "US"
+    except Exception as e:
+        print(f"❌ Region detection failed: {e}")
+    
+    # Default to US if detection fails
+    return "US"
+
+
 def create_user(username, email, password):
     engine = get_db_connection()
     if not engine:
@@ -685,7 +708,8 @@ def index():
         print(f"🔍 FLASK DEBUG: About to call scraper with seniority='{seniority}', type={type(seniority)}")
         
         try:
-            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
+            region = detect_user_region(request)
+            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority, region=region)
             
             # Process job descriptions (this was missing!)
             for job in jobs:
@@ -1127,7 +1151,8 @@ def load_saved_search(index):
             max_jobs = 50
 
         try:
-            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
+            region = detect_user_region(request)
+            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority, region=region)
         except Exception as e:
             print(f"❌ LOAD SEARCH ERROR: {str(e)}")
             print(f"❌ ERROR TYPE: {type(e).__name__}")
