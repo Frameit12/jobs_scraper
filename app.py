@@ -231,6 +231,7 @@ def check_excel_files_for_searches(searches):
 
 def detect_user_region(request):
     """Detect if user is in UK based on IP address"""
+    print("🚨🚨🚨 DETECT_USER_REGION CALLED! 🚨🚨🚨")
     print(f"🧪 REGION DEBUG: Function called with request args: {request.args}")
 
     # TEST OVERRIDE: Check for manual region parameter
