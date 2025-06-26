@@ -467,10 +467,11 @@ def run_scheduled_searches():
     try:
         with engine.connect() as conn:
             result = conn.execute(text("""
-                SELECT name, timestamp, criteria, schedule, last_run_date, user_id
-                FROM saved_searches 
-                WHERE schedule != 'none' AND user_id IS NOT NULL
-                ORDER BY id DESC
+                SELECT s.name, s.timestamp, s.criteria, s.schedule, s.last_run_date, s.user_id, u.email
+                FROM saved_searches s
+                JOIN users u ON s.user_id = u.id
+                WHERE s.schedule != 'none' AND s.user_id IS NOT NULL
+                ORDER BY s.id DESC
             """))
         
             for row in result:
