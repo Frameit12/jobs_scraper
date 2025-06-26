@@ -601,6 +601,8 @@ def clean_description_for_excel(html):
             .replace("</ul>", "")
             .replace("<b>", "")
             .replace("</b>", "")
+            .replace("<u>", "")
+            .replace("</u>", "")
             .replace("&nbsp;", " ")
     )
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
