@@ -1135,6 +1135,16 @@ def load_saved_search(index):
             traceback.print_exc()
             jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
         
+        # Format jobs for display (same as in main index route)
+        for job in jobs:
+            # Ensure the company name is included for rendering
+            if not job.get("company"):
+                job["company"] = "[Not Found]"
+
+            job["formatted_description"] = job.get("description", "Description not available")
+
+     
+        
         global last_results
         last_results = jobs
 
