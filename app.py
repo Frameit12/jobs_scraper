@@ -609,7 +609,7 @@ def send_email_with_attachment(subject, body, attachment_path, config, user_emai
         smtp_port = config["email_settings"]["smtp_port"]
         sender_email = config["email_settings"]["sender_email"]
         sender_password = config["email_settings"]["sender_password"]
-        recipients = config["email_settings"]["recipients"]
+        recipients = [user_email] if user_email else config["email_settings"]["recipients"]
 
         msg = EmailMessage()
         msg["Subject"] = subject
