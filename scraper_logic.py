@@ -116,6 +116,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
 
     # === REST OF YOUR EXACT WORKING LOGIC ===
     base_url = "https://www.efinancialcareers.com/" if region == "US" else "https://www.efinancialcareers.co.uk/"
+    print(f"🌍 REGION DEBUG: Using region '{region}' -> URL: {base_url}")
     driver.get(base_url)
     time.sleep(2)
 
