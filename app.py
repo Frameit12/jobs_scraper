@@ -481,7 +481,8 @@ def run_scheduled_searches():
                     "criteria": row[2],
                     "schedule": row[3] or "none",
                     "last_run_date": row[4] or "",
-                    "user_id": row[5]
+                    "user_id": row[5],
+                    "user_email": row[6]
                 }
                 search_history.append(search)
     except Exception as e:
@@ -527,7 +528,7 @@ def run_scheduled_searches():
             # 📧 Email the file if jobs exist
             subject = f"Scheduled Results for {search['name']} ({schedule})"
             body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
-            send_email_with_attachment(subject, body, output_path, config)
+            send_email_with_attachment(subject, body, output_path, config, search["user_email"])
 
             search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
             updated = True
