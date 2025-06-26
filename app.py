@@ -708,7 +708,21 @@ def index():
             if not job.get("company"):
                 job["company"] = "[Not Found]"
 
-            job["formatted_description"] = job.get("description", "Description not available")
+            # Clean and decode HTML entities in description
+            import html
+            raw_description = job.get("description", "Description not available")
+            # First decode HTML entities like &lt; back to 
+            decoded_description = html.unescape(raw_description)
+            # Then clean unwanted HTML tags
+            cleaned_description = (
+                decoded_description.replace("<u>", "")
+                                  .replace("</u>", "")
+                                  .replace("<strong>", "")
+                                  .replace("</strong>", "")
+                                  .replace("<b>", "")
+                                  .replace("</b>", "")
+            )
+            job["formatted_description"] = cleaned_description
 
             print("✅ Final company value:", job["company"])
             print("📦 FORMATTED DESCRIPTION SENT TO TEMPLATE:\n", job["formatted_description"][:500])
