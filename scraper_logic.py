@@ -156,7 +156,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
         try:
             print("⏳ Waiting for search results page to load...")
             WebDriverWait(driver, 65).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title"))
+                EC.presence_of_element_located((By.CSS_SELECTOR, "[data-cy='job-result'] a.font-subtitle-3-medium.job-title"))
             )
             time.sleep(3)
         
@@ -197,7 +197,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None):
             
                         print("⏳ Waiting for filtered results to reload...")
                         WebDriverWait(driver, 65).until(
-                            EC.presence_of_element_located((By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title"))
+                            EC.presence_of_element_located((By.CSS_SELECTOR, "[data-cy='job-result'] a.font-subtitle-3-medium.job-title"))
                         )
                         time.sleep(3)
             else:
