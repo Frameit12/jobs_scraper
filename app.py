@@ -1116,46 +1116,25 @@ def load_saved_search(index):
         criteria = searches[index]["criteria"]
         title = criteria.get("title", "")
         location = criteria.get("location", "")
-        seniority=criteria.get("seniority", "")
-        max_jobs = criteria.get("max_jobs", 10)
+        seniority = criteria.get("seniority", "")
+        max_jobs = criteria.get("max_jobs", 10)  # Get from criteria instead of form
+        
         try:
             max_jobs = int(max_jobs)
             if max_jobs <= 0 or max_jobs > 50:
-                max_jobs = 10
+                max_jobs = 50
         except (ValueError, TypeError):
-            max_jobs = 10
+            max_jobs = 50
 
-        
         try:
             jobs = scrape_jobs(title, location, max_jobs, seniority=seniority)
-    
-            # Process job descriptions (this was missing!)
-            for job in jobs:
-                if not job.get("company"):
-                    job["company"] = "[Not Found]"
-
-                # Clean and decode HTML entities in description
-                import html
-                raw_description = job.get("description", "Description not available")
-                decoded_description = html.unescape(raw_description)
-                cleaned_description = (
-                    decoded_description.replace("<u>", "")
-                                      .replace("</u>", "")
-                                      .replace("<strong>", "")
-                                      .replace("</strong>", "")
-                                      .replace("<b>", "")
-                                      .replace("</b>", "")
-                )
-                job["formatted_description"] = cleaned_description
-        
         except Exception as e:
             print(f"❌ LOAD SEARCH ERROR: {str(e)}")
             print(f"❌ ERROR TYPE: {type(e).__name__}")
             import traceback
             traceback.print_exc()
-        jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
+            jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
         
-              
         global last_results
         last_results = jobs
 
@@ -1168,12 +1147,11 @@ def load_saved_search(index):
             title=title,
             location=location,
             max_jobs=max_jobs,
-            seniority=seniority,
             saved_searches=searches,
-            criteria = searches[index]["criteria"],
-            name = searches[index]["name"],
-            timestamp = datetime.now().strftime("%d %B %Y"),
-            active_search_name = f"{searches[index]['name']} – {location} – {datetime.now().strftime('%d %B %Y')}"
+            criteria=searches[index]["criteria"],
+            name=searches[index]["name"],
+            timestamp=datetime.now().strftime("%d %B %Y"),
+            active_search_name=f"{searches[index]['name']} – {location} – {datetime.now().strftime('%d %B %Y')}"
         )
     else:
         return redirect("/")
