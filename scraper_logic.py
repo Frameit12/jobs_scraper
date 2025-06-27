@@ -290,18 +290,38 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
 
     print("⏳ Waiting for job cards to load...")
     job_links = []
-    cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
-    print(f"🔍 Total cards collected: {len(cards)}")
 
-    for card in cards:
+    # Get the expected number of jobs from the page indicator
+    try:
+        job_count_text = driver.find_element(By.XPATH, "//*[contains(text(), 'job in')]").text
+        # Extract number from text like "Operational Risk job in New York (1)"
+        import re
+        count_match = re.search(r'\((\d+)\)', job_count_text)
+        expected_jobs = int(count_match.group(1)) if count_match else 999
+        print(f"📊 Expected jobs from page indicator: {expected_jobs}")
+    except:
+        expected_jobs = 999  # Fallback if we can't find the count
+        print("⚠️ Could not find job count, collecting all")
+
+    # Collect only the expected number of jobs
+    cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+    print(f"🔍 Total cards found: {len(cards)}")
+
+    for i, card in enumerate(cards):
+        if i >= expected_jobs:  # Stop when we reach the expected count
+            print(f"🛑 Reached expected job count ({expected_jobs}), stopping collection")
+            break
+        
         try:
             href = card.get_attribute("href")
             if href:
                 job_links.append(href)
+                print(f"✅ Collected job {i+1}: '{card.text.strip()}'")
         except Exception:
             continue
 
     print(f"🔍 Found {len(job_links)} job links.\n")
+    
 
     # ✅ Collect only valid jobs until we reach max_jobs
     job_results = []
