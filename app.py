@@ -727,7 +727,7 @@ def send_email_with_attachment(subject, body, attachment_path, config, user_emai
 
         msg = EmailMessage()
         msg["Subject"] = subject
-        msg["From"] = sender_email
+        msg["From"] = "Find Me A Job <frameitbot@gmail.com>"
         msg["To"] = ", ".join(recipients)
         msg.set_content(body)
 
