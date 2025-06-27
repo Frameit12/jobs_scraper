@@ -269,7 +269,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         print("⚠️ Could not find job count, collecting all")
 
     # Collect only the expected number of jobs
-    cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+    cards = driver.find_elements(By.CSS_SELECTOR, "efc-job-card a.font-subtitle-3-medium.job-title")
     print(f"🔍 Total cards found: {len(cards)}")
 
     for i, card in enumerate(cards):
