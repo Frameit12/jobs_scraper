@@ -207,6 +207,18 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
                 
             print("✅ Seniority filter applied successfully")
             
+            # DEBUG: Check what jobs are visible immediately after filtering
+            print("🔍 DEBUG: Checking jobs immediately after seniority filter...")
+            immediate_cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+            print(f"Jobs found immediately: {len(immediate_cards)}")
+            for i, card in enumerate(immediate_cards):
+                try:
+                    title = card.text.strip()
+                    print(f"  Immediate Job {i+1}: '{title}'")
+                except:
+                    print(f"  Immediate Job {i+1}: Could not read title")
+         
+            
             # DEBUG: Save the actual page we're on after filtering
             print("🔍 DEBUG: Saving filtered page source...")
             with open("filtered_results_debug.html", "w", encoding="utf-8") as f:
