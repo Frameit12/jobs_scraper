@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from bleach import clean
 import time
 
+
 def wait_for_full_description(driver, selector, min_length=500, timeout=15):
     end_time = time.time() + timeout
     while time.time() < end_time:
