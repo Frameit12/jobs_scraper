@@ -257,8 +257,12 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         # Extract number from text like "Operational Risk job in New York (1)"
         import re
         count_match = re.search(r'\((\d+)\)', job_count_text)
-        expected_jobs = int(count_match.group(1)) if count_match else 999
-        print(f"📊 Expected jobs from page indicator: {expected_jobs}")
+        if count_match:
+            expected_jobs = int(count_match.group(1))
+            print(f"🎯 Successfully extracted job count: {expected_jobs}")
+        else:
+            expected_jobs = 999
+            print(f"❌ Regex failed to extract number from: '{job_count_text}'")
     except:
         expected_jobs = 999  # Fallback if we can't find the count
         print("⚠️ Could not find job count, collecting all")
