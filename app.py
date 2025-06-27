@@ -111,6 +111,25 @@ def init_password_reset_table():
 
 init_password_reset_table()
 
+def init_user_activity_table():
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_activity (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    action_type VARCHAR(50) NOT NULL,
+                    action_details TEXT,
+                    ip_address VARCHAR(45),
+                    user_agent TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+
+init_user_activity_table()
+
 def generate_reset_token():
     import secrets
     return secrets.token_urlsafe(32)
@@ -151,6 +170,39 @@ def create_password_reset_token(user_id):
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
+
+def log_user_activity(action_type, details=None):
+    """Log user activity to the database"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return
+    
+    engine = get_db_connection()
+    if not engine:
+        return
+    
+    try:
+        # Get user's IP and browser info
+        ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
+        if ',' in ip_address:
+            ip_address = ip_address.split(',')[0].strip()
+        
+        user_agent = request.headers.get('User-Agent', 'unknown')
+        
+        with engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO user_activity (user_id, action_type, action_details, ip_address, user_agent)
+                VALUES (:user_id, :action_type, :action_details, :ip_address, :user_agent)
+            """), {
+                "user_id": user_id,
+                "action_type": action_type,
+                "action_details": details,
+                "ip_address": ip_address,
+                "user_agent": user_agent
+            })
+            conn.commit()
+    except Exception as e:
+        print(f"Error logging activity: {e}")
 
 
 HISTORY_FILE = "search_history.json"
@@ -798,11 +850,13 @@ def login():
         if user_id:
             session['user_id'] = user_id
             session['username'] = username
+            log_user_activity("login", f"successful login")  # ADD THIS LINE
             return redirect("/")
         else:
             return render_template("login.html", error="Invalid username or password")
     
     return render_template("login.html")
+    
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
@@ -1188,6 +1242,7 @@ def load_saved_search(index):
         try:
             region = detect_user_region(request)
             jobs = scrape_jobs(title, location, max_jobs, seniority=seniority, region=region)
+            log_user_activity("search", f"'{title}' in '{location}' ({len(jobs)} results)")  # ADD THIS LINE
         except Exception as e:
             print(f"❌ LOAD SEARCH ERROR: {str(e)}")
             print(f"❌ ERROR TYPE: {type(e).__name__}")
