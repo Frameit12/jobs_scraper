@@ -241,6 +241,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             try:
                 job_count_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'Operational Risk job in New York')]")
                 for elem in job_count_elements:
+                    stored_job_count_text = elem.text
                     print(f"📊 Found job count text: '{elem.text}'")
             except Exception as e:
                 print(f"⚠️ Could not find job count text: {e}")
@@ -253,7 +254,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
     
     # Get the expected number of jobs from the page indicator
     try:
-        job_count_text = driver.find_element(By.XPATH, "//*[contains(text(), 'job in')]").text
+        job_count_text = stored_job_count_text if 'stored_job_count_text' in locals() else ""
         # Extract number from text like "Operational Risk job in New York (1)"
         import re
         count_match = re.search(r'\((\d+)\)', job_count_text)
