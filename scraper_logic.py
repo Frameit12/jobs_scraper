@@ -249,6 +249,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         except Exception as e:
             print(f"⚠️ Could not apply seniority filter: {e}")
 
+    job_links = []
     
     # Get the expected number of jobs from the page indicator
     try:
