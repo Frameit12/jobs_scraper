@@ -1213,7 +1213,67 @@ def settings():
     
     return render_template("settings.html", username=current_username, email=current_email)
 
+@app.route("/submit_feedback", methods=["POST"])
+def submit_feedback():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+    
+    feedback_type = request.form.get("feedback_type", "")
+    message = request.form.get("feedback_message", "").strip()
+    email = request.form.get("feedback_email", "").strip()
+    
+    if not message:
+        return redirect("/")  # Could add error handling here
+    
+    # Get current user info
+    user_id = get_current_user_id()
+    username = session.get('username', 'Unknown')
+    
+    # Send feedback via email (using existing email config)
+    try:
+        subject = f"Feedback: {feedback_type.title()} from {username}"
+        body = f"""New feedback received:
 
+Type: {feedback_type.title()}
+From User: {username} (ID: {user_id})
+Contact Email: {email if email else 'Not provided'}
+
+Message:
+{message}
+
+Timestamp: {datetime.now().strftime('%d %B %Y %H:%M:%S')}
+"""
+        
+        # Use your existing email configuration
+        smtp_server = config["email_settings"]["smtp_server"]
+        smtp_port = config["email_settings"]["smtp_port"]
+        sender_email = config["email_settings"]["sender_email"]
+        sender_password = config["email_settings"]["sender_password"]
+        admin_email = config["email_settings"]["recipients"][0]  # Send to your admin email
+        
+        import smtplib
+        from email.message import EmailMessage
+        
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = f"{username} via Find Me A Job <{sender_email}>"
+        msg["To"] = admin_email
+        if email:
+            msg["Reply-To"] = email
+        msg.set_content(body)
+        
+        with smtplib.SMTP(smtp_server, smtp_port) as smtp:
+            smtp.starttls()
+            smtp.login(sender_email, sender_password)
+            smtp.send_message(msg)
+            
+        print(f"✅ Feedback sent from {username}: {feedback_type}")
+        
+    except Exception as e:
+        print(f"❌ Error sending feedback: {e}")
+    
+    return redirect("/?feedback=sent")
 
 
 @app.route("/logout")
