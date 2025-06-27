@@ -249,48 +249,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         except Exception as e:
             print(f"⚠️ Could not apply seniority filter: {e}")
 
-    print("🔄 Checking if more jobs are available...")
-    # Get initial job count after filtering
-    cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
-    print(f"🔍 Jobs found after filtering: {len(cards)}")
-
-    # Check if there are more jobs available before trying to load them
-    attempts = 0
-    while len(cards) < max_jobs and attempts < 3:
-        try:
-            # First check if "No more jobs!" message exists
-            no_more_jobs = driver.find_elements(By.XPATH, "//*[contains(text(), 'No more jobs!')]")
-            if no_more_jobs:
-                print("🔚 'No more jobs!' message found - this is all the results available")
-                break
-            
-            # Try to find "Show more" button
-            show_more = WebDriverWait(driver, 5).until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(., 'Show more')]"))
-            )
-            print(f"📄 Found 'Show more' button, clicking (attempt {attempts + 1})...")
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", show_more)
-            show_more.click()
-            time.sleep(3)
-        
-            # Check if we got more jobs
-            new_cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
-            if len(new_cards) == len(cards):  # No new jobs loaded
-                print("🔚 No new jobs loaded after clicking 'Show more'")
-                break
-            cards = new_cards
-            print(f"📈 Total jobs now: {len(cards)}")
-            attempts += 1
-        except TimeoutException:
-            print("🔚 No 'Show more' button found - reached end of results")
-            break
-        except Exception as e:
-            print(f"⚠️ Error while trying to load more jobs: {e}")
-            break
-
-    print("⏳ Waiting for job cards to load...")
-    job_links = []
-
+    
     # Get the expected number of jobs from the page indicator
     try:
         job_count_text = driver.find_element(By.XPATH, "//*[contains(text(), 'job in')]").text
