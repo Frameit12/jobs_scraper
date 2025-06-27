@@ -207,6 +207,15 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
                 raise Exception("Seniority button not found")
                 
             print("✅ Seniority filter applied successfully")
+
+            # DEBUG: Wait and check if job count updates
+            print("🔍 DEBUG: Checking job count after filter...")
+            time.sleep(5)
+            try:
+                result_text = driver.find_element(By.XPATH, "//*[contains(text(), 'job in')]").text
+                print(f"📊 Updated job count: {result_text}")
+            except:
+                print("📊 Could not find job count text")
             
             # DEBUG: Check what jobs are visible immediately after filtering
             print("🔍 DEBUG: Checking jobs immediately after seniority filter...")
