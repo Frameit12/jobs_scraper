@@ -102,7 +102,19 @@
     </div>
 
     <div class="max-w-7xl mx-auto px-6">
-          
+
+        <!-- Feedback Success Message -->
+        {% if request.args.get('feedback') == 'sent' %}
+        <div class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+            <div class="flex items-center">
+                <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span class="text-green-800 font-medium">Thank you! Your feedback has been sent successfully.</span>
+            </div>
+        </div>
+        {% endif %}
+        
         <!-- How It Works Section -->
         <div class="mb-8">
             <div class="bg-blue-50 border border-blue-200 rounded-xl overflow-hidden">
