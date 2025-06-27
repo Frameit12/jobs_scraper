@@ -251,7 +251,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
 
     print("🔄 Checking if more jobs are available...")
     # Get initial job count after filtering
-    cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+    cards = driver.find_elements(By.CSS_SELECTOR, "[data-testid='job-item'] a.font-subtitle-3-medium.job-title")
     print(f"🔍 Jobs found after filtering: {len(cards)}")
 
     # Check if there are more jobs available before trying to load them
@@ -290,7 +290,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
 
     print("⏳ Waiting for job cards to load...")
     job_links = []
-    cards = driver.find_elements(By.CSS_SELECTOR, "a.font-subtitle-3-medium.job-title")
+    cards = driver.find_elements(By.CSS_SELECTOR, "[data-testid='job-item'] a.font-subtitle-3-medium.job-title")
     print(f"🔍 Total cards collected: {len(cards)}")
 
     for card in cards:
