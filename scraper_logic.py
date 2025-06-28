@@ -200,8 +200,8 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
                     except:
                         print(f"🚫 Seniority level '{seniority}' not available for this search")
                         driver.quit()
-                        return [{"title": "No Jobs Found", "company": "Seniority Level Not Available", "location": location, "link": "#", "description": f"No {seniority} level positions are available for '{title}' in {location}. Please try a different seniority level."}]
-
+                        return [{"no_results": True, "special_message": f"No {seniority} level positions available for '{title}' in {location}. Try a different seniority level."}]
+                    
                     if not checkbox.is_selected():
                         checkbox.click()
                         time.sleep(2)
