@@ -757,16 +757,7 @@ def root():
         # New visitor sees landing page
         return render_template("landing-page.html")
 
-# Rename your existing index route
 @app.route("/app", methods=["GET", "POST"])
-def app_interface():
-    login_redirect = require_login()
-    if login_redirect:
-        return login_redirect
-    
-    # Your existing index() function code goes here...
-
-@app.route("/", methods=["GET", "POST"])
 def index():
     login_redirect = require_login()
     if login_redirect:
