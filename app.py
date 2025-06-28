@@ -798,6 +798,18 @@ def index():
             region = detect_user_region(request)
             jobs = scrape_jobs(title, location, max_jobs, seniority=seniority, region=region)
             
+            # Check if this is a special "no results" message
+            if jobs and len(jobs) == 1 and jobs[0].get("no_results"):
+                special_message = jobs[0].get("special_message", "No jobs found")
+                return render_template("index.html", 
+                                     jobs=[], 
+                                     title=title, 
+                                     location=location, 
+                                     max_jobs=max_jobs, 
+                                     seniority=seniority, 
+                                     saved_searches=load_saved_searches(),
+                                     special_message=special_message)           
+            
             # Process job descriptions (this was missing!)
             for job in jobs:
                 if not job.get("company"):
