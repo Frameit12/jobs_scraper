@@ -748,7 +748,23 @@ def send_email_with_attachment(subject, body, attachment_path, config, user_emai
         print(f"❌ Failed to send email: {e}")
         return False
 
+@app.route("/")
+def root():
+    # If user is logged in, go to main app
+    if get_current_user_id():
+        return redirect("/app")
+    else:
+        # New visitor sees landing page
+        return render_template("landing-page.html")
 
+# Rename your existing index route
+@app.route("/app", methods=["GET", "POST"])
+def app_interface():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+    
+    # Your existing index() function code goes here...
 
 @app.route("/", methods=["GET", "POST"])
 def index():
