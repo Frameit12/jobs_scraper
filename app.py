@@ -824,7 +824,19 @@ def index():
             traceback.print_exc()
             jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
                     
-        
+        # Check if this is a special "no results" message
+        if jobs and len(jobs) == 1 and jobs[0].get("no_results"):
+            special_message = jobs[0].get("special_message", "No jobs found")
+            return render_template("index.html", 
+                                 jobs=[], 
+                                 title=title, 
+                                 location=location, 
+                                 max_jobs=max_jobs, 
+                                 seniority=seniority, 
+                                 saved_searches=load_saved_searches(),
+                                 special_message=special_message)    
+    
+       
         last_results = jobs
         global last_search_name
         last_search_name = title if title else "Job_Search"
