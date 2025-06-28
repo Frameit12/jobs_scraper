@@ -8,26 +8,54 @@
         body {
             font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
         }        
+        
         table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
             table-layout: fixed;
         }
+
         th, td {
-            border: 1px solid #ccc;
             padding: 8px;
             vertical-align: top;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            border-bottom: 1px solid #f1f5f9;
         }
 
-        /* Column width controls */
+        /* Keep your original column widths */
         th:nth-child(1), td:nth-child(1) { width: 5%; }    /* # */
         th:nth-child(2), td:nth-child(2) { width: 20%; }   /* Job Title */
         th:nth-child(3), td:nth-child(3) { width: 15%; }   /* Company */
         th:nth-child(4), td:nth-child(4) { width: 12%; }   /* Location */
         th:nth-child(5), td:nth-child(5) { width: 40%; }   /* Job Description */
         th:nth-child(6), td:nth-child(6) { width: 8%; }    /* Link */
+
+        th {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tbody tr:hover {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        
         
         .description-container {
             max-height: 120px;
