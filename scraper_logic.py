@@ -188,11 +188,20 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
                     'csuite': 'C_SUITE'
                 }
 
+
                 checkbox_value = seniority_mapping.get(seniority)
                 if checkbox_value:
                     print(f"☑️ Looking for checkbox with value: {checkbox_value}")
-                    checkbox = driver.find_element(By.ID, f"seniority{checkbox_value}")
-        
+    
+                    # Try to find the specific seniority checkbox
+                    try:
+                        checkbox = driver.find_element(By.ID, f"seniority{checkbox_value}")
+                        print(f"✅ Seniority option '{seniority}' found in dropdown")
+                    except:
+                        print(f"🚫 Seniority level '{seniority}' not available for this search")
+                        driver.quit()
+                        return [{"title": "No Jobs Found", "company": "Seniority Level Not Available", "location": location, "link": "#", "description": f"No {seniority} level positions are available for '{title}' in {location}. Please try a different seniority level."}]
+
                     if not checkbox.is_selected():
                         checkbox.click()
                         time.sleep(2)
