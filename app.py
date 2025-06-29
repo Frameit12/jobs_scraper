@@ -817,7 +817,20 @@ def index():
                                      saved_searches=load_saved_searches(),
                                      special_message=special_message)           
             
-            # Process job descriptions (this was missing!)
+            # Check if this is an error response from scraper
+            if jobs and len(jobs) == 1 and jobs[0].get("error_type"):
+                error_job = jobs[0]
+                error_message = error_job.get("description", "An error occurred during the search.")
+                return render_template("index.html", 
+                                     jobs=[], 
+                                     title=title, 
+                                     location=location, 
+                                     max_jobs=max_jobs, 
+                                     seniority=seniority, 
+                                     saved_searches=load_saved_searches(),
+                                     special_message=error_message)
+            
+            # Process job descriptions for successful results
             for job in jobs:
                 if not job.get("company"):
                     job["company"] = "[Not Found]"
@@ -841,7 +854,18 @@ def index():
             print(f"❌ ERROR TYPE: {type(e).__name__}")
             import traceback
             traceback.print_exc()
-            jobs = [{"title": "Scraping Failed", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
+            
+            # Fallback error message for unexpected Flask errors
+            error_message = "We're experiencing technical difficulties. Please try again in a few minutes. If you continue seeing this error, email frameitbot@gmail.com with details about what you were searching for."
+            return render_template("index.html", 
+                                 jobs=[], 
+                                 title=title, 
+                                 location=location, 
+                                 max_jobs=max_jobs, 
+                                 seniority=seniority, 
+                                 saved_searches=load_saved_searches(),
+                                 special_message=error_message)
+
                     
         # Check if this is a special "no results" message
         if jobs and len(jobs) == 1 and jobs[0].get("no_results"):
