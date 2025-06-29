@@ -1880,6 +1880,11 @@ def debug_database_files():
             return f"<pre>Current User ID: {current_user}\n\nFiles in database:\n{json.dumps(files, indent=2)}</pre>"
     except Exception as e:
         return f"Error: {e}"
-
+        
+# Debug: Print all registered routes
+print("🔍 DEBUG: Registered routes:")
+for rule in app.url_map.iter_rules():
+    print(f"  {rule.rule} -> {rule.methods} -> {rule.endpoint}")
+    
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
