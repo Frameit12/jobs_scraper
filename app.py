@@ -130,6 +130,25 @@ def init_user_activity_table():
 
 init_user_activity_table()
 
+def init_search_limits_table():
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS daily_search_limits (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    search_date DATE NOT NULL,
+                    search_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, search_date)
+                )
+            """))
+            conn.commit()
+
+init_search_limits_table()
+
+
 def generate_reset_token():
     import secrets
     return secrets.token_urlsafe(32)
@@ -799,6 +818,35 @@ def check_daily_search_limit():
     # For free users, limit to 3 searches per day
     # You can implement this later - for now, just return True
     return True
+
+def increment_search_count():
+    """Increment the user's daily search count"""
+    if check_feature_access('unlimited_searches'):
+        return  # Beta/paid users don't need tracking
+    
+    user_id = get_current_user_id()
+    if not user_id:
+        return
+    
+    engine = get_db_connection()
+    if not engine:
+        return
+    
+    try:
+        today = datetime.now().date()
+        
+        with engine.connect() as conn:
+            # Insert or update today's count
+            conn.execute(text("""
+                INSERT INTO daily_search_limits (user_id, search_date, search_count)
+                VALUES (:user_id, :today, 1)
+                ON CONFLICT (user_id, search_date) 
+                DO UPDATE SET search_count = daily_search_limits.search_count + 1
+            """), {"user_id": user_id, "today": today})
+            conn.commit()
+            
+    except Exception as e:
+        print(f"Error incrementing search count: {e}")
 
 @app.route("/test_beta_functions")
 def test_beta_functions():
