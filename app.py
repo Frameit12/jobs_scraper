@@ -1987,6 +1987,31 @@ def debug_database_files():
     except Exception as e:
         return f"Error: {e}"
 
+@app.route("/checkout")
+def checkout():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+    
+    # Simple placeholder for now - no actual payment processing
+    return """
+    <div style="font-family: Arial; text-align: center; padding: 50px; background: #f5f5f5; min-height: 100vh;">
+        <div style="background: white; max-width: 400px; margin: 0 auto; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+            <h2 style="color: #1e3a8a; margin-bottom: 20px;">💳 Checkout Coming Soon</h2>
+            <p style="color: #666; margin-bottom: 20px;">Stripe payment integration will be added here.</p>
+            <p style="color: #666; margin-bottom: 30px;">For now, this proves the upgrade flow works correctly!</p>
+            
+            <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <strong style="color: #0277bd;">Pro Plan - $15/month</strong><br>
+                <small style="color: #0277bd;">All premium features included</small>
+            </div>
+            
+            <a href="/app" style="display: inline-block; background: #1e3a8a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;">
+                ← Back to App
+            </a>
+        </div>
+    </div>
+    """
         
 # Debug: Print all registered routes
 print("🔍 DEBUG: Registered routes:")
