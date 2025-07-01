@@ -1905,26 +1905,6 @@ def debug_database_files():
     except Exception as e:
         return f"Error: {e}"
 
-@app.route("/setup_beta_columns")
-def setup_beta_columns():
-    engine = get_db_connection()
-    if not engine:
-        return "No database connection"
-    
-    try:
-        with engine.connect() as conn:
-            # Add beta tracking columns to existing users table
-            conn.execute(text("""
-                ALTER TABLE users 
-                ADD COLUMN IF NOT EXISTS beta_user BOOLEAN DEFAULT TRUE,
-                ADD COLUMN IF NOT EXISTS beta_expires DATE DEFAULT '2025-08-08',
-                ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(20) DEFAULT 'none',
-                ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(100) DEFAULT NULL
-            """))
-            conn.commit()
-        return "✅ Database columns added successfully to existing database!"
-    except Exception as e:
-        return f"❌ Error: {e}"
         
 # Debug: Print all registered routes
 print("🔍 DEBUG: Registered routes:")
