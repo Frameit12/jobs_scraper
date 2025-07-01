@@ -1594,6 +1594,13 @@ def load_saved_search(index):
 
 @app.route('/download', methods=['POST'])
 def download():
+    # ADD THIS CHECK AT THE BEGINNING
+    if not check_feature_access('excel_export'):
+        return render_template("upgrade.html", 
+                             feature="Excel exports",
+                             current_plan="free")
+
+    # Your existing code continues unchanged....   
     global last_results
     if not last_results:
         return "No results to export", 400
@@ -1796,6 +1803,13 @@ def schedule():
 
 @app.route("/save_schedule", methods=["POST"])
 def save_schedule():
+    # ADD THIS CHECK AT THE BEGINNING
+    if not check_feature_access('scheduling'):
+        return render_template("upgrade.html", 
+                             feature="scheduled searches",
+                             current_plan="free")
+        
+    # Your existing code continues unchanged...
     index = int(request.form.get("search_index"))
     frequency = request.form.get("frequency")
 
