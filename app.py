@@ -748,6 +748,58 @@ def send_email_with_attachment(subject, body, attachment_path, config, user_emai
         print(f"❌ Failed to send email: {e}")
         return False
 
+# ADD THESE FUNCTIONS AFTER send_email_with_attachment FUNCTION
+def check_feature_access(feature_name):
+    """Check if current user has access to a specific feature"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return False
+    
+    engine = get_db_connection()
+    if not engine:
+        return False
+    
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT beta_user, beta_expires, subscription_status 
+                FROM users WHERE id = :user_id
+            """), {"user_id": user_id})
+            user = result.fetchone()
+        
+        if not user:
+            return False
+        
+        beta_user, beta_expires, subscription_status = user
+        today = datetime.now().date()
+        
+        # Beta users get full access until beta expires
+        if beta_user and today <= beta_expires:
+            return True
+        
+        # Paid users get full access
+        if subscription_status == 'active':
+            return True
+        
+        # Free users only get basic features
+        if feature_name in ['basic_search']:
+            return True
+        
+        return False  # Block premium features
+    
+    except Exception as e:
+        print(f"Error checking feature access: {e}")
+        return False
+
+def check_daily_search_limit():
+    """Check if user has exceeded daily search limit (for free users)"""
+    if check_feature_access('unlimited_searches'):
+        return True  # Beta/paid users have unlimited searches
+    
+    # For free users, limit to 3 searches per day
+    # You can implement this later - for now, just return True
+    return True
+
 @app.route("/")
 def root():
     # If user is logged in, go to main app
