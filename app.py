@@ -1030,7 +1030,7 @@ def forgot_password():
         try:
             with engine.connect() as conn:
                 result = conn.execute(text("""
-                    SELECT id, username FROM users WHERE email = :email
+                    "SELECT id, username FROM users WHERE email = :email"
                 """), {"email": email})
                 user = result.fetchone()
                 
