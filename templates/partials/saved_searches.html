@@ -39,8 +39,10 @@
             </div>
           {% endif %}
 
+          {% if check_feature_access and check_feature_access('scheduling') %}
           <button onclick="toggleSchedule({{ loop.index0 }})"
-                  style="background: none; border: none; cursor: pointer;" title="Schedule">⏰</button>
+            style="background: none; border: none; cursor: pointer;" title="Schedule">⏰</button>
+          {% endif %}
 
           <button onclick="toggleRename({{ loop.index0 }})"
                   style="background: none; border: none; cursor: pointer; margin-left: 6px;" title="Rename">✏️</button>
