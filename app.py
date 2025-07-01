@@ -815,9 +815,34 @@ def check_daily_search_limit():
     if check_feature_access('unlimited_searches'):
         return True  # Beta/paid users have unlimited searches
     
-    # For free users, limit to 3 searches per day
-    # You can implement this later - for now, just return True
-    return True
+    # For free users, check their daily limit
+    user_id = get_current_user_id()
+    if not user_id:
+        return False
+    
+    engine = get_db_connection()
+    if not engine:
+        return True  # If DB fails, allow search
+    
+    try:
+        today = datetime.now().date()
+        
+        with engine.connect() as conn:
+            # Get today's search count
+            result = conn.execute(text("""
+                SELECT search_count FROM daily_search_limits 
+                WHERE user_id = :user_id AND search_date = :today
+            """), {"user_id": user_id, "today": today})
+            
+            row = result.fetchone()
+            current_count = row[0] if row else 0
+            
+            return current_count < 3  # Allow if under 3 searches
+            
+    except Exception as e:
+        print(f"Error checking search limit: {e}")
+        return True  # If error, allow search
+
 
 def increment_search_count():
     """Increment the user's daily search count"""
@@ -896,6 +921,31 @@ def index():
     global last_results
     jobs = []
     if request.method == "POST":
+        # ADD THIS SEARCH LIMIT CHECK HERE
+        if not check_daily_search_limit():
+            # Get current search count for display
+            user_id = get_current_user_id()
+            engine = get_db_connection()
+            current_count = 3  # Default to max
+        
+            if engine:
+                try:
+                    with engine.connect() as conn:
+                        today = datetime.now().date()
+                        result = conn.execute(text("""
+                            SELECT search_count FROM daily_search_limits 
+                            WHERE user_id = :user_id AND search_date = :today
+                        """), {"user_id": user_id, "today": today})
+                        row = result.fetchone()
+                        current_count = row[0] if row else 0
+                except:
+                    pass
+        
+            return render_template("upgrade.html", 
+                                 feature="unlimited searches",
+                                 current_plan="free",
+                                 search_limit_reached=True,
+                                 searches_used=current_count)
         title = request.form.get("title", "")
         location = request.form.get("location", "")
         seniority = request.form.get("seniority", "")
@@ -1008,7 +1058,10 @@ def index():
                                  seniority=seniority, 
                                  saved_searches=load_saved_searches(),
                                  special_message=special_message)    
-    
+
+        # IMPORTANT: After successful search, increment the count
+        if jobs and len(jobs) > 0 and not any(job.get("error_type") for job in jobs):
+            increment_search_count()
        
         last_results = jobs
         global last_search_name
