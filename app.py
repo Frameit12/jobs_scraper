@@ -828,6 +828,7 @@ def test_beta_functions():
         <br>
         <a href="/app">← Back to App</a>
     </div>
+    """
 
 @app.route("/")
 def root():
@@ -1030,7 +1031,7 @@ def forgot_password():
         try:
             with engine.connect() as conn:
                 result = conn.execute(text("""
-                    "SELECT id, username FROM users WHERE email = :email"
+                    SELECT id, username FROM users WHERE email = :email
                 """), {"email": email})
                 user = result.fetchone()
                 
