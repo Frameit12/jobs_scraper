@@ -2180,6 +2180,26 @@ def create_test_user():
         return f"❌ Error: {e}"
 
 
+@app.route("/reset_testuser_searches")
+def reset_testuser_searches():
+    engine = get_db_connection()
+    if not engine:
+        return "No database connection"
+    
+    try:
+        with engine.connect() as conn:
+            # Delete today's search count for testuser
+            conn.execute(text("""
+                DELETE FROM daily_search_limits 
+                WHERE user_id = (SELECT id FROM users WHERE username = 'testuser')
+                AND search_date = :today
+            """), {"today": datetime.now().date()})
+            conn.commit()
+        
+        return "✅ Testuser search count reset! <a href='/app'>← Back to app</a>"
+    except Exception as e:
+        return f"❌ Error: {e}"
+
 # Debug: Print all registered routes
 print("🔍 DEBUG: Registered routes:")
 for rule in app.url_map.iter_rules():
