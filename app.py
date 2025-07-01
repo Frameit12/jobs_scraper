@@ -800,6 +800,35 @@ def check_daily_search_limit():
     # You can implement this later - for now, just return True
     return True
 
+@app.route("/test_beta_functions")
+def test_beta_functions():
+    """Temporary route to test beta functions - REMOVE AFTER TESTING"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return "Not logged in - <a href='/login'>Login first</a>"
+    
+    # Test the functions
+    has_scheduling = check_feature_access('scheduling')
+    has_excel = check_feature_access('excel_export')
+    has_unlimited = check_feature_access('unlimited_searches')
+    search_limit_ok = check_daily_search_limit()
+    
+    return f"""
+    <div style="font-family: Arial; padding: 20px;">
+        <h2>🧪 Beta Function Test Results</h2>
+        <p><strong>User ID:</strong> {user_id}</p>
+        <p><strong>Has Scheduling Access:</strong> {has_scheduling}</p>
+        <p><strong>Has Excel Export:</strong> {has_excel}</p>
+        <p><strong>Has Unlimited Searches:</strong> {has_unlimited}</p>
+        <p><strong>Search Limit OK:</strong> {search_limit_ok}</p>
+        <br>
+        <div style="background: #d4edda; padding: 15px; border-radius: 5px;">
+            <strong>✅ Expected Result:</strong> All values should be <code>True</code> because you're a beta user!
+        </div>
+        <br>
+        <a href="/app">← Back to App</a>
+    </div>
+
 @app.route("/")
 def root():
     # If user is logged in, go to main app
