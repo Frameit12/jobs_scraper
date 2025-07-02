@@ -2095,7 +2095,7 @@ def checkout():
             <p style="color: #666; margin-bottom: 30px;">For now, this proves the upgrade flow works correctly!</p>
             
             <div style="background: #e0f2fe; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <strong style="color: #0277bd;">Pro Plan - $15/month</strong><br>
+                <strong style="color: #0277bd;">Pro Plan - $8/month</strong><br>
                 <small style="color: #0277bd;">All premium features included</small>
             </div>
             
