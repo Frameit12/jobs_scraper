@@ -117,8 +117,16 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
         # === REST OF YOUR EXACT WORKING LOGIC ===
-        base_url = "https://www.efinancialcareers.com/" if region == "US" else "https://www.efinancialcareers.co.uk/"
+        if region == "US":
+            base_url = "https://www.efinancialcareers.com/"
+        elif region == "UK":
+            base_url = "https://www.efinancialcareers.co.uk/"
+        elif region == "SG":
+            base_url = "https://www.efinancialcareers.sg/"
+        else:
+            base_url = "https://www.efinancialcareers.com/"  # Default to US
         print(f"🌍 REGION DEBUG: Using region '{region}' -> URL: {base_url}")
+                      
         driver.get(base_url)
         time.sleep(2)
 
