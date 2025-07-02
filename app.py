@@ -367,8 +367,8 @@ def create_user(username, email, password):
         password_hash = generate_password_hash(password)
         with engine.connect() as conn:
             conn.execute(text("""
-                INSERT INTO users (username, email, password_hash)
-                VALUES (:username, :email, :password_hash)
+                INSERT INTO users (username, email, password_hash, beta_user, beta_expires, subscription_status)
+                VALUES (:username, :email, :password_hash, TRUE, '2025-08-31', 'none')
             """), {
                 "username": username,
                 "email": email,
