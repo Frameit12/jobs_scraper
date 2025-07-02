@@ -873,35 +873,6 @@ def increment_search_count():
     except Exception as e:
         print(f"Error incrementing search count: {e}")
 
-@app.route("/test_beta_functions")
-def test_beta_functions():
-    """Temporary route to test beta functions - REMOVE AFTER TESTING"""
-    user_id = get_current_user_id()
-    if not user_id:
-        return "Not logged in - <a href='/login'>Login first</a>"
-    
-    # Test the functions
-    has_scheduling = check_feature_access('scheduling')
-    has_excel = check_feature_access('excel_export')
-    has_unlimited = check_feature_access('unlimited_searches')
-    search_limit_ok = check_daily_search_limit()
-    
-    return f"""
-    <div style="font-family: Arial; padding: 20px;">
-        <h2>🧪 Beta Function Test Results</h2>
-        <p><strong>User ID:</strong> {user_id}</p>
-        <p><strong>Has Scheduling Access:</strong> {has_scheduling}</p>
-        <p><strong>Has Excel Export:</strong> {has_excel}</p>
-        <p><strong>Has Unlimited Searches:</strong> {has_unlimited}</p>
-        <p><strong>Search Limit OK:</strong> {search_limit_ok}</p>
-        <br>
-        <div style="background: #d4edda; padding: 15px; border-radius: 5px;">
-            <strong>✅ Expected Result:</strong> All values should be <code>True</code> because you're a beta user!
-        </div>
-        <br>
-        <a href="/app">← Back to App</a>
-    </div>
-    """
 
 @app.route("/")
 def root():
@@ -1081,17 +1052,7 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         
-        # TEMPORARY: Allow test user without password check
-        if username == "testuser":
-            engine = get_db_connection()
-            with engine.connect() as conn:
-                result = conn.execute(text("SELECT id FROM users WHERE username = 'testuser'"))
-                user = result.fetchone()
-                if user:
-                    session['user_id'] = user[0]
-                    session['username'] = username
-                    return redirect("/")
-        
+                
         # Your existing login code continues below...
         if not username or not password:
             return render_template("login.html", error="Please enter both username and password")
@@ -2139,66 +2100,6 @@ def checkout():
         </div>
     </div>
     """
-
-@app.route("/create_test_user")
-def create_test_user():
-    """Temporary route to create a test non-beta user - REMOVE AFTER TESTING"""
-    engine = get_db_connection()
-    if not engine:
-        return "No database connection"
-    
-    try:
-        with engine.connect() as conn:
-            # Create test user with beta_user = FALSE
-            conn.execute(text("""
-                INSERT INTO users (username, email, password_hash, beta_user, subscription_status)
-                VALUES ('testuser', 'test@example.com', 'dummy_hash', FALSE, 'none')
-                ON CONFLICT (username) DO UPDATE SET 
-                    beta_user = FALSE, 
-                    subscription_status = 'none'
-            """))
-            conn.commit()
-        
-        return """
-        <div style="font-family: Arial; padding: 20px;">
-            <h2>✅ Test User Created!</h2>
-            <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <strong>Username:</strong> testuser<br>
-                <strong>Password:</strong> anything (we're not checking passwords for this test)<br>
-                <strong>Beta Status:</strong> FALSE (not a beta user)
-            </div>
-            <p>This user should see upgrade pages when trying to use premium features.</p>
-            <br>
-            <a href="/login" style="background: #1e3a8a; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px;">
-                → Go Test Login
-            </a>
-            <br><br>
-            <small style="color: #666;">After testing, you can delete this route for security.</small>
-        </div>
-        """
-    except Exception as e:
-        return f"❌ Error: {e}"
-
-
-@app.route("/reset_testuser_searches")
-def reset_testuser_searches():
-    engine = get_db_connection()
-    if not engine:
-        return "No database connection"
-    
-    try:
-        with engine.connect() as conn:
-            # Delete today's search count for testuser
-            conn.execute(text("""
-                DELETE FROM daily_search_limits 
-                WHERE user_id = (SELECT id FROM users WHERE username = 'testuser')
-                AND search_date = :today
-            """), {"today": datetime.now().date()})
-            conn.commit()
-        
-        return "✅ Testuser search count reset! <a href='/app'>← Back to app</a>"
-    except Exception as e:
-        return f"❌ Error: {e}"
 
 # Debug: Print all registered routes
 print("🔍 DEBUG: Registered routes:")
