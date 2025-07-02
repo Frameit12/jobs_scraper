@@ -39,7 +39,7 @@
             </div>
           {% endif %}
 
-          {% if check_feature_access and check_feature_access('scheduling') %}
+          {% if has_scheduling_access %}
           <button onclick="toggleSchedule({{ loop.index0 }})"
             style="background: none; border: none; cursor: pointer;" title="Schedule">⏰</button>
           {% endif %}
