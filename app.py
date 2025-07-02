@@ -948,7 +948,7 @@ def index():
                 info = f"✅ Search saved as: {formatted_name}"
             
             saved_searches = check_excel_files_for_searches(load_saved_searches())
-            return render_template("index.html", info=info, jobs=last_results, title=title, location=location, max_jobs=max_jobs, seniority=seniority, saved_searches=saved_searches)
+            return render_template("index.html", info=info, jobs=last_results, title=title, location=location, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=saved_searches)
             
         print(f"🔍 FLASK DEBUG: About to call scraper with seniority='{seniority}', type={type(seniority)}")
         
@@ -966,6 +966,7 @@ def index():
                                      max_jobs=max_jobs, 
                                      seniority=seniority, 
                                      saved_searches=load_saved_searches(),
+                                     has_scheduling_access=check_feature_access('scheduling'),
                                      special_message=special_message)           
             
             # Check if this is an error response from scraper
@@ -979,6 +980,7 @@ def index():
                                      max_jobs=max_jobs, 
                                      seniority=seniority, 
                                      saved_searches=load_saved_searches(),
+                                     has_scheduling_access=check_feature_access('scheduling'),
                                      special_message=error_message)
             
             # Process job descriptions for successful results
@@ -1015,6 +1017,7 @@ def index():
                                  max_jobs=max_jobs, 
                                  seniority=seniority, 
                                  saved_searches=load_saved_searches(),
+                                 has_scheduling_access=check_feature_access('scheduling'),
                                  special_message=error_message)
 
                     
@@ -1028,6 +1031,7 @@ def index():
                                  max_jobs=max_jobs, 
                                  seniority=seniority, 
                                  saved_searches=load_saved_searches(),
+                                 has_scheduling_access=check_feature_access('scheduling'),
                                  special_message=special_message)    
 
         # IMPORTANT: After successful search, increment the count
@@ -1037,14 +1041,14 @@ def index():
         last_results = jobs
         global last_search_name
         last_search_name = title if title else "Job_Search"
-        return render_template("index.html", jobs=jobs, title=title, location=location, max_jobs=max_jobs, seniority=seniority, saved_searches=load_saved_searches())
+        return render_template("index.html", jobs=jobs, title=title, location=location, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=load_saved_searches())
     
     saved_searches = check_excel_files_for_searches(load_saved_searches())
     print("✅ Saved searches and their Excel status:")
     for s in saved_searches:
         print(f"- {s['name']}: has_excel = {s.get('has_excel')}")
 
-    return render_template("index.html", title="", location="", seniority="", max_jobs=10, saved_searches=saved_searches)
+    return render_template("index.html", title="", location="", seniority="", max_jobs=10, has_scheduling_access=check_feature_access('scheduling'), saved_searches=saved_searches)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -1547,7 +1551,8 @@ def load_saved_search(index):
             criteria=searches[index]["criteria"],
             name=searches[index]["name"],
             timestamp=datetime.now().strftime("%d %B %Y"),
-            active_search_name=f"{searches[index]['name']} – {location} – {datetime.now().strftime('%d %B %Y')}"
+            active_search_name=f"{searches[index]['name']} – {location} – {datetime.now().strftime('%d %B %Y')}",
+            has_scheduling_access=check_feature_access('scheduling')
         )
     else:
         return redirect("/")
@@ -1846,7 +1851,7 @@ def api_saved_searches():
 @app.route("/saved_searches_partial")
 def saved_searches_partial():
     searches = check_excel_files_for_searches(load_saved_searches())
-    return render_template("partials/saved_searches.html", saved_searches=searches)
+    return render_template("partials/saved_searches.html", saved_searches=searches, has_scheduling_access=check_feature_access('scheduling'))
 
 from flask import send_file
 import zipfile
