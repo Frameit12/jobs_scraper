@@ -309,7 +309,7 @@ def detect_user_region(request):
     test_region = request.args.get('test_region')
     print(f"🧪 REGION DEBUG: test_region parameter = '{test_region}'")
     
-    if test_region and test_region.upper() in ['UK', 'US']:
+    if test_region and test_region.upper() in ['UK', 'US', 'SG']:
         print(f"🧪 TEST MODE: Using manual region override: {test_region}")
         return test_region.upper()
 
@@ -345,7 +345,12 @@ def detect_user_region(request):
             country_name = data.get('country', 'NOT_FOUND')
             print(f"🔍 Country Code = '{country_code}'")
             print(f"🔍 Country Name = '{country_name}'")
-            return "UK" if country_code == "GB" else "US"
+            if country_code == "GB":
+                return "UK"
+            elif country_code == "SG":
+                return "SG"
+            else:
+                return "US" 
         else:
             print(f"❌ API returned non-200 status: {response.status_code}")
     except Exception as e:
