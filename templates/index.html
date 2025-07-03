@@ -221,7 +221,7 @@
                   Data source: eFinancialCareers.com • More job sites coming soon
                 </p>
                 
-                <form method="POST" action="/app">
+                <form method="POST" action="/app{% if request.args.get('test_region') %}?test_region={{ request.args.get('test_region') }}{% endif %}">
                     <div style="margin-bottom: 10px;">
                         <label for="title" style="display: block; font-weight: bold;">Job Title or Keyword:</label>
                         <input type="text" id="title" name="title" value="{{ title }}" placeholder="e.g. Risk & Control" style="width: 100%; padding: 8px;">
