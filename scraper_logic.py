@@ -129,11 +129,21 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             base_url = "https://www.efinancialcareers.com/"  # Default to US
         print(f"🌍 REGION DEBUG: Using region '{region}' -> URL: {base_url}")
         print(f"🌐 ACTUAL URL BEING ACCESSED: About to navigate to {base_url}")
-                      
+    
         driver.get(base_url)
         time.sleep(2)
         print(f"🌐 CURRENT URL AFTER NAVIGATION: {driver.current_url}")
         print(f"🌐 PAGE TITLE: {driver.title}")
+        print(f"🌐 PAGE LANGUAGE: Checking for German content...")
+
+        # Check if page has German elements
+        try:
+            german_elements = driver.find_elements(By.XPATH, "//*[contains(text(), 'Suche') or contains(text(), 'Stellenangebote') or contains(text(), 'Berufserfahrung')]")
+            print(f"🌐 GERMAN ELEMENTS FOUND: {len(german_elements)}")
+            if german_elements:
+                print(f"🌐 SAMPLE GERMAN TEXT: {german_elements[0].text}")
+        except:
+            print(f"🌐 NO GERMAN ELEMENTS DETECTED")
 
         print("⌨️ Filling job title and location...")
         WebDriverWait(driver, 60).until(
