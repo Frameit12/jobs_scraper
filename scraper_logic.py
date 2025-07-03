@@ -124,7 +124,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         elif region == "SG":
             base_url = "https://www.efinancialcareers.sg/"
         elif region == "DE":
-            base_url = "https://www.efinancialcareers.de/"
+            base_url = "https://www.efinancialcareers.de/en/"
         else:
             base_url = "https://www.efinancialcareers.com/"  # Default to US
         print(f"🌍 REGION DEBUG: Using region '{region}' -> URL: {base_url}")
