@@ -309,7 +309,7 @@ def detect_user_region(request):
     test_region = request.args.get('test_region')
     print(f"🧪 REGION DEBUG: test_region parameter = '{test_region}'")
     
-    if test_region and test_region.upper() in ['UK', 'US', 'SG']:
+    if test_region and test_region.upper() in ['UK', 'US', 'SG', 'DE']:
         print(f"🧪 TEST MODE: Using manual region override: {test_region}")
         return test_region.upper()
 
