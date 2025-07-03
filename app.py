@@ -308,10 +308,19 @@ def detect_user_region(request):
     # TEST OVERRIDE: Check for manual region parameter
     test_region = request.args.get('test_region')
     print(f"🧪 REGION DEBUG: test_region parameter = '{test_region}'")
-        
+
     if test_region and test_region.upper() in ['UK', 'US', 'SG', 'DE']:
         print(f"🧪 TEST MODE: Using manual region override: {test_region}")
         return test_region.upper()
+ 
+    # Quick Frankfurt test for Germany
+    try:
+        if 'frankfurt' in request.form.get('location', '').lower():
+            print("🔥 FORCING DE REGION FOR FRANKFURT TEST")
+            return "DE"
+    except:
+        pass
+     
 
     # STEP 1: Debug IP detection
     print("🔍 STEP 1: Checking IP detection...")
