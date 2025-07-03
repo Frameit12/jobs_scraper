@@ -154,7 +154,20 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='Location']"))
         ).send_keys(location)
 
-        driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+        # Try German search button first, then English
+        try:
+            search_button = driver.find_element(By.XPATH, "//button[contains(text(), 'Suche')]")
+            print("🇩🇪 Found German 'Suche' button")
+        except:
+            try:
+                search_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
+                print("🇺🇸 Found English submit button")
+            except:
+                search_button = driver.find_element(By.XPATH, "//button[contains(@class, 'search') or contains(@class, 'submit')]")
+                print("🔍 Found generic search button")
+
+        search_button.click()
+        
         time.sleep(5)
 
         # DEBUG: Check what we actually got after the search
