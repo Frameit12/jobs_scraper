@@ -128,9 +128,12 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         else:
             base_url = "https://www.efinancialcareers.com/"  # Default to US
         print(f"🌍 REGION DEBUG: Using region '{region}' -> URL: {base_url}")
+        print(f"🌐 ACTUAL URL BEING ACCESSED: About to navigate to {base_url}")
                       
         driver.get(base_url)
         time.sleep(2)
+        print(f"🌐 CURRENT URL AFTER NAVIGATION: {driver.current_url}")
+        print(f"🌐 PAGE TITLE: {driver.title}")
 
         print("⌨️ Filling job title and location...")
         WebDriverWait(driver, 60).until(
