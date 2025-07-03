@@ -349,6 +349,8 @@ def detect_user_region(request):
                 return "UK"
             elif country_code == "SG":
                 return "SG"
+            elif country_code == "DE":
+                return "DE"            
             else:
                 return "US" 
         else:
