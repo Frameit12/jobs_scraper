@@ -899,6 +899,8 @@ def index():
     global last_results
     jobs = []
     if request.method == "POST":
+        print(f"🚨 DEBUG: request.args = {request.args}")
+        print(f"🚨 DEBUG: test_region = {request.args.get('test_region')}")
         # ADD THIS SEARCH LIMIT CHECK HERE
         if not check_daily_search_limit():
             # Get current search count for display
