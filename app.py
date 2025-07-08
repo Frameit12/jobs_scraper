@@ -754,11 +754,11 @@ def clean_description_for_excel(html):
 
 def send_email_with_attachment(subject, body, attachment_path, config, user_email=None):
     try:
-        smtp_server = config["email_settings"]["smtp_server"]
-        smtp_port = config["email_settings"]["smtp_port"]
-        sender_email = config["email_settings"]["sender_email"]
-        sender_password = config["email_settings"]["sender_password"]
-        recipients = [user_email] if user_email else config["email_settings"]["recipients"]
+        smtp_server = ]["smtp_server"]
+        smtp_port = ]["smtp_port"]
+        sender_email = ]["sender_email"]
+        sender_password = ]["sender_password"]
+        recipients = [user_email] if user_email else []
 
         msg = EmailMessage()
         msg["Subject"] = subject
