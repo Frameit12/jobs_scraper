@@ -338,13 +338,7 @@
                 </form>
                 {% endif %}
             </div>
-            <!-- Show info message -->
-            {% if info %}
-                <div style="background: #dbeafe; border: 1px solid #3b82f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                    <p style="color: #1e40af; margin: 0; font-weight: 500;">{{ info }}</p>
-                </div>
-            {% endif %}
-                        
+                                    
             
                 <div class="flex items-center justify-between mb-6">
 
@@ -352,6 +346,14 @@
                 <p style="margin-top: -10px; color: #444;">
                     Showing results from saved search: <strong style="color: #002060;">{{ active_search_name }} - {{ timestamp }}</strong>
                 </p>
+            {% endif %}
+
+
+            <!-- Show info message -->
+            {% if info %}
+                <div style="background: #dbeafe; border: 1px solid #3b82f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <p style="color: #1e40af; margin: 0; font-weight: 500;">{{ info }}</p>
+                </div>
             {% endif %}
 
             {% if jobs %}
@@ -393,9 +395,7 @@
                 </form>
             </div>
                 
-                {% if info %}
-                        <p style="color: green; font-size: 14px; margin-top: 8px;">{{ info }}</p>
-                {% endif %}
+               
                 <table id="resultsTable" style="table-layout: fixed; margin-bottom: 20px;">
                     <thead>
                         <tr>
