@@ -913,6 +913,7 @@ def index():
     global last_results
     jobs = []
     if request.method == "POST":
+        info = None # Add this line
         print(f"🚨 DEBUG: request.args = {request.args}")
         print(f"🚨 DEBUG: test_region = {request.args.get('test_region')}")
         # ADD THIS SEARCH LIMIT CHECK HERE
@@ -1081,7 +1082,7 @@ def index():
         last_results = jobs
         global last_search_name
         last_search_name = title if title else "Job_Search"
-        return render_template("index.html", jobs=jobs, title=title, location=location, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=load_saved_searches())
+        return render_template("index.html", info=info, jobs=jobs, title=title, location=location, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=load_saved_searches())
     
     saved_searches = check_excel_files_for_searches(load_saved_searches())
     print("✅ Saved searches and their Excel status:")
