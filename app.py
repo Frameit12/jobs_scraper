@@ -2159,8 +2159,7 @@ for rule in app.url_map.iter_rules():
 
 @app.route("/test")
 def test():
-    return render_template("test.html", info="TEST MESSAGE")
-
+    return render_template("test.html", info="⏳ Indeed search is coming soon! We're currently testing this feature.", jobs=[])
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
