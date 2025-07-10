@@ -916,6 +916,7 @@ def index():
         info = None # Add this line
         print(f"🚨 DEBUG: request.args = {request.args}")
         print(f"🚨 DEBUG: test_region = {request.args.get('test_region')}")
+        print(f"🚨 POST METHOD DETECTED - Starting search processing")
         # ADD THIS SEARCH LIMIT CHECK HERE
         if not check_daily_search_limit():
             # Get current search count for display
