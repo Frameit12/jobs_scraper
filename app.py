@@ -986,15 +986,7 @@ def index():
             saved_searches = check_excel_files_for_searches(load_saved_searches())
             return render_template("index.html", info=info, jobs=last_results, title=title, location=location, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=saved_searches)
             
-            # Add source selection handling
-            source = request.form.get("source", "efinancialcareers")
-
-            # Admin-only access to Indeed/Both (replace 'your_username' with your actual username)
-            if source in ["indeed", "both"] and session.get('username') != 'frameit':
-                info = "⏳ Indeed search is coming soon! We're currently testing this feature."
-                source = "efinancialcareers"  # Default back to efinancialcareers
-        
-        
+       
         print(f"🔍 FLASK DEBUG: About to call scraper with seniority='{seniority}', type={type(seniority)}")
         
         try:
@@ -1087,7 +1079,7 @@ def index():
         global last_search_name
         last_search_name = title if title else "Job_Search"
         print(f"🔍 DEBUG: About to render template with info = '{info}'")
-        return render_template("index.html", info=info, jobs=jobs, title=title, location=location, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=load_saved_searches())
+        return render_template("index.html", info=info, jobs=jobs, title=title, location=location, source=source, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=load_saved_searches())
     
     saved_searches = check_excel_files_for_searches(load_saved_searches())
     print("✅ Saved searches and their Excel status:")
