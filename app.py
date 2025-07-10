@@ -64,7 +64,7 @@ def init_users_table():
                 ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE
             """))
             
-            # Add user_id column to saved_searches table
+            # Add user_id columns to saved_searches table
             conn.execute(text("""
                 ALTER TABLE saved_searches 
                 ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)
