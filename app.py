@@ -2157,6 +2157,10 @@ print("🔍 DEBUG: Registered routes:")
 for rule in app.url_map.iter_rules():
     print(f"  {rule.rule} -> {rule.methods} -> {rule.endpoint}")
 
-    
+@app.route("/test")
+def test():
+    return render_template("test.html", info="TEST MESSAGE")
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
