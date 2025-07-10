@@ -217,28 +217,28 @@
                     </svg>
                     Search Filters
                 </h2>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; font-weight: bold; margin-bottom: 8px; color: #1e3a8a;">
-                        Search on:
-                    </label>
-                    <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
-                        <label style="display: flex; align-items: center; font-weight: 500;">
-                            <input type="radio" name="source" value="efinancialcareers" checked style="margin-right: 6px;">
-                            eFinancialCareers
-                        </label>
-                        <label style="display: flex; align-items: center; font-weight: 500; color: #6b7280;">
-                            <input type="radio" name="source" value="indeed" style="margin-right: 6px;">
-                            Indeed <span style="font-size: 12px; color: #999; margin-left: 4px; font-style: italic;">(Coming Soon)</span>
-                    </label>
-                        <label style="display: flex; align-items: center; font-weight: 500; color: #6b7280;">
-                            <input type="radio" name="source" value="both" style="margin-right: 6px;">
-                            Both <span style="font-size: 12px; color: #999; margin-left: 4px; font-style: italic;">(Coming Soon)</span>
-                        </label>
-                    </div>
-                </div>
-             
                 
                 <form method="POST" action="/app">
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; font-weight: bold; margin-bottom: 8px; color: #1e3a8a;">
+                            Search on:
+                        </label>
+                        <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; font-weight: 500;">
+                                <input type="radio" name="source" value="efinancialcareers" {{ 'checked' if source == 'efinancialcareers' or not source else '' }} style="margin-right: 6px;">
+                                eFinancialCareers
+                            </label>
+                            <label style="display: flex; align-items: center; font-weight: 500; color: #6b7280;">
+                                <input type="radio" name="source" value="indeed" {{ 'checked' if source == 'indeed' else '' }} style="margin-right: 6px;">
+                                Indeed <span style="font-size: 12px; color: #999; margin-left: 4px; font-style: italic;">(Coming Soon)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; font-weight: 500; color: #6b7280;">
+                                <input type="radio" name="source" value="both" {{ 'checked' if source == 'both' else '' }} style="margin-right: 6px;">
+                                Both <span style="font-size: 12px; color: #999; margin-left: 4px; font-style: italic;">(Coming Soon)</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div style="margin-bottom: 10px;">
                         <label for="title" style="display: block; font-weight: bold;">Job Title or Keyword:</label>
                         <input type="text" id="title" name="title" value="{{ title }}" placeholder="e.g. Risk & Control" style="width: 100%; padding: 8px;">
