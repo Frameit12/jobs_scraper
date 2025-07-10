@@ -961,9 +961,12 @@ def index():
         # Admin-only access to Indeed/Both
         if source in ["indeed", "both"] :
             info = "⏳ Indeed search is coming soon! We're currently testing this feature."
-            source = "efinancialcareers"  # Default back to efinancialcareers
             print(f"🔍 DEBUG: Set info message = '{info}'")
             print(f"🔍 DEBUG: Reset source to = '{source}'")
+
+            # Return early with the message, don't run any scraper
+            saved_searches = check_excel_files_for_searches(load_saved_searches())
+            return render_template("index.html", info=info, jobs=[], title=title, location=location, source=source, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=saved_searches)
 
         if request.form.get("action") == "save":
             search_name = request.form.get("search_name", "").strip()
