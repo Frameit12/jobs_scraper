@@ -338,13 +338,14 @@
                 </form>
                 {% endif %}
             </div>
-            <!-- DEBUG BOXES - Should always be visible -->
-            <p style="color: red; background: yellow; padding: 10px; margin: 10px 0;">
-                STATIC TEST: This should always be visible!
-            </p>
-            <p style="color: red; background: yellow; padding: 10px;">
-                DEBUG: info variable = "{{ info }}"
-            </p>
+            <!-- Show info message -->
+            {% if info %}
+                <div style="background: #dbeafe; border: 1px solid #3b82f6; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <p style="color: #1e40af; margin: 0; font-weight: 500;">{{ info }}</p>
+                </div>
+            {% endif %}
+                        
+            
                 <div class="flex items-center justify-between mb-6">
 
             {% if active_search_name %}
