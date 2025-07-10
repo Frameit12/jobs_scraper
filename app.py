@@ -913,6 +913,7 @@ def index():
     global last_results
     jobs = []
     if request.method == "POST":
+        print("🚨 POST METHOD DETECTED - Starting debug")
         info = None # Add this line
         print(f"🚨 DEBUG: request.args = {request.args}")
         print(f"🚨 DEBUG: test_region = {request.args.get('test_region')}")
