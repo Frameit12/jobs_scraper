@@ -692,24 +692,29 @@ def run_scheduled_searches():
                 })
                 conn.commit()
 
-
 # Add scheduler initialization right after the function
 print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
-try:
-    scheduler = BackgroundScheduler()
-    print("🚀 SCHEDULER DEBUG: BackgroundScheduler created")
-    def test_scheduler():
-        print("🧪 TEST: Scheduler called a function!")
-    scheduler.add_job(func=run_scheduled_searches, trigger="cron", hour=5, minute=0) # Runs daily at 9am
-    print("🚀 SCHEDULER DEBUG: Job added to scheduler")
-    scheduler.start()
-    print("🚀 SCHEDULER DEBUG: Scheduler started successfully!") 
-    atexit.register(lambda: scheduler.shutdown())
-    print("🚀 SCHEDULER DEBUG: Exit handler registered")
-except Exception as e:
-    print(f"❌ SCHEDULER DEBUG: Failed to start scheduler: {e}")
-    import traceback
-    traceback.print_exc()
+
+# Only run scheduler if ENABLE_SCHEDULER environment variable is set
+if os.environ.get('ENABLE_SCHEDULER', 'false').lower() == 'true':
+    print("🚀 SCHEDULER DEBUG: ENABLE_SCHEDULER is true, starting scheduler...")
+    try:
+        scheduler = BackgroundScheduler()
+        print("🚀 SCHEDULER DEBUG: BackgroundScheduler created")
+        def test_scheduler():
+            print("🧪 TEST: Scheduler called a function!")
+        scheduler.add_job(func=run_scheduled_searches, trigger="cron", hour=5, minute=0) # Runs daily at 9am
+        print("🚀 SCHEDULER DEBUG: Job added to scheduler")
+        scheduler.start()
+        print("🚀 SCHEDULER DEBUG: Scheduler started successfully!") 
+        atexit.register(lambda: scheduler.shutdown())
+        print("🚀 SCHEDULER DEBUG: Exit handler registered")
+    except Exception as e:
+        print(f"❌ SCHEDULER DEBUG: Failed to start scheduler: {e}")
+        import traceback
+        traceback.print_exc()
+else:
+    print("🚀 SCHEDULER DEBUG: ENABLE_SCHEDULER not set to true, skipping scheduler initialization")
 
 
 def format_description(desc):
