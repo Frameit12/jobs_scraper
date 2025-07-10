@@ -375,13 +375,13 @@
                             </div>
                         </div>
                     </div>
-                    {% if info %}
-                        <p style="color: green; font-size: 14px; margin-top: 8px;">{{ info }}</p>
-                    {% endif %}
+                    
                 </form>
             </div>
 
-            
+                {% if info %}
+                        <p style="color: green; font-size: 14px; margin-top: 8px;">{{ info }}</p>
+                {% endif %}
                 <table id="resultsTable" style="table-layout: fixed; margin-bottom: 20px;">
                     <thead>
                         <tr>
