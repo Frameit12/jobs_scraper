@@ -954,11 +954,15 @@ def index():
             
         # Add source selection handling HERE
         source = request.form.get("source", "efinancialcareers")
+        print(f"🔍 DEBUG: Selected source = '{source}'")
+        print(f"🔍 DEBUG: Username = '{session.get('username')}'")
 
         # Admin-only access to Indeed/Both
         if source in ["indeed", "both"] :
             info = "⏳ Indeed search is coming soon! We're currently testing this feature."
             source = "efinancialcareers"  # Default back to efinancialcareers
+            print(f"🔍 DEBUG: Set info message = '{info}'")
+            print(f"🔍 DEBUG: Reset source to = '{source}'")
 
         if request.form.get("action") == "save":
             search_name = request.form.get("search_name", "").strip()
@@ -1082,6 +1086,7 @@ def index():
         last_results = jobs
         global last_search_name
         last_search_name = title if title else "Job_Search"
+        print(f"🔍 DEBUG: About to render template with info = '{info}'")
         return render_template("index.html", info=info, jobs=jobs, title=title, location=location, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=load_saved_searches())
     
     saved_searches = check_excel_files_for_searches(load_saved_searches())
