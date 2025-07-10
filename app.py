@@ -955,7 +955,7 @@ def index():
         source = request.form.get("source", "efinancialcareers")
 
         # Admin-only access to Indeed/Both
-        if source in ["indeed", "both"] and session.get('username') != 'frameit':
+        if source in ["indeed", "both"] :
             info = "⏳ Indeed search is coming soon! We're currently testing this feature."
             source = "efinancialcareers"  # Default back to efinancialcareers
 
