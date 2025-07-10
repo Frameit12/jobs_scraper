@@ -955,6 +955,9 @@ def index():
             
         # Add source selection handling HERE
         source = request.form.get("source", "efinancialcareers")
+        print(f"🔍 DEBUG: Raw form data = {dict(request.form)}")
+        print(f"🔍 DEBUG: Source from form = '{request.form.get('source')}'")
+        print(f"🔍 DEBUG: Final source variable = '{source}'")
         print(f"🔍 DEBUG: Selected source = '{source}'")
         print(f"🔍 DEBUG: Username = '{session.get('username')}'")
 
