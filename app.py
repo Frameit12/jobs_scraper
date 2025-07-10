@@ -2133,6 +2133,67 @@ def checkout():
 print("🔍 DEBUG: Registered routes:")
 for rule in app.url_map.iter_rules():
     print(f"  {rule.rule} -> {rule.methods} -> {rule.endpoint}")
+
+@app.route("/indeed", methods=["GET", "POST"])
+def indeed_search():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+        
+    indeed_results = []
+    if request.method == "POST":
+        # Check search limits (reuse your existing function)
+        if not check_daily_search_limit():
+            user_id = get_current_user_id()
+            engine = get_db_connection()
+            current_count = 3
+            if engine:
+                try:
+                    with engine.connect() as conn:
+                        today = datetime.now().date()
+                        result = conn.execute(text("""
+                            SELECT search_count FROM daily_search_limits 
+                            WHERE user_id = :user_id AND search_date = :today
+                        """), {"user_id": user_id, "today": today})
+                        row = result.fetchone()
+                        current_count = row[0] if row else 0
+                except:
+                    pass
+            return render_template("upgrade.html", 
+                                 feature="unlimited searches",
+                                 current_plan="free",
+                                 search_limit_reached=True,
+                                 searches_used=current_count)
+        
+        title = request.form.get("title", "")
+        location = request.form.get("location", "")
+        max_jobs = int(request.form.get("max_jobs", 10))
+        seniority = request.form.get("seniority", "")
+        
+        try:
+            # Import your Indeed scraper
+            from indeed_scraper import scrape_jobs as scrape_indeed_jobs
+            indeed_results = scrape_indeed_jobs(title, location, max_jobs, seniority)
+            
+            # Process results same way as your main app
+            for job in indeed_results:
+                if not job.get("company"):
+                    job["company"] = "[Not Found]"
+                import html
+                raw_description = job.get("description", "Description not available")
+                decoded_description = html.unescape(raw_description)
+                job["formatted_description"] = decoded_description
+                
+        except Exception as e:
+            print(f"Indeed scraping error: {e}")
+            indeed_results = []
+        
+        # Increment search count
+        increment_search_count()
+        
+        return render_template("indeed.html", jobs=indeed_results, title=title, location=location, max_jobs=max_jobs, seniority=seniority)
+    
+    return render_template("indeed.html", title="", location="", seniority="", max_jobs=10)
     
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
