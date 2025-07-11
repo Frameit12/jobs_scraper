@@ -28,7 +28,39 @@ def wait_for_full_description(driver, selector, min_length=500, timeout=15):
        time.sleep(0.5)
    return False
 
-def wait_for_turnstile_completion(driver, timeout=30):
+def wait_for_turnstile_completion(driver, timeout=60):
+    """Wait for Turnstile auto-verification using DOM-based approach"""
+    print("🔍 Waiting for Turnstile auto-verification...")
+    
+    for i in range(timeout):
+        try:
+            # Check for the hidden input that Turnstile populates upon completion
+            hidden_input = driver.find_element(By.CSS_SELECTOR, "input[name='cf-turnstile-response']")
+            response_value = hidden_input.get_attribute('value')
+            if response_value:
+                print(f"✅ Turnstile auto-verified successfully! Response: {response_value[:20]}...")
+                return True
+            elif i % 10 == 0:  # Print status every 10 seconds
+                print(f"🔍 Still waiting... ({i}/60 seconds) - Response field empty")
+        except Exception as e:
+            if i % 10 == 0:
+                print(f"🔍 Still waiting... ({i}/60 seconds) - No response field found yet")
+        
+        # Also check if page title changes (indicates completion)
+        current_title = driver.title
+        if "Just a moment" not in current_title:
+            print(f"✅ Page title changed to: '{current_title}'")
+            return True
+            
+        time.sleep(1)
+    
+    print(f"❌ Turnstile verification timed out after {timeout} seconds")
+    # Save page source for debugging
+    with open("debug_turnstile_timeout.html", "w", encoding="utf-8") as f:
+        f.write(driver.page_source)
+    print("💾 Saved page source to debug_turnstile_timeout.html for analysis")
+    return False
+   
     """Wait for Turnstile auto-verification using DOM-based approach"""
     print("🔍 Waiting for Turnstile auto-verification...")
     
