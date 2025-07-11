@@ -224,6 +224,19 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                   print(f"🔍 DEBUG: Contains 'cloudflare': {'cloudflare' in page_source_snippet}")
                   print(f"🔍 DEBUG: Contains 'just a moment': {'just a moment' in page_source_snippet}")
                   print(f"🔍 DEBUG: Contains 'checking your browser': {'checking your browser' in page_source_snippet}")
+
+                  # ADD THE CAPTCHA DETECTION HERE:
+                  # Detect and handle the "Verify you are human" challenge
+                  if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
+                    print("🔍 Detected Cloudflare verification challenge")
+                    try:
+                      sb.uc_gui_click_captcha()
+                      print("✅ Attempted to handle verification challenge")
+                      time.sleep(10)  # Wait for challenge to resolve
+                      print(f"🔍 Page title after challenge: {driver.title}")
+                    except Exception as e:
+                      print(f"❌ Challenge handling failed: {e}")
+            
               else:
                   print("🔍 DEBUG: URL already has sort parameter")
           except Exception as e:
