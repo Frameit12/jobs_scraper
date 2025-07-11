@@ -94,14 +94,25 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
 
         # Use your exact browser User-Agent
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
-
-        with SB(uc=True, headless=headless, incognito=True) as sb:
+        
+        with SB(uc=True, headless=headless, incognito=True, block_images=True, no_sandbox=True, disable_gpu=True, disable_dev_shm=True, page_load_strategy="eager", undetectable=True, chromium_arg="--disable-blink-features=AutomationControlled") as sb:    
             # Get the underlying driver object to use with your existing code
             driver = sb.driver
-                   
-            # Simple User-Agent setting (like your EFC scraper)
-            driver.execute_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{user_agent}'}});")
+
+
+            # Enhanced anti-detection with randomized user agents
+            user_agents = [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+            ]
+            selected_ua = random.choice(user_agents)
+
+            # Comprehensive anti-detection
+            driver.execute_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{selected_ua}'}});")
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            driver.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
+            driver.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']})")
         
             # SeleniumBase anti-bot protection
             sb.uc_open_with_reconnect("https://www.indeed.com/", reconnect_time=6)
@@ -113,9 +124,9 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                 print("✅ Handled Cloudflare challenge")
             except Exception:
                 print("No Cloudflare challenge detected")
-            
-            time.sleep(2)
-
+                        
+            # Human-like delay with randomization
+            time.sleep(random.uniform(3, 7))
 
             print("⌨️ Filling job title and location...")
             WebDriverWait(driver, 10).until(
@@ -150,13 +161,14 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
 
             # Now enter your desired location
             location_input.send_keys(location)
-            time.sleep(1)
+            # Random typing delay
+            time.sleep(random.uniform(1.5, 3.0))
 
             # Submit the search
             driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-
-
-            time.sleep(5)
+            
+            # Extended wait with randomization for page load
+            time.sleep(random.uniform(7, 12))
 
             # Handle post-search Cloudflare if needed
             try:
