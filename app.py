@@ -1005,7 +1005,28 @@ def index():
             # Choose scraper based on source
             if source == "indeed":
                 print(f"🔍 DEBUG: Running Indeed scraper for admin user")
-                jobs = scrape_indeed_jobs(title, location, max_jobs, seniority=seniority, headless=True)
+                try:
+                    jobs = scrape_indeed_jobs(title, location, max_jobs, seniority=seniority, headless=True)
+                    print(f"🔍 DEBUG: Indeed scraper returned {len(jobs)} jobs")
+
+                    # Check if we got blocked by Cloudflare
+                    if jobs and len(jobs) == 1 and jobs[0].get("error_type") == "timeout":
+                        # Replace the generic timeout with a more specific message
+                        jobs[0]["description"] = "Indeed's anti-bot protection is currently blocking automated searches. We're working on a solution. Please try eFinancialCareers for now."
+                        jobs[0]["formatted_description"] = jobs[0]["description"]
+
+                except Exception as e: 
+                    print(f"❌ Indeed scraper failed: {e}")
+                    jobs = [{
+                        "title": "Indeed Currently Unavailable",
+                        "company": "System Info",
+                        "location": location,
+                        "link": "#",
+                        "description": "Indeed's anti-bot protection is preventing automated searches in the server environment. We're working on a solution. Please use eFinancialCareers for now.",
+                        "formatted_description": "Indeed's anti-bot protection is preventing automated searches in the server environment. We're working on a solution. Please use eFinancialCareers for now."
+                    }]
+                    
+           
             else:
                 # Regular efinancialcareers scraper
                 region = detect_user_region(request)
