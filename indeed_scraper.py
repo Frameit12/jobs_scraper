@@ -104,7 +104,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
        
        logger.info("🌐 Trying minimal SeleniumBase UC Mode...")
 
-       with SB(uc=True, headless=True) as sb:
+       with SB(uc=True, headless=False) as sb:
            driver = sb.driver
            logger.info("✅ SeleniumBase UC Mode initialized successfully")
 
