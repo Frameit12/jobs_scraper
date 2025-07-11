@@ -7,6 +7,9 @@ from bs4 import BeautifulSoup
 from bleach import clean
 import time
 import random
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def wait_for_full_description(driver, selector, min_length=500, timeout=15):
     """Your original wait function - unchanged"""
@@ -90,8 +93,8 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
     print(f"  - seniority: '{seniority}'")
     
     try:  # <-- ONLY CHANGE: Added this try statement
-        print("🌐 Launching SeleniumBase browser...")
-
+        logger.info("🌐 Launching SeleniumBase browser...")
+        
         # Use your exact browser User-Agent
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
         
