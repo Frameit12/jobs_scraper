@@ -217,6 +217,12 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                   print(f"🔍 DEBUG: Navigating to relevance-sorted URL: {relevance_url}")
                   driver.get(relevance_url)
                   time.sleep(3)
+                  # Check if this is a second Cloudflare challenge
+                  page_source_snippet = driver.page_source[:500].lower()
+                  print(f"🔍 DEBUG: Page source snippet: {page_source_snippet}")
+                  print(f"🔍 DEBUG: Contains 'cloudflare': {'cloudflare' in page_source_snippet}")
+                  print(f"🔍 DEBUG: Contains 'just a moment': {'just a moment' in page_source_snippet}")
+                  print(f"🔍 DEBUG: Contains 'checking your browser': {'checking your browser' in page_source_snippet}")
               else:
                   print("🔍 DEBUG: URL already has sort parameter")
           except Exception as e:
