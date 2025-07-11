@@ -135,39 +135,17 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
            logger.info(f"🔍 Page title: {driver.title}")
 
-           # Enhanced Turnstile handling for homepage
-           if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
-               print("🔍 Detected Cloudflare Turnstile challenge")
-               try:
-                   # Wait for Turnstile widget to load
-                   print("⏳ Waiting for Turnstile widget to render...")
-                   WebDriverWait(driver, 15).until(
-                       EC.presence_of_element_located((By.CSS_SELECTOR, "[id*='cf-chl-widget']"))
-                   )
-                   
-                   # Check if already auto-verified
-                   hidden_input = driver.find_element(By.CSS_SELECTOR, "input[name='cf-turnstile-response']")
-                   if hidden_input.get_attribute('value'):
-                       print("✅ Turnstile auto-verified!")
-                       time.sleep(3)
-                   else:
-                       # Try clicking the widget
-                       widget = driver.find_element(By.CSS_SELECTOR, "div[id*='cf-chl-widget']")
-                       widget.click()
-                       print("✅ Clicked Turnstile widget")
-                       
-                       # Wait for verification (up to 30 seconds)
-                       for i in range(30):
-                           time.sleep(1)
-                           if hidden_input.get_attribute('value'):
-                               print("✅ Turnstile verification completed!")
-                               time.sleep(3)
-                               break
-                       else:
-                           print("❌ Turnstile verification timed out")
-                           
-               except Exception as e:
-                   print(f"❌ Turnstile handling failed: {e}")
+           # Debug current page state
+           print(f"🔍 DEBUG: Page title = '{driver.title}'")
+           print(f"🔍 DEBUG: URL = '{driver.current_url}'")
+
+           # Let SeleniumBase handle any challenges
+           try:
+               sb.uc_gui_click_captcha()
+               print("✅ SeleniumBase handled challenge")
+               time.sleep(5)
+           except Exception as e:
+               print(f"❌ SeleniumBase challenge handling failed: {e}")
 
            time.sleep(2)
 
@@ -259,39 +237,17 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                    print(f"🔍 DEBUG: Contains 'just a moment': {'just a moment' in page_source_snippet}")
                    print(f"🔍 DEBUG: Contains 'checking your browser': {'checking your browser' in page_source_snippet}")
 
-                   # Enhanced Turnstile handling for post-search
-                   if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
-                       print("🔍 Detected Cloudflare Turnstile challenge")
-                       try:
-                           # Wait for Turnstile widget to load
-                           print("⏳ Waiting for Turnstile widget to render...")
-                           WebDriverWait(driver, 15).until(
-                               EC.presence_of_element_located((By.CSS_SELECTOR, "[id*='cf-chl-widget']"))
-                           )
-                           
-                           # Check if already auto-verified
-                           hidden_input = driver.find_element(By.CSS_SELECTOR, "input[name='cf-turnstile-response']")
-                           if hidden_input.get_attribute('value'):
-                               print("✅ Turnstile auto-verified!")
-                               time.sleep(3)
-                           else:
-                               # Try clicking the widget
-                               widget = driver.find_element(By.CSS_SELECTOR, "div[id*='cf-chl-widget']")
-                               widget.click()
-                               print("✅ Clicked Turnstile widget")
-                               
-                               # Wait for verification (up to 30 seconds)
-                               for i in range(30):
-                                   time.sleep(1)
-                                   if hidden_input.get_attribute('value'):
-                                       print("✅ Turnstile verification completed!")
-                                       time.sleep(3)
-                                       break
-                               else:
-                                   print("❌ Turnstile verification timed out")
-                                   
-                       except Exception as e:
-                           print(f"❌ Turnstile handling failed: {e}")
+                   # Debug current page state
+                   print(f"🔍 DEBUG: Page title = '{driver.title}'")
+                   print(f"🔍 DEBUG: URL = '{driver.current_url}'")
+
+                   # Let SeleniumBase handle any challenges
+                   try:
+                       sb.uc_gui_click_captcha()
+                       print("✅ SeleniumBase handled challenge")
+                       time.sleep(5)
+                   except Exception as e:
+                       print(f"❌ SeleniumBase challenge handling failed: {e}")
                            
                else:
                    print("🔍 DEBUG: URL already has sort parameter")
