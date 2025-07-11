@@ -106,6 +106,27 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
        with SB(uc=True, headless=True) as sb:
           driver = sb.driver
           logger.info("✅ SeleniumBase UC Mode initialized successfully")
+
+          
+      # ADD ALL THE SCRAPING LOGIC HERE:
+      # Add anti-detection scripts
+      user_agents = [
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+      ]
+      selected_ua = random.choice(user_agents)
+    
+      driver.execute_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{selected_ua}'}});")
+      driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    
+      # Use SeleniumBase UC navigation instead of regular driver.get()
+      sb.uc_open_with_reconnect("https://www.indeed.com/", reconnect_time=6)
+      logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
+      logger.info(f"🔍 Page title: {driver.title}")
+
+
+          
         
          # Test connection immediately and handle disconnection
           try:
@@ -117,20 +138,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
              driver = sb.driver
              logger.info("🔄 Attempted driver reconnection")
 
-       try:
-           # Add anti-detection scripts
-           user_agents = [
-               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-               "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-           ]
-           selected_ua = random.choice(user_agents)
-   
-           driver.execute_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{selected_ua}'}});")
-           driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-   
-           # Navigate to Indeed
-           driver.get("https://www.indeed.com/")
+       
            time.sleep(2)
 
            # Add stealth page load simulation
