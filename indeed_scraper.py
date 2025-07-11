@@ -306,6 +306,35 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
           print("🔍 DEBUG: Current URL:", driver.current_url)
           print("🔍 DEBUG: Page title:", driver.title)
 
+          # Handle potential pop-ups that might be blocking content
+          print("🔍 Checking for Indeed pop-ups and overlays...")
+          try:
+              # Common Indeed pop-up selectors
+              pop_up_selectors = [
+                ".popover-x-button-close",
+                "[data-testid='close-button']", 
+                ".icl-CloseButton",
+                ".pn-CloseButton",
+                "#onetrust-close-btn-container button"
+              ]
+    
+              for selector in pop_up_selectors:
+                try:
+                    pop_up = WebDriverWait(driver, 2).until(
+                      EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                    )
+                    pop_up.click()
+                    print(f"✅ Closed pop-up with selector: {selector}")
+                    time.sleep(1)
+                    break
+                except:
+                    continue
+              
+          except Exception as e:
+            print("No pop-ups detected")
+
+    
+
           print("⏳ Waiting for job cards to load...")
           WebDriverWait(driver, 15).until(
               EC.presence_of_element_located((By.CSS_SELECTOR, "a[data-jk]"))
