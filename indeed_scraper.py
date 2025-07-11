@@ -99,9 +99,11 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
         
         with SB(uc=True, headless=headless, incognito=True, block_images=True, no_sandbox=True, disable_gpu=True, disable_dev_shm=True, page_load_strategy="eager", undetectable=True, chromium_arg="--disable-blink-features=AutomationControlled") as sb:    
+            logger.info("✅ SeleniumBase browser initialized successfully")
+            
             # Get the underlying driver object to use with your existing code
             driver = sb.driver
-
+            logger.info("✅ WebDriver object obtained")
 
             # Enhanced anti-detection with randomized user agents
             user_agents = [
