@@ -230,28 +230,47 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                   if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
                     print("🔍 Detected Cloudflare verification challenge")
                     try:
-                      # Manual CAPTCHA handling for headless mode
-                      iframe = WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.XPATH, "//iframe[contains(@title, 'challenge') or contains(@src, 'challenge')]"))
-                      )
-                      driver.switch_to.frame(iframe)
+                      # Debug: Find all iframes on the page
+                      iframes = driver.find_elements(By.TAG_NAME, "iframe")
+                      print(f"🔍 DEBUG: Found {len(iframes)} iframes on the page")
         
-                      checkbox = WebDriverWait(driver, 10).until(
-                        EC.element_to_be_clickable((By.CSS_SELECTOR, "span.mark, input[type='checkbox'], .cb-i"))
-                      )
-                      checkbox.click()
+                      for i, iframe in enumerate(iframes):
+                        title = iframe.get_attribute("title") or "No title"
+                        src = iframe.get_attribute("src") or "No src"
+                        print(f"🔍 DEBUG: Iframe {i}: title='{title}', src='{src[:100]}...'")
         
-                      driver.switch_to.default_content()
-                      print("✅ Successfully handled verification challenge")
-                      time.sleep(10)
-                      print(f"🔍 Page title after challenge: {driver.title}")
-                    except Exception as e:
-                      print(f"❌ Challenge handling failed: {e}")
-                
+                      # Try to find the Cloudflare iframe with broader selectors
+                      iframe_selectors = [
+                        "//iframe[contains(@title, 'challenge')]",
+                        "//iframe[contains(@src, 'challenge')]", 
+                        "//iframe[contains(@src, 'cloudflare')]",
+                        "//iframe[contains(@title, 'verify')]",
+                        "//iframe"  # Last resort: try first iframe
+                      ]
+        
+                      iframe_found = False
+                      for selector in iframe_selectors:
+                        try:
+                          iframe = WebDriverWait(driver, 3).until(
+                            EC.presence_of_element_located((By.XPATH, selector))
+                          )
+                          print(f"✅ Found iframe using selector: {selector}")
+                          iframe_found = True
+                          break
+                        except:
+                          continue
+        
+                    if not iframe_found:
+                      print("❌ No suitable iframe found")
+                      raise Exception("No CAPTCHA iframe found")
+            
+                  except Exception as e:
+                    print(f"❌ Challenge handling failed: {e}")
+                            
               else:
                   print("🔍 DEBUG: URL already has sort parameter")
-          except Exception as e:
-              print(f"⚠️ Could not set sorting: {e}")
+            except Exception as e:
+               print(f"⚠️ Could not set sorting: {e}")
 
           # Add this section after the relevance sorting and before collecting job links:
 
