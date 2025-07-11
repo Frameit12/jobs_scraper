@@ -103,20 +103,19 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
        
        logger.info("🌐 Trying minimal SeleniumBase UC Mode...")
 
-      try:
-          with SB(uc=True, headless=True) as sb:
-              driver = sb.driver
-              logger.info("✅ SeleniumBase UC Mode initialized successfully")
+       with SB(uc=True, headless=True) as sb:
+          driver = sb.driver
+          logger.info("✅ SeleniumBase UC Mode initialized successfully")
         
-              # Test connection immediately and handle disconnection
-              try:
-                  test_url = driver.current_url
-                  logger.info(f"🔍 Driver connection working: {test_url}")
-              except Exception as conn_error:
-                  logger.error(f"❌ Driver connection failed: {conn_error}")
-                  # Try to reconnect
-                  driver = sb.driver
-                  logger.info("🔄 Attempted driver reconnection")
+         # Test connection immediately and handle disconnection
+          try:
+             test_url = driver.current_url
+             logger.info(f"🔍 Driver connection working: {test_url}")
+          except Exception as conn_error:
+             logger.error(f"❌ Driver connection failed: {conn_error}")
+             # Try to reconnect
+             driver = sb.driver
+             logger.info("🔄 Attempted driver reconnection")
 
        try:
            # Add anti-detection scripts
