@@ -10,6 +10,7 @@ import random
 import logging
 from selenium.webdriver.chrome.options import Options
 from selenium import webdriver
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -249,7 +250,18 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                   time.sleep(2)
 
                   # Take screenshot to see what's available
-                  driver.save_screenshot("debug_experience_dropdown.png")
+                 
+                  # Take screenshot and save with timestamp for easy identification
+                  from datetime import datetime
+                  timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                  screenshot_filename = f"debug_indeed_{timestamp}.png"
+                  driver.save_screenshot(screenshot_filename)
+                  print(f"🔍 DEBUG: Saved screenshot as {screenshot_filename}")
+
+                  # Also save page source for analysis
+                  with open(f"debug_page_source_{timestamp}.html", "w", encoding="utf-8") as f:
+                    f.write(driver.page_source)
+                  print(f"🔍 DEBUG: Saved page source as debug_page_source_{timestamp}.html")
                   print("🔍 DEBUG: Saved dropdown screenshot as debug_experience_dropdown.png")
 
                   # Use seniority value directly (no mapping needed)
