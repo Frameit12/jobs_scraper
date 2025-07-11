@@ -135,49 +135,39 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
            logger.info(f"🔍 Page title: {driver.title}")
 
-           # Check for immediate Cloudflare challenge on homepage
+           # Enhanced Turnstile handling for homepage
            if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
-               print("🔍 Detected immediate Cloudflare challenge on homepage")
+               print("🔍 Detected Cloudflare Turnstile challenge")
                try:
-                   # Since no iframes found, look for direct DOM elements
-                   print("🔍 Looking for direct DOM CAPTCHA elements...")
+                   # Wait for Turnstile widget to load
+                   print("⏳ Waiting for Turnstile widget to render...")
+                   WebDriverWait(driver, 15).until(
+                       EC.presence_of_element_located((By.CSS_SELECTOR, "[id*='cf-chl-widget']"))
+                   )
                    
-                   # Common Cloudflare checkbox selectors (non-iframe)
-                   checkbox_selectors = [
-                       "input[type='checkbox']",
-                       ".cf-turnstile input",
-                       ".challenge-form input[type='checkbox']",
-                       "[data-callback] input",
-                       ".cb-i",
-                       ".mark"
-                   ]
-                   
-                   checkbox_found = False
-                   for selector in checkbox_selectors:
-                       try:
-                           checkbox = WebDriverWait(driver, 3).until(
-                               EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
-                           )
-                           print(f"✅ Found checkbox using selector: {selector}")
-                           checkbox.click()
-                           print("✅ Clicked CAPTCHA checkbox")
-                           checkbox_found = True
-                           time.sleep(10)  # Wait for verification
-                           break
-                       except:
-                           continue
-                   
-                   if not checkbox_found:
-                       print("❌ No clickable checkbox found on homepage")
-                       # Save page source to analyze the actual structure
-                       with open("debug_homepage_captcha.html", "w", encoding="utf-8") as f:
-                           f.write(driver.page_source)
-                       print("💾 Saved homepage CAPTCHA page source to debug_homepage_captcha.html")
+                   # Check if already auto-verified
+                   hidden_input = driver.find_element(By.CSS_SELECTOR, "input[name='cf-turnstile-response']")
+                   if hidden_input.get_attribute('value'):
+                       print("✅ Turnstile auto-verified!")
+                       time.sleep(3)
+                   else:
+                       # Try clicking the widget
+                       widget = driver.find_element(By.CSS_SELECTOR, "div[id*='cf-chl-widget']")
+                       widget.click()
+                       print("✅ Clicked Turnstile widget")
                        
-                   print(f"🔍 Page title after homepage handling: {driver.title}")
-                   
+                       # Wait for verification (up to 30 seconds)
+                       for i in range(30):
+                           time.sleep(1)
+                           if hidden_input.get_attribute('value'):
+                               print("✅ Turnstile verification completed!")
+                               time.sleep(3)
+                               break
+                       else:
+                           print("❌ Turnstile verification timed out")
+                           
                except Exception as e:
-                   print(f"❌ Homepage challenge handling failed: {e}")
+                   print(f"❌ Turnstile handling failed: {e}")
 
            time.sleep(2)
 
@@ -269,50 +259,39 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                    print(f"🔍 DEBUG: Contains 'just a moment': {'just a moment' in page_source_snippet}")
                    print(f"🔍 DEBUG: Contains 'checking your browser': {'checking your browser' in page_source_snippet}")
 
-                   # ADD THE CAPTCHA DETECTION HERE:
-                   # Detect and handle the "Verify you are human" challenge  
+                   # Enhanced Turnstile handling for post-search
                    if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
-                       print("🔍 Detected Cloudflare verification challenge")
+                       print("🔍 Detected Cloudflare Turnstile challenge")
                        try:
-                           # Since no iframes found, look for direct DOM elements
-                           print("🔍 Looking for direct DOM CAPTCHA elements...")
+                           # Wait for Turnstile widget to load
+                           print("⏳ Waiting for Turnstile widget to render...")
+                           WebDriverWait(driver, 15).until(
+                               EC.presence_of_element_located((By.CSS_SELECTOR, "[id*='cf-chl-widget']"))
+                           )
                            
-                           # Common Cloudflare checkbox selectors (non-iframe)
-                           checkbox_selectors = [
-                               "input[type='checkbox']",
-                               ".cf-turnstile input",
-                               ".challenge-form input[type='checkbox']",
-                               "[data-callback] input",
-                               ".cb-i",
-                               ".mark"
-                           ]
-                           
-                           checkbox_found = False
-                           for selector in checkbox_selectors:
-                               try:
-                                   checkbox = WebDriverWait(driver, 3).until(
-                                       EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
-                                   )
-                                   print(f"✅ Found checkbox using selector: {selector}")
-                                   checkbox.click()
-                                   print("✅ Clicked CAPTCHA checkbox")
-                                   checkbox_found = True
-                                   time.sleep(10)  # Wait for verification
-                                   break
-                               except:
-                                   continue
-                           
-                           if not checkbox_found:
-                               print("❌ No clickable checkbox found")
-                               # Save page source to analyze the actual structure
-                               with open("debug_captcha_dom.html", "w", encoding="utf-8") as f:
-                                   f.write(driver.page_source)
-                               print("💾 Saved CAPTCHA page source to debug_captcha_dom.html")
+                           # Check if already auto-verified
+                           hidden_input = driver.find_element(By.CSS_SELECTOR, "input[name='cf-turnstile-response']")
+                           if hidden_input.get_attribute('value'):
+                               print("✅ Turnstile auto-verified!")
+                               time.sleep(3)
+                           else:
+                               # Try clicking the widget
+                               widget = driver.find_element(By.CSS_SELECTOR, "div[id*='cf-chl-widget']")
+                               widget.click()
+                               print("✅ Clicked Turnstile widget")
                                
-                           print(f"🔍 Page title after handling: {driver.title}")
-                           
+                               # Wait for verification (up to 30 seconds)
+                               for i in range(30):
+                                   time.sleep(1)
+                                   if hidden_input.get_attribute('value'):
+                                       print("✅ Turnstile verification completed!")
+                                       time.sleep(3)
+                                       break
+                               else:
+                                   print("❌ Turnstile verification timed out")
+                                   
                        except Exception as e:
-                           print(f"❌ Challenge handling failed: {e}")
+                           print(f"❌ Turnstile handling failed: {e}")
                            
                else:
                    print("🔍 DEBUG: URL already has sort parameter")
