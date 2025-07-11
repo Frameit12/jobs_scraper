@@ -28,6 +28,29 @@ def wait_for_full_description(driver, selector, min_length=500, timeout=15):
        time.sleep(0.5)
    return False
 
+def wait_for_turnstile_completion(driver, timeout=30):
+    """Wait for Turnstile auto-verification using DOM-based approach"""
+    print("🔍 Waiting for Turnstile auto-verification...")
+    
+    for i in range(timeout):
+        try:
+            # Check for the hidden input that Turnstile populates upon completion
+            hidden_input = driver.find_element(By.CSS_SELECTOR, "input[name='cf-turnstile-response']")
+            if hidden_input.get_attribute('value'):
+                print("✅ Turnstile auto-verified successfully!")
+                return True
+        except:
+            pass
+        
+        # Also check if page title changes (indicates completion)
+        if "Just a moment" not in driver.title:
+            print("✅ Page title changed - challenge likely completed!")
+            return True
+            
+        time.sleep(1)
+    
+    print("❌ Turnstile verification timed out")
+    return False
 
 def extract_job_details(driver, url):
    driver.get(url)
@@ -104,7 +127,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
        
        logger.info("🌐 Trying minimal SeleniumBase UC Mode...")
 
-       with SB(uc=True, headless=False) as sb:
+       with SB(uc=True, headless=True) as sb:
            driver = sb.driver
            logger.info("✅ SeleniumBase UC Mode initialized successfully")
 
@@ -135,17 +158,10 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
            logger.info(f"🔍 Page title: {driver.title}")
 
-           # Debug current page state
-           print(f"🔍 DEBUG: Page title = '{driver.title}'")
-           print(f"🔍 DEBUG: URL = '{driver.current_url}'")
-
-           # Let SeleniumBase handle any challenges
-           try:
-               sb.uc_gui_click_captcha()
-               print("✅ SeleniumBase handled challenge")
-               time.sleep(5)
-           except Exception as e:
-               print(f"❌ SeleniumBase challenge handling failed: {e}")
+           # DOM-based Turnstile handling for homepage
+           if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
+               print("🔍 Detected Cloudflare Turnstile challenge on homepage")
+               wait_for_turnstile_completion(driver)
 
            time.sleep(2)
 
@@ -153,16 +169,6 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            driver.execute_script("window.scrollTo(0, 100);")
            time.sleep(1)
            driver.execute_script("window.scrollTo(0, 0);")
-
-           # Human-like delay with randomization
-           time.sleep(random.uniform(3, 7))
-
-           # Handle Cloudflare if present
-           try:
-               sb.uc_gui_click_captcha()
-               print("✅ Handled Cloudflare challenge")
-           except Exception:
-               print("No Cloudflare challenge detected")
 
            # Human-like delay with randomization
            time.sleep(random.uniform(3, 7))
@@ -209,13 +215,6 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            # Extended wait with randomization for page load
            time.sleep(random.uniform(7, 12))
 
-           # Handle post-search Cloudflare if needed
-           try:
-               sb.uc_gui_click_captcha()
-               print("✅ Handled post-search Cloudflare challenge")
-           except Exception:
-               pass
-
            # NEW: Force sorting by relevance to match manual search
            print("🔄 Setting sort order to 'relevance'...")
            try:
@@ -230,24 +229,11 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                    print(f"🔍 DEBUG: Navigating to relevance-sorted URL: {relevance_url}")
                    driver.get(relevance_url)
                    time.sleep(3)
-                   # Check if this is a second Cloudflare challenge
-                   page_source_snippet = driver.page_source[:500].lower()
-                   print(f"🔍 DEBUG: Page source snippet: {page_source_snippet}")
-                   print(f"🔍 DEBUG: Contains 'cloudflare': {'cloudflare' in page_source_snippet}")
-                   print(f"🔍 DEBUG: Contains 'just a moment': {'just a moment' in page_source_snippet}")
-                   print(f"🔍 DEBUG: Contains 'checking your browser': {'checking your browser' in page_source_snippet}")
 
-                   # Debug current page state
-                   print(f"🔍 DEBUG: Page title = '{driver.title}'")
-                   print(f"🔍 DEBUG: URL = '{driver.current_url}'")
-
-                   # Let SeleniumBase handle any challenges
-                   try:
-                       sb.uc_gui_click_captcha()
-                       print("✅ SeleniumBase handled challenge")
-                       time.sleep(5)
-                   except Exception as e:
-                       print(f"❌ SeleniumBase challenge handling failed: {e}")
+                   # DOM-based Turnstile handling for post-search
+                   if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
+                       print("🔍 Detected Cloudflare Turnstile challenge after search")
+                       wait_for_turnstile_completion(driver)
                            
                else:
                    print("🔍 DEBUG: URL already has sort parameter")
