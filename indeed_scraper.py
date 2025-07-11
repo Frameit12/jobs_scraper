@@ -98,37 +98,56 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
         # Use your exact browser User-Agent
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
         
-        with SB(uc=True, headless=True, no_sandbox=True, disable_gpu=True) as sb:
-            logger.info("✅ SeleniumBase browser initialized successfully")
-            
-            # Get the underlying driver object to use with your existing code
-            driver = sb.driver
-            logger.info("✅ WebDriver object obtained")
+        logger.info("🌐 Using same Chrome setup as working efinancialcareers scraper...")
 
-            # Enhanced anti-detection with randomized user agents
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox") 
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
+
+        driver = webdriver.Chrome(options=options)
+        logger.info("✅ Chrome driver initialized successfully")
+
+        try:
+            # Add anti-detection scripts
             user_agents = [
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
             ]
             selected_ua = random.choice(user_agents)
-
-            # Comprehensive anti-detection
+    
             driver.execute_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{selected_ua}'}});")
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-            driver.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]})")
-            driver.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']})")
+    
+            # Navigate to Indeed
+            driver.get("https://www.indeed.com/")
+            logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
+            logger.info(f"🔍 Page title: {driver.title}")
+    
+            # Human-like delay with randomization
+            time.sleep(random.uniform(3, 7))
+         
         
+        try:
+            # Navigate to Indeed
+            driver.get("https://www.indeed.com/")
+            logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
+            logger.info(f"🔍 Page title: {driver.title}")
+               
+                
             # SeleniumBase anti-bot protection
-            sb.uc_open_with_reconnect("https://www.indeed.com/", reconnect_time=6)
+            #sb.uc_open_with_reconnect("https://www.indeed.com/", reconnect_time=6)
             
                     
             # Handle Cloudflare if present
-            try:
-                sb.uc_gui_click_captcha()
-                print("✅ Handled Cloudflare challenge")
-            except Exception:
-                print("No Cloudflare challenge detected")
+            #try:
+                #sb.uc_gui_click_captcha()
+                #print("✅ Handled Cloudflare challenge")
+            #except Exception:
+                #print("No Cloudflare challenge detected")
                         
             # Human-like delay with randomization
             time.sleep(random.uniform(3, 7))
