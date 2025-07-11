@@ -130,13 +130,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
             # Human-like delay with randomization
             time.sleep(random.uniform(3, 7))
          
-        
-        try:
-            # Navigate to Indeed
-            driver.get("https://www.indeed.com/")
-            logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
-            logger.info(f"🔍 Page title: {driver.title}")
-               
+                
                 
             # SeleniumBase anti-bot protection
             #sb.uc_open_with_reconnect("https://www.indeed.com/", reconnect_time=6)
