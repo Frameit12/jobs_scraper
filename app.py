@@ -769,7 +769,7 @@ def send_email_with_attachment(subject, body, attachment_path, config, user_emai
 
         msg = EmailMessage()
         msg["Subject"] = subject
-        msg["From"] = "Find Me A Job <frameitbot@gmail.com>"
+        msg["From"] = "Find Me A Job <fmaj.app@gmail.com>"
         msg["To"] = ", ".join(recipients)
         msg.set_content(body)
 
@@ -1085,7 +1085,7 @@ def index():
             traceback.print_exc()
             
             # Fallback error message for unexpected Flask errors
-            error_message = "We're experiencing technical difficulties. Please try again in a few minutes. If you continue seeing this error, email frameitbot@gmail.com with details about what you were searching for."
+            error_message = "We're experiencing technical difficulties. Please try again in a few minutes. If you continue seeing this error, email fmaj.app@gmail.com with details about what you were searching for."
             return render_template("index.html", 
                                  jobs=[], 
                                  title=title, 
