@@ -1002,8 +1002,14 @@ def index():
         print(f"🔍 FLASK DEBUG: About to call scraper with seniority='{seniority}', type={type(seniority)}")
         
         try:
-            region = detect_user_region(request)
-            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority, region=region)
+            # Choose scraper based on source
+            if source == "indeed":
+                print(f"🔍 DEBUG: Running Indeed scraper for admin user")
+                jobs = scrape_indeed_jobs(title, location, max_jobs, seniority=seniority, headless=True)
+            else:
+                # Regular efinancialcareers scraper
+                region = detect_user_region(request)
+                jobs = scrape_jobs(title, location, max_jobs, seniority=seniority, region=region)
             
             # Check if this is a special "no results" message
             if jobs and len(jobs) == 1 and jobs[0].get("no_results"):
