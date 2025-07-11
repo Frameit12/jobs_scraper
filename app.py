@@ -2194,5 +2194,22 @@ def test():
     return render_template("index.html", info="⏳ Indeed search is coming soon! We're currently testing this feature.", jobs=[])
 
 
+@app.route("/debug_files/<filename>")
+def download_debug_file(filename):
+    """Download debug files like screenshots and page source"""
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+    
+    try:
+        import os
+        if os.path.exists(filename):
+            return send_file(filename, as_attachment=True)
+        else:
+            return f"File {filename} not found", 404
+    except Exception as e:
+        return f"Error downloading file: {e}", 500
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
