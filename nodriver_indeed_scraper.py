@@ -30,7 +30,7 @@ async def wait_for_turnstile_completion(driver, timeout=60):
                 print(f"🔍 Still waiting... ({i}/60 seconds) - No response field found yet")
         
         # Also check if page title changes (indicates completion)
-        current_title = await driver.get_title()
+        current_title = driver.title
         if "Just a moment" not in current_title:
             print(f"✅ Page title changed to: '{current_title}'")
             return True
@@ -39,7 +39,7 @@ async def wait_for_turnstile_completion(driver, timeout=60):
     
     print(f"❌ Turnstile verification timed out after {timeout} seconds")
     # Save page source for debugging
-    page_source = await driver.get_page_source()
+    page_source = await driver.get_content()
     with open("debug_nodriver_turnstile_timeout.html", "w", encoding="utf-8") as f:
         f.write(page_source)
     print("💾 Saved page source to debug_nodriver_turnstile_timeout.html for analysis")
@@ -172,11 +172,11 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         
         # Navigate to Indeed
         await driver.get("https://www.indeed.com/")
-        logger.info(f"🔍 Page loaded - URL: {await driver.get_url()}")
-        logger.info(f"🔍 Page title: {await driver.get_title()}")
+        logger.info(f"🔍 Page loaded - URL: {driver.url}")
+        logger.info(f"🔍 Page title: {driver.title}")
 
         # Check for Turnstile on homepage
-        current_title = await driver.get_title()
+        current_title = driver.title
         if "Just a moment" in current_title:
             print("🔍 Detected Cloudflare Turnstile challenge on homepage")
             await wait_for_turnstile_completion(driver)
@@ -284,8 +284,8 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         # Save debug screenshot
         await driver.save_screenshot("debug_nodriver_page.png")
         print("🔍 DEBUG: Saved screenshot as debug_nodriver_page.png")
-        print("🔍 DEBUG: Current URL:", await driver.get_url())
-        print("🔍 DEBUG: Page title:", await driver.get_title())
+        print("🔍 DEBUG: Current URL:", driver.url)
+        print("🔍 DEBUG: Page title:", driver.title)
 
         # Collect job links
         print("⏳ Collecting job links...")
