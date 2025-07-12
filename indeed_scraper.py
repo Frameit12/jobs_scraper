@@ -185,8 +185,11 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            driver.execute_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{selected_ua}'}});")
            driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-           # Use SeleniumBase UC navigation instead of regular driver.get()
-           sb.uc_open_with_reconnect("https://www.indeed.com/", reconnect_time=6)
+           # Try UC navigation with tab switching
+           print("🔄 Trying uc_open_with_tab navigation...")
+           sb.uc_open_with_tab("https://www.indeed.com/")
+           time.sleep(3)
+           sb.uc_switch_to_tab(0)  # Switch to first tab
            logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
            logger.info(f"🔍 Page title: {driver.title}")
 
@@ -256,26 +259,20 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            # Random typing delay
            time.sleep(random.uniform(1.5, 3.0))
 
-           # Submit the search
-           driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+           # Try UC navigation for search submission instead of clicking
+           print("🔄 Using UC navigation for search instead of button click...")
+           search_url = f"https://www.indeed.com/jobs?q={title}&l={location}&sort=relevance"
+           print(f"🔍 DEBUG: Direct UC navigation to: {search_url}")
 
-           # Extended wait with randomization for page load
-           time.sleep(random.uniform(7, 12))
-
-           # NEW: Force sorting by relevance to match manual search
-           print("🔄 Setting sort order to 'relevance'...")
            try:
-               current_url = driver.current_url
-               if "sort=" not in current_url:
-                   # Add sort=relevance parameter to URL
-                   if "?" in current_url:
-                       relevance_url = current_url + "&sort=relevance"
-                   else:
-                       relevance_url = current_url + "?sort=relevance"
-
-                   print(f"🔍 DEBUG: Navigating to relevance-sorted URL: {relevance_url}")
-                   driver.get(relevance_url)
-                   time.sleep(3)
+              sb.uc_open_with_reconnect(search_url, reconnect_time=10)
+              time.sleep(5)
+              print("✅ UC navigation completed")
+           except Exception as e:
+              print(f"❌ UC navigation failed: {e}")
+              # Fallback to original method
+              driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+              time.sleep(random.uniform(7, 12))     
 
 
                    # Try SeleniumBase solve_captcha for Turnstile  
