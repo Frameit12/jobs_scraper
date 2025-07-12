@@ -179,78 +179,78 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         await driver.evaluate("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});")
         
         # Navigate to Indeed
-        print("🔍 STEP 1: About to navigate to mobile Indeed...")
+        logger.info("🔍 STEP 1: About to navigate to mobile Indeed...")
         await driver.get("https://www.m.indeed.com/")
-        print("🔍 STEP 1: Navigation completed")
+        logger.info("🔍 STEP 1: Navigation completed")
         
-        print("🔍 STEP 2: Getting page info...")
+        logger.info("🔍 STEP 2: Getting page info...")
         logger.info(f"🔍 Page loaded - URL: {driver.url}")
         logger.info(f"🔍 Page title: {driver.title}")
-        print(f"🔍 STEP 2: Page info retrieved - Title: '{driver.title}', URL: '{driver.url}'")
+        logger.info(f"🔍 STEP 2: Page info retrieved - Title: '{driver.title}', URL: '{driver.url}'")
 
-        print("🔍 STEP 3: Starting post-load setup...")
+        logger.info("🔍 STEP 3: Starting post-load setup...")
         try:
-            print(f"🔍 STEP 3a: Mobile site loaded successfully!")
-            print(f"🔍 STEP 3b: Current title: '{driver.title}'")
-            print(f"🔍 STEP 3c: Current URL: '{driver.url}'")
+            logger.info(f"🔍 STEP 3a: Mobile site loaded successfully!")
+            logger.info(f"🔍 STEP 3b: Current title: '{driver.title}'")
+            logger.info(f"🔍 STEP 3c: Current URL: '{driver.url}'")
             
             # Check for Turnstile on homepage
-            print("🔍 STEP 4: Checking for Turnstile...")
+            logger.info("🔍 STEP 4: Checking for Turnstile...")
             current_title = driver.title
             if "Just a moment" in current_title:
-                print("🔍 STEP 4a: Detected Cloudflare Turnstile challenge on homepage")
+                logger.info("🔍 STEP 4a: Detected Cloudflare Turnstile challenge on homepage")
                 await wait_for_turnstile_completion(driver)
             else:
-                print("🔍 STEP 4b: No Turnstile detected")
+                logger.info("🔍 STEP 4b: No Turnstile detected")
 
-            print("🔍 STEP 5: Starting initial delay...")
+            logger.info("🔍 STEP 5: Starting initial delay...")
             await asyncio.sleep(2)
-            print("🔍 STEP 5: Initial delay completed")
+            logger.info("🔍 STEP 5: Initial delay completed")
 
             # Add stealth page load simulation
-            print("🔍 STEP 6: Starting stealth simulation...")
+            logger.info("🔍 STEP 6: Starting stealth simulation...")
             await driver.evaluate("window.scrollTo(0, 100);")
-            print("🔍 STEP 6a: First scroll completed")
+            logger.info("🔍 STEP 6a: First scroll completed")
             await asyncio.sleep(1)
             await driver.evaluate("window.scrollTo(0, 0);")
-            print("🔍 STEP 6b: Stealth simulation completed")
+            logger.info("🔍 STEP 6b: Stealth simulation completed")
 
         except Exception as e:
-            print(f"❌ ERROR in STEP 3-6 setup: {e}")
-            print(f"❌ ERROR TYPE: {type(e).__name__}")
+            logger.info(f"❌ ERROR in STEP 3-6 setup: {e}")
+            logger.info(f"❌ ERROR TYPE: {type(e).__name__}")
             import traceback
             traceback.print_exc()
             raise e
 
         # Human-like delay with randomization
-        print("🔍 STEP 7: Starting human delay...")
+        logger.info("🔍 STEP 7: Starting human delay...")
         delay_time = random.uniform(3, 7)
-        print(f"🔍 STEP 7: Waiting {delay_time:.1f} seconds...")
+        logger.info(f"🔍 STEP 7: Waiting {delay_time:.1f} seconds...")
         await asyncio.sleep(delay_time)
-        print("🔍 STEP 7: Human delay completed")
+        logger.info("🔍 STEP 7: Human delay completed")
 
-        print("🔍 STEP 8: Starting form filling...")
-        print("⌨️ Filling job title and location...")
+        logger.info("🔍 STEP 8: Starting form filling...")
+        logger.info("⌨️ Filling job title and location...")
         
         # Fill job title
-        print("🔍 STEP 8a: Looking for job title input...")
+        logger.info("🔍 STEP 8a: Looking for job title input...")
         title_input = await driver.find("input[name='q']", timeout=10)
         if title_input:
-            print("🔍 STEP 8b: Job title input found, filling...")
+            logger.info("🔍 STEP 8b: Job title input found, filling...")
             await title_input.send_keys(title)
             await asyncio.sleep(random.uniform(1, 2))
-            print("🔍 STEP 8c: Job title filled")
+            logger.info("🔍 STEP 8c: Job title filled")
         else:
-            print("❌ STEP 8b: Job title input NOT found")
+            logger.info("❌ STEP 8b: Job title input NOT found")
 
         # Clear and fill location
-        print("🔍 STEP 9: Looking for location input...")
+        logger.info("🔍 STEP 9: Looking for location input...")
         location_input = await driver.find("input[name='l']", timeout=10)
         if location_input:
-            print("🔍 STEP 9a: Location input found, clearing...")
+            logger.info("🔍 STEP 9a: Location input found, clearing...")
             # Multiple clearing attempts
             for i in range(3):
-                print(f"🔍 STEP 9b{i+1}: Clearing attempt {i+1}")
+                logger.info(f"🔍 STEP 9b{i+1}: Clearing attempt {i+1}")
                 await location_input.clear_input()
                 await asyncio.sleep(0.5)
                 await driver.evaluate("arguments[0].value = '';", location_input)
@@ -258,49 +258,49 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
 
             # Verify it's cleared
             current_value = await location_input.get_attribute('value')
-            print(f"🔍 STEP 9c: Location field after clearing: '{current_value}'")
+            logger.info(f"🔍 STEP 9c: Location field after clearing: '{current_value}'")
 
             # Enter new location
-            print(f"🔍 STEP 9d: Entering location: '{location}'")
+            logger.info(f"🔍 STEP 9d: Entering location: '{location}'")
             await location_input.send_keys(location)
             await asyncio.sleep(random.uniform(1.5, 3.0))
-            print("🔍 STEP 9e: Location entered")
+            logger.info("🔍 STEP 9e: Location entered")
         else:
-            print("❌ STEP 9a: Location input NOT found")
+            logger.info("❌ STEP 9a: Location input NOT found")
 
         # Submit search
-        print("🔍 STEP 10: Looking for search button...")
+        logger.info("🔍 STEP 10: Looking for search button...")
         search_button = await driver.find("button[type='submit'], input[type='submit']", timeout=10)
         if search_button:
-            print("🔍 STEP 10a: Search button found, clicking...")
+            logger.info("🔍 STEP 10a: Search button found, clicking...")
             await search_button.click()
             search_delay = random.uniform(5, 8)
-            print(f"🔍 STEP 10b: Search submitted, waiting {search_delay:.1f} seconds...")
+            logger.info(f"🔍 STEP 10b: Search submitted, waiting {search_delay:.1f} seconds...")
             await asyncio.sleep(search_delay)
-            print("🔍 STEP 10c: Search delay completed")
+            logger.info("🔍 STEP 10c: Search delay completed")
         else:
-            print("❌ STEP 10a: Search button NOT found")
+            logger.info("❌ STEP 10a: Search button NOT found")
 
         # Check for Turnstile after search
-        print("🔍 STEP 11: Checking for post-search Turnstile...")
+        logger.info("🔍 STEP 11: Checking for post-search Turnstile...")
         current_title = driver.title
-        print(f"🔍 STEP 11a: Post-search page title: '{current_title}'")
+        logger.info(f"🔍 STEP 11a: Post-search page title: '{current_title}'")
         if "Just a moment" in current_title:
-            print("🔍 STEP 11b: Detected Cloudflare Turnstile challenge after search")
+            logger.info("🔍 STEP 11b: Detected Cloudflare Turnstile challenge after search")
             success = await wait_for_turnstile_completion(driver)
             if not success:
-                print("❌ STEP 11c: Turnstile challenge not resolved, but continuing...")
+                logger.info("❌ STEP 11c: Turnstile challenge not resolved, but continuing...")
         else:
-            print("🔍 STEP 11b: No post-search Turnstile detected")
+            logger.info("🔍 STEP 11b: No post-search Turnstile detected")
 
         # Handle seniority filtering if specified
         if seniority:
-            print(f"🔍 STEP 12: Applying seniority filter: {seniority}")
+            logger.info(f"🔍 STEP 12: Applying seniority filter: {seniority}")
             try:
-                print("🔍 STEP 12a: Waiting for search results page to load...")
+                logger.info("🔍 STEP 12a: Waiting for search results page to load...")
                 await asyncio.sleep(3)
 
-                print("🔍 STEP 12b: Opening Experience level filter...")
+                logger.info("🔍 STEP 12b: Opening Experience level filter...")
                 experience_button = await driver.find("//button[contains(text(), 'Experience level')]", timeout=10)
                 if experience_button:
                     await experience_button.click()
@@ -309,82 +309,82 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
                     # Save screenshot for debugging
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     await driver.save_screenshot(f"debug_nodriver_{timestamp}.png")
-                    print(f"🔍 STEP 12c: Saved screenshot as debug_nodriver_{timestamp}.png")
+                    logger.info(f"🔍 STEP 12c: Saved screenshot as debug_nodriver_{timestamp}.png")
 
                     # Look for seniority option
                     indeed_level = seniority
-                    print(f"🔍 STEP 12d: Looking for experience level: {indeed_level}")
+                    logger.info(f"🔍 STEP 12d: Looking for experience level: {indeed_level}")
 
                     dropdown_option = await driver.find(f"//a[contains(text(), '{indeed_level}')]", timeout=5)
                     if dropdown_option:
                         await dropdown_option.click()
                         await asyncio.sleep(2)
-                        print(f"✅ STEP 12e: Selected {indeed_level}")
+                        logger.info(f"✅ STEP 12e: Selected {indeed_level}")
                         await asyncio.sleep(5)
                     else:
-                        print(f"🚫 STEP 12e: Could not find experience level '{indeed_level}'")
+                        logger.info(f"🚫 STEP 12e: Could not find experience level '{indeed_level}'")
 
-                print("✅ STEP 12f: Experience level filter applied successfully")
+                logger.info("✅ STEP 12f: Experience level filter applied successfully")
 
             except Exception as e:
-                print(f"⚠️ STEP 12 ERROR: Could not apply experience level filter: {e}")
+                logger.info(f"⚠️ STEP 12 ERROR: Could not apply experience level filter: {e}")
         else:
-            print("🔍 STEP 12: No seniority filter specified, skipping")
+            logger.info("🔍 STEP 12: No seniority filter specified, skipping")
 
         # Load more jobs
-        print("🔍 STEP 13: Loading more jobs...")
+        logger.info("🔍 STEP 13: Loading more jobs...")
         for i in range(5):
             try:
-                print(f"🔍 STEP 13{i+1}: Looking for 'Show more' button...")
+                logger.info(f"🔍 STEP 13{i+1}: Looking for 'Show more' button...")
                 show_more = await driver.find("//button[contains(., 'Show more')]", timeout=5)
                 if show_more:
-                    print(f"🔍 STEP 13{i+1}a: Found 'Show more', clicking...")
+                    logger.info(f"🔍 STEP 13{i+1}a: Found 'Show more', clicking...")
                     await driver.evaluate("arguments[0].scrollIntoView({block: 'center'});", show_more)
                     await show_more.click()
                     await asyncio.sleep(3)
-                    print(f"🔍 STEP 13{i+1}b: 'Show more' clicked")
+                    logger.info(f"🔍 STEP 13{i+1}b: 'Show more' clicked")
                 else:
-                    print(f"🔍 STEP 13{i+1}: No more 'Show more' buttons found")
+                    logger.info(f"🔍 STEP 13{i+1}: No more 'Show more' buttons found")
                     break
             except Exception as e:
-                print(f"🔍 STEP 13{i+1} ERROR: {e}")
+                logger.info(f"🔍 STEP 13{i+1} ERROR: {e}")
                 break
 
         # Save debug screenshot
-        print("🔍 STEP 14: Saving debug screenshot...")
+        logger.info("🔍 STEP 14: Saving debug screenshot...")
         await driver.save_screenshot("debug_nodriver_page.png")
-        print("🔍 STEP 14a: Saved screenshot as debug_nodriver_page.png")
-        print("🔍 STEP 14b: Current URL:", driver.url)
-        print("🔍 STEP 14c: Page title:", driver.title)
+        logger.info("🔍 STEP 14a: Saved screenshot as debug_nodriver_page.png")
+        logger.info("🔍 STEP 14b: Current URL:", driver.url)
+        logger.info("🔍 STEP 14c: Page title:", driver.title)
 
         # Collect job links
-        print("🔍 STEP 15: Collecting job links...")
+        logger.info("🔍 STEP 15: Collecting job links...")
         job_links = []
         
         try:
-            print("🔍 STEP 15a: Looking for job cards...")
+            logger.info("🔍 STEP 15a: Looking for job cards...")
             job_cards = await driver.find_all("a[data-jk]", timeout=15)
-            print(f"🔍 STEP 15b: Total cards found: {len(job_cards)}")
+            logger.info(f"🔍 STEP 15b: Total cards found: {len(job_cards)}")
 
-            print("🔍 STEP 15c: Extracting URLs from cards...")
+            logger.info("🔍 STEP 15c: Extracting URLs from cards...")
             for i, card in enumerate(job_cards):
                 try:
                     href = await card.get_attribute("href")
                     if href:
                         job_links.append(href)
                         if i < 3:  # Show first 3 URLs for debug
-                            print(f"🔍 STEP 15c{i+1}: Found URL: {href}")
+                            logger.info(f"🔍 STEP 15c{i+1}: Found URL: {href}")
                 except Exception as e:
-                    print(f"🔍 STEP 15c{i+1} ERROR: {e}")
+                    logger.info(f"🔍 STEP 15c{i+1} ERROR: {e}")
                     continue
 
-            print(f"🔍 STEP 15d: Found {len(job_links)} job links total")
+            logger.info(f"🔍 STEP 15d: Found {len(job_links)} job links total")
 
         except Exception as e:
-            print(f"❌ STEP 15 ERROR: Error collecting job links: {e}")
+            logger.info(f"❌ STEP 15 ERROR: Error collecting job links: {e}")
             # Take screenshot for debugging
             await driver.save_screenshot("debug_nodriver_error.png")
-            print("🔍 STEP 15 ERROR: Saved error screenshot")
+            logger.info("🔍 STEP 15 ERROR: Saved error screenshot")
             return [{
                 "error_type": "collection_failed",
                 "title": "Job Collection Failed",
