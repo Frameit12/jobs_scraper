@@ -279,7 +279,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                           sb.uc_click("input[type='checkbox']", timeout=30)
                           print("✅ uc_click() completed")
                           time.sleep(5)
-                      except Exception as e:
+                       except Exception as e:
                           print(f"❌ uc_click() failed: {e}")
                           wait_for_turnstile_completion(driver)
 
