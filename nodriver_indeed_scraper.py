@@ -171,7 +171,7 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         await driver.evaluate("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});")
         
         # Navigate to Indeed
-        await driver.get("https://www.indeed.com/")
+        await driver.get("https://www.indeed.de/")
         logger.info(f"🔍 Page loaded - URL: {driver.url}")
         logger.info(f"🔍 Page title: {driver.title}")
 
@@ -218,7 +218,7 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
             await asyncio.sleep(random.uniform(1.5, 3.0))
 
         # Submit search
-        search_button = await driver.find("button[type='submit']", timeout=10)
+        search_button = await driver.find("button[type='submit'], input[type='submit']", timeout=10)
         if search_button:
             await search_button.click()
             await asyncio.sleep(random.uniform(5, 8))
