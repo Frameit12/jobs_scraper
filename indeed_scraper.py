@@ -193,7 +193,16 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            # DOM-based Turnstile handling for homepage
            if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
                print("🔍 Detected Cloudflare Turnstile challenge on homepage")
-               wait_for_turnstile_completion(driver)
+               print("🔄 Trying sb.uc_click() method...")
+               try:
+                 # Look for Turnstile checkbox and try uc_click
+                 sb.uc_click("input[type='checkbox']", timeout=30)
+                 print("✅ uc_click() completed")
+                 time.sleep(5)
+               except Exception as e:
+                 print(f"❌ uc_click() failed: {e}")
+                 # Fallback to DOM waiting
+                 wait_for_turnstile_completion(driver)
 
            time.sleep(2)
 
@@ -265,8 +274,15 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                    # DOM-based Turnstile handling for post-search
                    if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
                        print("🔍 Detected Cloudflare Turnstile challenge after search")
-                       wait_for_turnstile_completion(driver)
-                           
+                       print("🔄 Trying sb.uc_click() method...")
+                       try:
+                          sb.uc_click("input[type='checkbox']", timeout=30)
+                          print("✅ uc_click() completed")
+                          time.sleep(5)
+                      except Exception as e:
+                          print(f"❌ uc_click() failed: {e}")
+                          wait_for_turnstile_completion(driver)
+
                else:
                    print("🔍 DEBUG: URL already has sort parameter")
            except Exception as e:
