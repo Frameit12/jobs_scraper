@@ -133,6 +133,7 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
     
     try:
         logger.info("🌐 Launching Nodriver browser...")
+        logger.info("🔍 ASYNC DEBUG: Inside try block, about to launch browser...")
         
         # Configure browser options for stealth
         browser = await uc.start(
