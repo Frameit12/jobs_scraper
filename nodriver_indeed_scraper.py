@@ -345,7 +345,11 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
                 continue
 
         # Close browser
-        await browser.stop()
+        try:
+            if browser:
+                await browser.stop()
+        except Exception as e:
+            print(f"Browser cleanup error (non-critical): {e}")
         return job_results
 
     except Exception as e:
