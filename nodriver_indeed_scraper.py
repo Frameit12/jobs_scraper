@@ -171,7 +171,7 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         await driver.evaluate("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});")
         
         # Navigate to Indeed
-        await driver.get("https://www.indeed.de/")
+        await driver.get("https://www.m.indeed.com/")
         logger.info(f"🔍 Page loaded - URL: {driver.url}")
         logger.info(f"🔍 Page title: {driver.title}")
 
