@@ -161,7 +161,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
             # Use SeleniumBase UC navigation (back to working method)
-            sb.uc_open_with_reconnect("https://www.indeed.com/", reconnect_time=6)
+            sb.uc_open_with_reconnect("https://www.indeed.co.uk/", reconnect_time=6)
             logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
             logger.info(f"🔍 Page title: {driver.title}")
 
@@ -218,7 +218,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
 
             # Try UC navigation for search submission instead of clicking
             print("🔄 Using UC navigation for search instead of button click...")
-            search_url = f"https://www.indeed.com/jobs?q={title}&l={location}&sort=relevance"
+            search_url = f"https://www.indeed.co.uk/jobs?q={title}&l={location}&sort=relevance"
             print(f"🔍 DEBUG: Direct UC navigation to: {search_url}")
 
             try:
