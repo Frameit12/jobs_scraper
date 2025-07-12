@@ -193,6 +193,27 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
             logger.info(f"🔍 STEP 3a: Mobile site loaded successfully!")
             logger.info(f"🔍 STEP 3b: Current title: '{driver.title}'")
             logger.info(f"🔍 STEP 3c: Current URL: '{driver.url}'")
+            # ADD THIS NEW INSPECTION BLOCK:
+            logger.info("🔍 STEP 3d: Inspecting mobile page structure...")
+            try:
+                page_source = await driver.get_content()
+                # Save full page source
+                with open("mobile_indeed_debug.html", "w", encoding="utf-8") as f:
+                    f.write(page_source)
+                logger.info("🔍 STEP 3e: Mobile page source saved to mobile_indeed_debug.html")
+                
+                # Log first 1000 characters to see basic structure
+                logger.info(f"🔍 STEP 3f: Page source preview: {page_source[:1000]}")
+                
+                # Check for common form elements
+                has_form = "form" in page_source.lower()
+                has_input = "input" in page_source.lower()
+                has_search = "search" in page_source.lower()
+                logger.info(f"🔍 STEP 3g: Contains form: {has_form}, input: {has_input}, search: {has_search}")
+                
+            except Exception as e:
+                logger.info(f"❌ STEP 3h: Page inspection failed: {e}")
+            
             
             # Check for Turnstile on homepage
             logger.info("🔍 STEP 4: Checking for Turnstile...")
@@ -355,7 +376,7 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         await driver.save_screenshot("debug_nodriver_page.png")
         logger.info("🔍 STEP 14a: Saved screenshot as debug_nodriver_page.png")
         logger.info("🔍 STEP 14b: Current URL:", driver.url)
-        logger.info("🔍 STEP 14c: Page title:", driver.title)
+        logger.info("🔍 STEP 14c: Page title:, {driver.title}")
 
         # Collect job links
         logger.info("🔍 STEP 15: Collecting job links...")
