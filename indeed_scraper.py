@@ -275,26 +275,25 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                time.sleep(random.uniform(7, 12))     
 
 
-                   # Try SeleniumBase solve_captcha for Turnstile  
-                   if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
-                        print("🔍 Detected Cloudflare Turnstile challenge after search")
-                        print("🔄 Trying sb.solve_captcha() method...")
-                        try:
-                           sb.solve_captcha(timeout=60)
-                           print("✅ solve_captcha() completed")
-                           time.sleep(5)
-                        except Exception as e:
-                           print(f"❌ solve_captcha() failed: {e}")
-                           print("🔄 Trying manual wait approach...")
-                           # Extended wait to see if challenge resolves
-                           for i in range(90):  # 90 seconds
-                               if "Just a moment" not in driver.title:
-                                   print("✅ Challenge appears to have resolved!")
-                                   break
-                               time.sleep(1)
-                           else:
-                               print("❌ Challenge still blocking after 90 seconds")
-        
+            # Try SeleniumBase solve_captcha for Turnstile  
+            if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
+                print("🔍 Detected Cloudflare Turnstile challenge after search")
+                print("🔄 Trying sb.solve_captcha() method...")
+                try:
+                   sb.solve_captcha(timeout=60)
+                   print("✅ solve_captcha() completed")
+                   time.sleep(5)
+                except Exception as e:
+                   print(f"❌ solve_captcha() failed: {e}")
+                   print("🔄 Trying manual wait approach...")
+                   # Extended wait to see if challenge resolves
+                   for i in range(90):  # 90 seconds
+                       if "Just a moment" not in driver.title:
+                           print("✅ Challenge appears to have resolved!")
+                           break
+                       time.sleep(1)
+                   else:
+                       print("❌ Challenge still blocking after 90 seconds")        
 
                else:
                    print("🔍 DEBUG: URL already has sort parameter")
