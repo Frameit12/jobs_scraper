@@ -175,23 +175,33 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         logger.info(f"🔍 Page loaded - URL: {driver.url}")
         logger.info(f"🔍 Page title: {driver.title}")
 
-        # Check for Turnstile on homepage
-        current_title = driver.title
-        if "Just a moment" in current_title:
-            print("🔍 Detected Cloudflare Turnstile challenge on homepage")
-            await wait_for_turnstile_completion(driver)
-        
-        print(f"🔍 DEBUG: Mobile site loaded successfully!")
-        print(f"🔍 DEBUG: Current title: '{driver.title}'")
-        print(f"🔍 DEBUG: Current URL: '{driver.url}'")
-        print(f"🔍 DEBUG: About to start form filling...")
+        try:
+            print(f"🔍 DEBUG: Mobile site loaded successfully!")
+            print(f"🔍 DEBUG: Current title: '{driver.title}'")
+            print(f"🔍 DEBUG: Current URL: '{driver.url}'")
+            print(f"🔍 DEBUG: About to start form filling...")
+            
+            # Check for Turnstile on homepage
+            current_title = driver.title
+            if "Just a moment" in current_title:
+                print("🔍 Detected Cloudflare Turnstile challenge on homepage")
+                await wait_for_turnstile_completion(driver)
 
-        await asyncio.sleep(2)
+            await asyncio.sleep(2)
 
-        # Add stealth page load simulation
-        await driver.evaluate("window.scrollTo(0, 100);")
-        await asyncio.sleep(1)
-        await driver.evaluate("window.scrollTo(0, 0);")
+            # Add stealth page load simulation
+            print("🔍 DEBUG: Starting stealth simulation...")
+            await driver.evaluate("window.scrollTo(0, 100);")
+            await asyncio.sleep(1)
+            await driver.evaluate("window.scrollTo(0, 0);")
+            print("🔍 DEBUG: Stealth simulation completed")
+
+        except Exception as e:
+            print(f"❌ ERROR in initial page setup: {e}")
+            print(f"❌ ERROR TYPE: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
+            raise e  # Re-raise to see full context
 
         # Human-like delay with randomization
         await asyncio.sleep(random.uniform(3, 7))
