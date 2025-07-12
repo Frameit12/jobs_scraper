@@ -224,7 +224,7 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
             await asyncio.sleep(random.uniform(5, 8))
 
         # Check for Turnstile after search
-        current_title = await driver.get_title()
+        current_title = driver.title
         if "Just a moment" in current_title:
             print("🔍 Detected Cloudflare Turnstile challenge after search")
             success = await wait_for_turnstile_completion(driver)
