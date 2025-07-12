@@ -160,11 +160,8 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
             driver.execute_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{selected_ua}'}});")
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-            # Try UC navigation with tab switching
-            print("🔄 Trying uc_open_with_tab navigation...")
-            sb.uc_open_with_tab("https://www.indeed.com/")
-            time.sleep(3)
-            sb.uc_switch_to_tab(0)  # Switch to first tab
+            # Use SeleniumBase UC navigation (back to working method)
+            sb.uc_open_with_reconnect("https://www.indeed.com/", reconnect_time=6)
             logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
             logger.info(f"🔍 Page title: {driver.title}")
 
