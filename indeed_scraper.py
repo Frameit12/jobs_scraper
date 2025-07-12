@@ -280,20 +280,20 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                 print("🔍 Detected Cloudflare Turnstile challenge after search")
                 print("🔄 Trying sb.solve_captcha() method...")
                 try:
-                   sb.solve_captcha(timeout=60)
-                   print("✅ solve_captcha() completed")
-                   time.sleep(5)
+                    sb.solve_captcha(timeout=60)
+                    print("✅ solve_captcha() completed")
+                    time.sleep(5)
                 except Exception as e:
-                   print(f"❌ solve_captcha() failed: {e}")
-                   print("🔄 Trying manual wait approach...")
-                   # Extended wait to see if challenge resolves
-                   for i in range(90):  # 90 seconds
-                       if "Just a moment" not in driver.title:
-                           print("✅ Challenge appears to have resolved!")
-                           break
-                       time.sleep(1)
-                   else:
-                       print("❌ Challenge still blocking after 90 seconds")        
+                    print(f"❌ solve_captcha() failed: {e}")
+                    print("🔄 Trying manual wait approach...")
+                    # Extended wait to see if challenge resolves
+                    for i in range(90):  # 90 seconds
+                        if "Just a moment" not in driver.title:
+                            print("✅ Challenge appears to have resolved!")
+                            break
+                        time.sleep(1)
+                    else:
+                        print("❌ Challenge still blocking after 90 seconds")        
 
                else:
                    print("🔍 DEBUG: URL already has sort parameter")
