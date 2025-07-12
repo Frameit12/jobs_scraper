@@ -350,7 +350,20 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
 
     except Exception as e:
         print(f"❌ GENERAL ERROR: {e}")
-        error_msg = "Nodriver scraping failed. Error details logged for debugging."
+        print(f"❌ ERROR TYPE: {type(e).__name__}")
+        import traceback
+        print(f"❌ FULL TRACEBACK:")
+        traceback.print_exc()
+
+        # Try to save a screenshot if browser is still available
+        try:
+            if 'driver' in locals():
+                await driver.save_screenshot("debug_nodriver_error_fallback.png")
+                print("💾 Saved error screenshot")
+        except:
+            print("💾 Could not save error screenshot")
+        
+        error_msg = f"Nodriver failed: {str(e)[:200]}..."
         
         return [{
             "error_type": "general",
