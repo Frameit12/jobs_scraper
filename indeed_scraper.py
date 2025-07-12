@@ -193,16 +193,22 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            # DOM-based Turnstile handling for homepage
            if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
                print("🔍 Detected Cloudflare Turnstile challenge on homepage")
-               print("🔄 Trying sb.uc_click() method...")
+               print("🔄 Trying sb.solve_captcha() method...")
                try:
-                 # Look for Turnstile checkbox and try uc_click
-                 sb.uc_click("input[type='checkbox']", timeout=30)
-                 print("✅ uc_click() completed")
-                 time.sleep(5)
+                 sb.solve_captcha(timeout=60)
+                 print("✅ solve_captcha() completed")
+                 time.sleep(5)                  
                except Exception as e:
-                 print(f"❌ uc_click() failed: {e}")
-                 # Fallback to DOM waiting
-                 wait_for_turnstile_completion(driver)
+                 print(f"❌ solve_captcha() failed: {e}")
+                 print("🔄 Trying manual wait approach...")
+                 # Extended wait to see if challenge resolves
+                 for i in range(90):  # 90 seconds 
+                    if "Just a moment" not in driver.title:
+                       print("✅ Challenge appears to have resolved!")
+                       break
+                    time.sleep(1)
+                 else:
+                    print("❌ Challenge still blocking after 90 seconds")
 
            time.sleep(2)
 
@@ -271,17 +277,27 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                    driver.get(relevance_url)
                    time.sleep(3)
 
-                   # DOM-based Turnstile handling for post-search
-                   if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
-                       print("🔍 Detected Cloudflare Turnstile challenge after search")
-                       print("🔄 Trying sb.uc_click() method...")
-                       try:
-                          sb.uc_click("input[type='checkbox']", timeout=30)
-                          print("✅ uc_click() completed")
-                          time.sleep(5)
-                       except Exception as e:
-                          print(f"❌ uc_click() failed: {e}")
-                          wait_for_turnstile_completion(driver)
+
+                    # Try SeleniumBase solve_captcha for Turnstile  
+                    if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
+                        print("🔍 Detected Cloudflare Turnstile challenge after search")
+                        print("🔄 Trying sb.solve_captcha() method...")
+                        try:
+                           sb.solve_captcha(timeout=60)
+                           print("✅ solve_captcha() completed")
+                           time.sleep(5)
+                        except Exception as e:
+                           print(f"❌ solve_captcha() failed: {e}")
+                           print("🔄 Trying manual wait approach...")
+                           # Extended wait to see if challenge resolves
+                           for i in range(90):  # 90 seconds
+                               if "Just a moment" not in driver.title:
+                                   print("✅ Challenge appears to have resolved!")
+                                   break
+                               time.sleep(1)
+                           else:
+                               print("❌ Challenge still blocking after 90 seconds")
+        
 
                else:
                    print("🔍 DEBUG: URL already has sort parameter")
