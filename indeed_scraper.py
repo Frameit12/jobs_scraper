@@ -265,14 +265,14 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
            print(f"🔍 DEBUG: Direct UC navigation to: {search_url}")
 
            try:
-              sb.uc_open_with_reconnect(search_url, reconnect_time=10)
-              time.sleep(5)
-              print("✅ UC navigation completed")
+               sb.uc_open_with_reconnect(search_url, reconnect_time=10)
+               time.sleep(5)
+               print("✅ UC navigation completed")
            except Exception as e:
-              print(f"❌ UC navigation failed: {e}")
-              # Fallback to original method
-              driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-              time.sleep(random.uniform(7, 12))     
+               print(f"❌ UC navigation failed: {e}")
+               # Fallback to original method
+               driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+               time.sleep(random.uniform(7, 12))     
 
 
                    # Try SeleniumBase solve_captcha for Turnstile  
