@@ -164,12 +164,12 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         ]
         selected_ua = random.choice(user_agents)
 
-        # Advanced anti-detection
-        await driver.execute_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{selected_ua}'}});")
-        await driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
-        await driver.execute_script("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});")
-        await driver.execute_script("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});")
-
+        # Advanced anti-detection using Nodriver's evaluate method
+        await driver.evaluate(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{selected_ua}'}});")
+        await driver.evaluate("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
+        await driver.evaluate("Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});")
+        await driver.evaluate("Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});")
+        
         # Navigate to Indeed
         await driver.get("https://www.indeed.com/")
         logger.info(f"🔍 Page loaded - URL: {await driver.get_url()}")
@@ -184,9 +184,9 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         await asyncio.sleep(2)
 
         # Add stealth page load simulation
-        await driver.execute_script("window.scrollTo(0, 100);")
+        await driver.evaluate("window.scrollTo(0, 100);")
         await asyncio.sleep(1)
-        await driver.execute_script("window.scrollTo(0, 0);")
+        await driver.evaluate("window.scrollTo(0, 0);")
 
         # Human-like delay with randomization
         await asyncio.sleep(random.uniform(3, 7))
@@ -206,7 +206,7 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
             for _ in range(3):
                 await location_input.clear_input()
                 await asyncio.sleep(0.5)
-                await driver.execute_script("arguments[0].value = '';", location_input)
+                await driver.evaluate("arguments[0].value = '';", location_input)
                 await asyncio.sleep(0.5)
 
             # Verify it's cleared
@@ -273,7 +273,7 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
             try:
                 show_more = await driver.find("//button[contains(., 'Show more')]", timeout=5)
                 if show_more:
-                    await driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", show_more)
+                    await driver.evaluate("arguments[0].scrollIntoView({block: 'center'});", show_more)
                     await show_more.click()
                     await asyncio.sleep(3)
                 else:
