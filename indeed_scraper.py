@@ -278,8 +278,8 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                    time.sleep(3)
 
 
-                    # Try SeleniumBase solve_captcha for Turnstile  
-                    if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
+                   # Try SeleniumBase solve_captcha for Turnstile  
+                   if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
                         print("🔍 Detected Cloudflare Turnstile challenge after search")
                         print("🔄 Trying sb.solve_captcha() method...")
                         try:
