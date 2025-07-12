@@ -155,6 +155,13 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         # Get the main tab
         driver = await browser.get("about:blank")
         logger.info("✅ Nodriver initialized successfully")
+        
+        # Take screenshot to see initial state
+        try:
+            await driver.save_screenshot("debug_01_initial.png")
+            print("📸 Saved screenshot: debug_01_initial.png")
+        except Exception as e:
+            print(f"📸 Could not save initial screenshot: {e}")
 
         # Add anti-detection scripts
         user_agents = [
