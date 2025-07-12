@@ -180,6 +180,9 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         if "Just a moment" in current_title:
             print("🔍 Detected Cloudflare Turnstile challenge on homepage")
             await wait_for_turnstile_completion(driver)
+            print(f"🔍 DEBUG: About to start form filling process...")
+            print(f"🔍 DEBUG: Current title: '{driver.title}'")
+            print(f"🔍 DEBUG: Current URL: '{driver.url}'")
 
         await asyncio.sleep(2)
 
