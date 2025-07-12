@@ -19,7 +19,7 @@ from sqlalchemy import create_engine, text
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import session
-from indeed_scraper import scrape_jobs as scrape_indeed_jobs
+from nodriver_indeed_scraper import scrape_jobs as scrape_indeed_jobs
 
 
 # Database setup
