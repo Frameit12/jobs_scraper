@@ -160,8 +160,11 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
             driver.execute_script(f"Object.defineProperty(navigator, 'userAgent', {{get: () => '{selected_ua}'}});")
             driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-            # Use SeleniumBase UC navigation instead of regular driver.get()
-            sb.uc_open_with_reconnect("https://www.indeed.com/", reconnect_time=6)
+            # Try UC navigation with tab switching
+            print("🔄 Trying uc_open_with_tab navigation...")
+            sb.uc_open_with_tab("https://www.indeed.com/")
+            time.sleep(3)
+            sb.uc_switch_to_tab(0)  # Switch to first tab
             logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
             logger.info(f"🔍 Page title: {driver.title}")
 
@@ -231,18 +234,39 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
                 driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
                 time.sleep(random.uniform(7, 12))
 
-            # Try SeleniumBase solve_captcha for Turnstile  
+            # Try click_if_visible for Turnstile elements
             if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
                 print("🔍 Detected Cloudflare Turnstile challenge after search")
-                print("🔄 Trying manual wait approach...")
-                # Extended wait to see if challenge resolves
-                for i in range(90):  # 90 seconds
+                print("🔄 Trying sb.click_if_visible() on various Turnstile selectors...")
+                
+                # Try different Turnstile selectors
+                turnstile_selectors = [
+                    "input[type='checkbox']",
+                    ".cf-turnstile",
+                    "[name='cf-turnstile-response']",
+                    ".challenge-form",
+                    "iframe[src*='challenges.cloudflare.com']"
+                ]
+                
+                for selector in turnstile_selectors:
+                    try:
+                        print(f"🔄 Trying selector: {selector}")
+                        if sb.click_if_visible(selector, timeout=5):
+                            print(f"✅ Successfully clicked: {selector}")
+                            time.sleep(5)
+                            break
+                    except Exception as e:
+                        print(f"❌ Selector {selector} failed: {e}")
+                
+                # Short wait to see if challenge resolves
+                print("🔄 Checking if challenge resolved...")
+                for i in range(30):  # 30 seconds instead of 90
                     if "Just a moment" not in driver.title:
                         print("✅ Challenge appears to have resolved!")
                         break
                     time.sleep(1)
                 else:
-                    print("❌ Challenge still blocking after 90 seconds")
+                    print("❌ Challenge still blocking after 30 seconds")
 
             # Handle seniority filtering if specified
             if seniority:
