@@ -180,7 +180,7 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         
         # Navigate to Indeed
         logger.info("🔍 STEP 1: About to navigate to mobile Indeed...")
-        await driver.get("https://indeed.com/mobile")
+        await driver.get("https://indeed.com/")
         logger.info("🔍 STEP 1: Navigation completed")
         
         logger.info("🔍 STEP 2: Getting page info...")
