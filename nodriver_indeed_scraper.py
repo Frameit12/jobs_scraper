@@ -375,8 +375,8 @@ async def scrape_jobs_async(title, location, max_jobs=10, seniority=None, headle
         logger.info("🔍 STEP 14: Saving debug screenshot...")
         await driver.save_screenshot("debug_nodriver_page.png")
         logger.info("🔍 STEP 14a: Saved screenshot as debug_nodriver_page.png")
-        logger.info("🔍 STEP 14b: Current URL:", driver.url)
-        logger.info("🔍 STEP 14c: Page title:, {driver.title}")
+        logger.info(f"🔍 STEP 14b: Current URL:", {driver.url}")
+        logger.info(f"🔍 STEP 14c: Page title:, {driver.title}")
 
         # Collect job links
         logger.info("🔍 STEP 15: Collecting job links...")
