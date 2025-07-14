@@ -165,6 +165,27 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
             logger.info(f"🔍 Page loaded - URL: {driver.current_url}")
             logger.info(f"🔍 Page title: {driver.title}")
 
+            # ADD THIS NEW INSPECTION BLOCK:
+            logger.info("🔍 STEP 3d: Inspecting mobile page structure...")
+            try:
+                page_source = driver.page_source
+                # Save full page source
+                with open("mobile_indeed_debug.html", "w", encoding="utf-8") as f:
+                    f.write(page_source)
+                logger.info("🔍 STEP 3e: Mobile page source saved to mobile_indeed_debug.html")
+                
+                # Log first 1000 characters to see basic structure
+                logger.info(f"🔍 STEP 3f: Page source preview: {page_source[:1000]}")
+                
+                # Check for common form elements
+                has_form = "form" in page_source.lower()
+                has_input = "input" in page_source.lower()
+                has_search = "search" in page_source.lower()
+                logger.info(f"🔍 STEP 3g: Contains form: {has_form}, input: {has_input}, search: {has_search}")
+                
+            except Exception as e:
+                logger.info(f"❌ STEP 3h: Page inspection failed: {e}")
+
             # DOM-based Turnstile handling for homepage
             if "Just a moment" in driver.title or "Additional Verification Required" in driver.page_source:
                 print("🔍 Detected Cloudflare Turnstile challenge on homepage")
@@ -347,7 +368,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, headless=False):
             driver.save_screenshot("debug_indeed_page.png")
             print("🔍 DEBUG: Saved screenshot as debug_indeed_page.png")
             print("🔍 DEBUG: Current URL:", driver.current_url)
-            print("🔍 DEBUG: Page title:", driver.title)
+            print(f"🔍 DEBUG: Page title: {driver.title}")
 
             # Handle potential pop-ups that might be blocking content
             print("🔍 Checking for Indeed pop-ups and overlays...")
