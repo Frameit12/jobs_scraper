@@ -1007,7 +1007,8 @@ def index():
                 print(f"🔍 DEBUG: Running CareerJet API for admin user")
                 try:
                     from careerjet_api import scrape_jobs as scrape_careerjet_jobs
-                    jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region=region)
+                    user_region = detect_user_region(request) if 'detect_user_region' in globals() else "US"
+                    jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region=user_region)
                     print(f"🔍 DEBUG: CareerJet API returned {len(jobs)} jobs")
 
                 except Exception as e: 
