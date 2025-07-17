@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 from urllib.parse import quote
 import html
 
-def scrape_jobs_rss(title, location, max_jobs=10, seniority=None):
+def scrape_jobs_rss(title, location, max_jobs=10, seniority=None, region="US"):
     """Simple Indeed RSS implementation"""
     try:
         # Build search query
