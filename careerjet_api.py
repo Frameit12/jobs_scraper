@@ -36,7 +36,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         params = {
             'keywords': title,
             'location': location,
-            'affid': '213e213hd12344552',  # You'll need to register for your own
+            'affid': 'dbeb46864e3514ee44146b52e98c7e8e',  # Your real affiliate ID
             'user_ip': '127.0.0.1',
             'user_agent': 'FindMeAJob/1.0',
             'locale_code': 'en_US' if region == "US" else 'en_GB',
