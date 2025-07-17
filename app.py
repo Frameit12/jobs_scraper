@@ -1006,7 +1006,7 @@ def index():
             if source == "indeed":
                 print(f"🔍 DEBUG: Running CareerJet API for admin user")
                 try:
-                    from careerjet_client import scrape_jobs as scrape_careerjet_jobs
+                    from careerjet_rss import scrape_jobs_rss as scrape_careerjet_jobs
                     jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region="US")           
 
                 except Exception as e: 
