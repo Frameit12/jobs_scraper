@@ -14,10 +14,19 @@ def scrape_jobs_rss(title, location, max_jobs=10, seniority=None, region="US"):
         # Indeed RSS URL
         url = f"https://www.indeed.com/rss?q={quote(search_query)}&l={quote(location)}&limit={min(max_jobs, 25)}"
       
-        
-        # Get RSS feed
+
+        # Get RSS feed with browser headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/rss+xml, application/xml, text/xml',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
+        }
         print(f"🔍 Trying URL: {url}")
-        response = requests.get(url, timeout=30)
+        response = requests.get(url, headers=headers, timeout=30)        
         print(f"🔍 Response status: {response.status_code}")
         if response.status_code != 200:
             return [{"title": "RSS Error", "company": "Error", "location": location, "link": "#", "description": f"RSS returned status {response.status_code}"}]
