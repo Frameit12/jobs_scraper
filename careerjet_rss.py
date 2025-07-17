@@ -13,11 +13,14 @@ def scrape_jobs_rss(title, location, max_jobs=10, seniority=None, region="US"):
         
         # Indeed RSS URL
         url = f"https://www.indeed.com/rss?q={quote(search_query)}&l={quote(location)}&limit={min(max_jobs, 25)}"
+      
         
         # Get RSS feed
+        print(f"🔍 Trying URL: {url}")
         response = requests.get(url, timeout=30)
+        print(f"🔍 Response status: {response.status_code}")
         if response.status_code != 200:
-            return [{"title": "RSS Error", "company": "Error", "location": location, "link": "#", "description": "RSS feed error"}]
+            return [{"title": "RSS Error", "company": "Error", "location": location, "link": "#", "description": f"RSS returned status {response.status_code}"}]
         
         # Parse XML
         root = ET.fromstring(response.content)
@@ -52,6 +55,9 @@ def scrape_jobs_rss(title, location, max_jobs=10, seniority=None, region="US"):
             })
         
         return jobs
-        
+
     except Exception as e:
-        return [{"title": "Error", "company": "Error", "location": location, "link": "#", "description": f"Error: {str(e)}"}]
+        print(f"❌ RSS Exception: {e}")
+        import traceback
+        traceback.print_exc()
+        return [{"title": "Debug Error", "company": "Error", "location": location, "link": "#", "description": f"Full error: {str(e)}"}]
