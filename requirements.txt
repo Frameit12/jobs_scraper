@@ -11,3 +11,4 @@ sqlalchemy
 requests==2.31.0
 seleniumbase
 nodriver
+requests==2.31.0
