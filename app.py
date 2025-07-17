@@ -1004,26 +1004,21 @@ def index():
         try:
             # Choose scraper based on source
             if source == "indeed":
-                print(f"🔍 DEBUG: Running Indeed scraper for admin user")
+                print(f"🔍 DEBUG: Running CareerJet API for admin user")
                 try:
-                    jobs = scrape_indeed_jobs(title, location, max_jobs, seniority=seniority, headless=True)
-                    print(f"🔍 DEBUG: Indeed scraper returned {len(jobs)} jobs")
-
-                    # Check if we got blocked by Cloudflare
-                    if jobs and len(jobs) == 1 and jobs[0].get("error_type") == "timeout":
-                        # Replace the generic timeout with a more specific message
-                        jobs[0]["description"] = "Indeed's anti-bot protection is currently blocking automated searches. We're working on a solution. Please try eFinancialCareers for now."
-                        jobs[0]["formatted_description"] = jobs[0]["description"]
+                    from careerjet_api import scrape_jobs as scrape_careerjet_jobs
+                    jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region=region)
+                    print(f"🔍 DEBUG: CareerJet API returned {len(jobs)} jobs")
 
                 except Exception as e: 
-                    print(f"❌ Indeed scraper failed: {e}")
+                    print(f"❌ CareerJet API failed: {e}")
                     jobs = [{
-                        "title": "Indeed Currently Unavailable",
+                        "title": "CareerJet API Error",
                         "company": "System Info",
                         "location": location,
                         "link": "#",
-                        "description": "Indeed's anti-bot protection is preventing automated searches in the server environment. We're working on a solution. Please use eFinancialCareers for now.",
-                        "formatted_description": "Indeed's anti-bot protection is preventing automated searches in the server environment. We're working on a solution. Please use eFinancialCareers for now."
+                        "description": f"CareerJet API error: {str(e)}. Please try eFinancialCareers for now.",
+                        "formatted_description": f"CareerJet API error: {str(e)}. Please try eFinancialCareers for now."                        
                     }]
                     
            
