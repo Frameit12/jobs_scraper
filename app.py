@@ -1004,13 +1004,13 @@ def index():
         try:
             # Choose scraper based on source
             if source == "indeed":
-                print(f"🔍 DEBUG: Running CareerJet API for admin user")
+                print(f"🔍 DEBUG: Running JobSpy Indeed for admin user")
                 try:
-                    from careerjet_jobspy import scrape_jobs as scrape_careerjet_jobs
-                    jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region="US")           
+                    from indeed_jobspy import scrape_jobs as scrape_indeed_jobs
+                    jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region=region)           
 
                 except Exception as e: 
-                    print(f"❌ python-jobspy failed: {e}")
+                    print(f"❌ JobSpy Indeed failed: {e}")
                     jobs = [{
                         "title": "CareerJet API Error",
                         "company": "System Info",
