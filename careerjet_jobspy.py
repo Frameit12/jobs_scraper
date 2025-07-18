@@ -13,9 +13,23 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
     
     try:
         # Import jobspy (this will tell us if it's properly installed)
-        from python_jobspy import scrape_jobs as jobspy_scrape
-        print("✅ python-jobspy import successful")
         
+        try:
+            from python_jobspy import scrape_jobs as jobspy_scrape
+            print("✅ Import successful: from python_jobspy import scrape_jobs")
+        except ImportError:
+            try:
+                from jobspy import scrape_jobs as jobspy_scrape
+                print("✅ Import successful: from jobspy import scrape_jobs")
+            except ImportError:
+                try:
+                    import jobspy
+                    jobspy_scrape = jobspy.scrape_jobs
+                    print("✅ Import successful: import jobspy")
+                except ImportError as e:
+                    print(f"❌ All import attempts failed: {e}")
+                    raise ImportError("python-jobspy not found - tried all import methods")        
+                
         # Map your regions to jobspy country codes
         country_mapping = {
             "US": "usa",
