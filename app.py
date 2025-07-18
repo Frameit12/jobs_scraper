@@ -2218,6 +2218,54 @@ def debug_packages():
     
     return f"<pre>All jobspy-related packages: {jobspy_packages}\n\nPython path: {sys.path}\n\nAll packages: {installed_packages}</pre>"
 
+@app.route("/debug_jobspy")
+def debug_jobspy():
+    import sys
+    import subprocess
+    
+    try:
+        # Check if jobspy is installed via pip list
+        result = subprocess.run([sys.executable, '-m', 'pip', 'list'], 
+                              capture_output=True, text=True)
+        pip_list = result.stdout
+        
+        # Find jobspy lines
+        jobspy_lines = [line for line in pip_list.split('\n') 
+                       if 'jobspy' in line.lower()]
+        
+        # Try import
+        import_status = "Failed"
+        import_error = ""
+        try:
+            import jobspy
+            import_status = f"SUCCESS - Version: {getattr(jobspy, '__version__', 'Unknown')}"
+        except Exception as e:
+            import_status = "FAILED"
+            import_error = str(e)
+        
+        # Check sys.path
+        python_paths = '\n'.join(sys.path)
+        
+        return f"""
+        <pre>
+        JOBSPY INSTALLATION CHECK:
+        ========================
+        
+        In pip list: {len(jobspy_lines)} matches
+        {jobspy_lines}
+        
+        Import Test: {import_status}
+        Import Error: {import_error}
+        
+        Python Paths:
+        {python_paths}
+        
+        Full pip list (first 20 lines):
+        {chr(10).join(pip_list.split(chr(10))[:20])}
+        </pre>
+        """
+    except Exception as e:
+        return f"<pre>Debug route failed: {e}</pre>"
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
