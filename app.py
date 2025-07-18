@@ -2204,6 +2204,16 @@ def download_debug_file(filename):
     except Exception as e:
         return f"Error downloading file: {e}", 500
 
+@app.route("/debug_packages")
+def debug_packages():
+    import sys
+    import pkg_resources
+    
+    installed_packages = [str(d) for d in pkg_resources.working_set]
+    jobspy_packages = [p for p in installed_packages if 'jobspy' in p.lower()]
+    
+    return f"<pre>All jobspy-related packages: {jobspy_packages}\n\nPython path: {sys.path}\n\nAll packages: {installed_packages}</pre>"
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
