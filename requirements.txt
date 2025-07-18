@@ -11,4 +11,4 @@ sqlalchemy
 requests==2.31.0
 seleniumbase
 nodriver
-jobspy
+jobspy==0.31.0
