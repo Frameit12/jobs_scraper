@@ -1006,8 +1006,12 @@ def index():
             if source == "indeed":
                 print(f"🔍 DEBUG: Running JobSpy Indeed for admin user")
                 try:
+                    # Debug region detection
+                    region = detect_user_region(request)
+                    print(f"🔍 DEBUG: Detected region = '{region}'")
+        
                     from indeed_jobspy import scrape_jobs as scrape_indeed_jobs
-                    jobs = scrape_indeed_jobs(title, location, max_jobs, seniority=seniority, region=region)           
+                    jobs = scrape_indeed_jobs(title, location, max_jobs, seniority=seniority, region=region)
 
                 except Exception as e: 
                     print(f"❌ JobSpy Indeed failed: {e}")
