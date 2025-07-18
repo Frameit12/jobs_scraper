@@ -15,12 +15,12 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         # Import jobspy (this will tell us if it's properly installed)
         
         try:
-            from python_jobspy import scrape_jobs as jobspy_scrape
-            print("✅ Import successful: from python_jobspy import scrape_jobs")
+            from jobspy import scrape_jobs as jobspy_scrape
+            print("✅ Import successful: from jobspy import scrape_jobs")
         except ImportError:
             try:
-                from jobspy import scrape_jobs as jobspy_scrape
-                print("✅ Import successful: from jobspy import scrape_jobs")
+                from python_jobspy import scrape_jobs as jobspy_scrape
+                print("✅ Import successful: from python_jobspy import scrape_jobs")
             except ImportError:
                 try:
                     import jobspy
