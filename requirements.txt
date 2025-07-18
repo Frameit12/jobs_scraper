@@ -12,4 +12,4 @@ requests==2.31.0
 seleniumbase
 nodriver
 requests==2.31.0
-careerjet-api-client==3.0.1
+python-jobspy==1.1.80
