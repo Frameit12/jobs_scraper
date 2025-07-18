@@ -1006,11 +1006,11 @@ def index():
             if source == "indeed":
                 print(f"🔍 DEBUG: Running CareerJet API for admin user")
                 try:
-                    from careerjet_rss import scrape_jobs_rss as scrape_careerjet_jobs
+                    from careerjet_jobspy import scrape_jobs as scrape_careerjet_jobs
                     jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region="US")           
 
                 except Exception as e: 
-                    print(f"❌ CareerJet API failed: {e}")
+                    print(f"❌ python-jobspy failed: {e}")
                     jobs = [{
                         "title": "CareerJet API Error",
                         "company": "System Info",
