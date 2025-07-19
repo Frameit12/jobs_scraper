@@ -1606,6 +1606,8 @@ def load_saved_search(index):
             region = detect_user_region(request)
             saved_source = criteria.get("source", "efinancialcareers")
             print(f"🔍 LOAD DEBUG: Using SAVED source = '{saved_source}' (ignoring current form)")
+            print(f"🔍 LOAD DEBUG: saved_source == 'indeed'? {saved_source == 'indeed'}")
+            print(f"🔍 LOAD DEBUG: All criteria: {criteria}")
 
             # Use the SAVED source, not the form
             if saved_source == "indeed":
