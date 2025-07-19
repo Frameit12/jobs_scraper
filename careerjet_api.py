@@ -3,15 +3,42 @@ import time
 import random
 import logging
 from datetime import datetime
+from bs4 import BeautifulSoup
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def extract_full_careerjet_description(job_url):
+    """Extract full description from individual CareerJet job page"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
+        }
+        
+        response = requests.get(job_url, headers=headers, timeout=15)
+        if response.status_code != 200:
+            return None
+            
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Find the content section (from your HTML analysis)
+        content_section = soup.find('section', class_='content')
+        if content_section:
+            # Get all text content
+            full_description = content_section.get_text(separator=' ', strip=True)
+            print(f"🔍 Extracted full description: {len(full_description)} chars")
+            return full_description
+            
+    except Exception as e:
+        print(f"⚠️ Could not extract full description from {job_url}: {e}")
+        
+    return None
+
 def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
     """
-    CareerJet API implementation to replace Indeed scraping
-    Uses legitimate API instead of scraping
+    Enhanced CareerJet API: Get URLs from API, then extract full descriptions
     """
+    print("🚨 CAREERJET ENHANCED VERSION - FULL DESCRIPTIONS")
     print("🔍 CAREERJET API DEBUG: Function called with parameters:")
     print(f"  - title: '{title}'")
     print(f"  - location: '{location}'") 
@@ -20,33 +47,23 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
     print(f"  - region: '{region}'")
     
     try:
-        # CareerJet API endpoints by country
-        api_endpoints = {
-            "US": "http://public.api.careerjet.net/search",  # Fixed!
-            "UK": "http://public.api.careerjet.net/search",  # Fixed!
-            "CA": "http://public.api.careerjet.net/search",  # Fixed!
-            "AU": "http://public.api.careerjet.net/search"   # Fixed!
-        }
-        
-        # Get appropriate endpoint
-        api_url = api_endpoints.get(region, api_endpoints["US"])
-        print(f"🌍 Using CareerJet endpoint: {api_url}")
+        # STEP 1: Get job URLs from CareerJet API (your existing code)
+        api_url = "http://public.api.careerjet.net/search"
         
         # API parameters
         params = {
             'keywords': title,
             'location': location,
-            'affid': 'dbeb46864e3514ee44146b52e98c7e8e',  # Your real affiliate ID
+            'affid': 'dbeb46864e3514ee44146b52e98c7e8e',
             'user_ip': '127.0.0.1',
             'user_agent': 'FindMeAJob/1.0',
             'locale_code': 'en_US' if region == "US" else 'en_GB',
-            'pagesize': min(max_jobs, 20),  # CareerJet max is 20 per request
+            'pagesize': min(max_jobs, 20),
             'page': 1
         }
         
         # Add seniority filtering if specified
         if seniority:
-            # Map your seniority levels to CareerJet's expected format
             seniority_mapping = {
                 'intern': 'internship',
                 'junior': 'entry level',
@@ -114,34 +131,32 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
                 "formatted_description": f"CareerJet API error: {data.get('type', 'Unknown error')}"
             }]
         
-        # Convert to your existing job format
+        # STEP 2: Extract full descriptions (NEW PART)
         job_results = []
         for i, job in enumerate(jobs_data):
-            if i == 0:  # Just debug the first job
-                print(f"🔍 DEBUG: Available job fields: {list(job.keys())}")
-                for key, value in job.items():
-                    if 'desc' in key.lower():
-                        print(f"🔍 DEBUG: {key} = {str(value)[:200]}...")
             if len(job_results) >= max_jobs:
                 break
                 
-            # Clean and format job data
+            # Get basic job data from API
             job_title = job.get('title', '[Not Found]').strip()
             company = job.get('company', '[Not Found]').strip()
             job_location = job.get('locations', location).strip()
             job_url = job.get('url', '#')
-            # Get full description from CareerJet
-            description = job.get('description', 'No description available').strip()
-
-            # If description is truncated (ends with ...), try to get more
-            if description.endswith('...') and len(description) < 500:
-                # CareerJet might provide a 'snippet' vs 'description' field
-                full_description = job.get('snippet', description)
-                if len(full_description) > len(description):
-                    description = full_description
-
-            # Debug the actual length
-            print(f"🔍 DEBUG: Job {i+1} description length: {len(description)} chars")
+            short_description = job.get('description', 'No description available').strip()
+            
+            print(f"🔍 Processing job {i+1}: {job_title}")
+            print(f"🔍 Short description length: {len(short_description)} chars")
+            
+            # STEP 3: Get full description from individual job page
+            full_description = extract_full_careerjet_description(job_url)
+            
+            # Use full description if available, otherwise use short one
+            if full_description and len(full_description) > len(short_description):
+                description = full_description
+                print(f"✅ Using full description: {len(description)} chars")
+            else:
+                description = short_description
+                print(f"⚠️ Using short description: {len(description)} chars")
             
             # Basic description cleanup
             import html
@@ -159,33 +174,12 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             
             job_results.append(formatted_job)
             print(f"✅ Processed job {i+1}: {job_title} at {company}")
+            
+            # Add delay to be respectful
+            time.sleep(2)
         
-        print(f"🎯 FINAL RESULT: Successfully retrieved {len(job_results)} jobs from CareerJet API")
+        print(f"🎯 FINAL RESULT: Successfully retrieved {len(job_results)} jobs from CareerJet")
         return job_results
-        
-    except requests.exceptions.Timeout:
-        print("❌ TIMEOUT ERROR: CareerJet API request timed out")
-        return [{
-            "error_type": "timeout",
-            "title": "API Timeout",
-            "company": "Error",
-            "location": location,
-            "link": "#", 
-            "description": "CareerJet API request timed out. Please try again with fewer results or try later.",
-            "formatted_description": "CareerJet API request timed out. Please try again with fewer results or try later."
-        }]
-        
-    except requests.exceptions.RequestException as e:
-        print(f"❌ REQUEST ERROR: {e}")
-        return [{
-            "error_type": "request_error",
-            "title": "Network Error", 
-            "company": "Error",
-            "location": location,
-            "link": "#",
-            "description": f"Network error connecting to CareerJet API: {str(e)}",
-            "formatted_description": f"Network error connecting to CareerJet API: {str(e)}"
-        }]
         
     except Exception as e:
         print(f"❌ GENERAL ERROR: {e}")
@@ -204,7 +198,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
 
 # Test function
 if __name__ == "__main__":
-    jobs = scrape_jobs("Risk Manager", "New York", 5)
+    jobs = scrape_jobs("Risk Manager", "New York", 3)
     print(f"\n🎯 FINAL RESULT: Found {len(jobs)} jobs")
     for i, job in enumerate(jobs, 1):
         print(f"{i}. {job['title']} at {job['company']}")
