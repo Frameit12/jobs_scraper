@@ -1592,15 +1592,18 @@ def load_saved_search(index):
 
         try:
             region = detect_user_region(request)
-            source = criteria.get("source", "efinancialcareers")
-            print(f"🔍 LOAD DEBUG: Retrieved source = '{source}'")  # Debug line
-            
-            # ADD THIS BLOCK:
-            if source == "indeed":
+            saved_source = criteria.get("source", "efinancialcareers")
+            print(f"🔍 LOAD DEBUG: Using SAVED source = '{saved_source}' (ignoring current form)")
+
+            # Use the SAVED source, not the form
+            if saved_source == "indeed":
+                print("🔍 LOAD DEBUG: Calling CareerJet because saved search was CareerJet")
                 from careerjet_api import scrape_jobs as scrape_careerjet_jobs
                 jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region=region)
             else:
+                print("🔍 LOAD DEBUG: Calling eFinancialCareers because saved search was eFinancialCareers")
                 jobs = scrape_jobs(title, location, max_jobs, seniority=seniority, region=region)
+                        
             log_user_activity("search", f"'{title}' in '{location}' ({len(jobs)} results)")
             
         except Exception as e:
@@ -1632,7 +1635,7 @@ def load_saved_search(index):
             title=title,
             location=location,
             max_jobs=max_jobs,
-            source=source,
+            source=saved_source,
             saved_searches=searches,
             criteria=searches[index]["criteria"],
             name=searches[index]["name"],
