@@ -971,6 +971,7 @@ def index():
 
             # Return early with the message, don't run any scraper
             saved_searches = check_excel_files_for_searches(load_saved_searches())
+            print(f"🔍 TEMPLATE DEBUG: Passing source = '{source}' to template")
             return render_template("index.html", info=info, jobs=[], title=title, location=location, source=source, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=saved_searches)
 
         print(f"🔍 DEBUG: Admin user '{session.get('username')}' can access {source}")
