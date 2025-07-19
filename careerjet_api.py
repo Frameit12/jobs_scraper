@@ -117,6 +117,11 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         # Convert to your existing job format
         job_results = []
         for i, job in enumerate(jobs_data):
+            if i == 0:  # Just debug the first job
+                print(f"🔍 DEBUG: Available job fields: {list(job.keys())}")
+                for key, value in job.items():
+                    if 'desc' in key.lower():
+                        print(f"🔍 DEBUG: {key} = {str(value)[:200]}...")
             if len(job_results) >= max_jobs:
                 break
                 
@@ -125,7 +130,18 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             company = job.get('company', '[Not Found]').strip()
             job_location = job.get('locations', location).strip()
             job_url = job.get('url', '#')
+            # Get full description from CareerJet
             description = job.get('description', 'No description available').strip()
+
+            # If description is truncated (ends with ...), try to get more
+            if description.endswith('...') and len(description) < 500:
+                # CareerJet might provide a 'snippet' vs 'description' field
+                full_description = job.get('snippet', description)
+                if len(full_description) > len(description):
+                    description = full_description
+
+            # Debug the actual length
+            print(f"🔍 DEBUG: Job {i+1} description length: {len(description)} chars")
             
             # Basic description cleanup
             import html
