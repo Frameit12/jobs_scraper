@@ -22,10 +22,10 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
     try:
         # CareerJet API endpoints by country
         api_endpoints = {
-            "US": "http://public-api.careerjet.com/search",
-            "UK": "http://public-api.careerjet.co.uk/search", 
-            "CA": "http://public-api.careerjet.ca/search",
-            "AU": "http://public-api.careerjet.com.au/search"
+            "US": "http://public.api.careerjet.net/search",  # Fixed!
+            "UK": "http://public.api.careerjet.net/search",  # Fixed!
+            "CA": "http://public.api.careerjet.net/search",  # Fixed!
+            "AU": "http://public.api.careerjet.net/search"   # Fixed!
         }
         
         # Get appropriate endpoint
