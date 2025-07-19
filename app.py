@@ -2306,5 +2306,30 @@ def debug_saved_search(search_name):
     except Exception as e:
         return f"Error: {e}"
 
+@app.route("/debug_all_searches")
+def debug_all_searches():
+    engine = get_db_connection()
+    if not engine:
+        return "No database connection"
+    
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT name, criteria FROM saved_searches 
+                WHERE user_id = :user_id
+                ORDER BY id DESC
+            """), {"user_id": get_current_user_id()})
+            
+            output = "<h2>All Saved Searches:</h2><pre>"
+            for row in result:
+                name, criteria = row
+                output += f"\nName: '{name}'\n"
+                output += f"Criteria: {criteria}\n"
+                output += "-" * 50 + "\n"
+            output += "</pre>"
+            return output
+    except Exception as e:
+        return f"Error: {e}"
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
