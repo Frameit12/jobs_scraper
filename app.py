@@ -1592,8 +1592,17 @@ def load_saved_search(index):
 
         try:
             region = detect_user_region(request)
-            jobs = scrape_jobs(title, location, max_jobs, seniority=seniority, region=region)
-            log_user_activity("search", f"'{title}' in '{location}' ({len(jobs)} results)")  # ADD THIS LINE
+            source = criteria.get("source", "efinancialcareers")
+            print(f"🔍 LOAD DEBUG: Retrieved source = '{source}'")  # Debug line
+            
+            # ADD THIS BLOCK:
+            if source == "indeed":
+                from careerjet_api import scrape_jobs as scrape_careerjet_jobs
+                jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region=region)
+            else:
+                jobs = scrape_jobs(title, location, max_jobs, seniority=seniority, region=region)
+            log_user_activity("search", f"'{title}' in '{location}' ({len(jobs)} results)")
+            
         except Exception as e:
             print(f"❌ LOAD SEARCH ERROR: {str(e)}")
             print(f"❌ ERROR TYPE: {type(e).__name__}")
@@ -1623,6 +1632,7 @@ def load_saved_search(index):
             title=title,
             location=location,
             max_jobs=max_jobs,
+            source=source,
             saved_searches=searches,
             criteria=searches[index]["criteria"],
             name=searches[index]["name"],
