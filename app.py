@@ -19,7 +19,6 @@ from sqlalchemy import create_engine, text
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import session
-from nodriver_indeed_scraper import scrape_jobs as scrape_indeed_jobs
 
 
 # Database setup
@@ -1005,6 +1004,7 @@ def index():
             # Choose scraper based on source
    
             if source == "indeed":
+                print(f"🚨 APP.PY DEBUG: About to call CareerJet API - VERSION 2.0")  # ADD THIS
                 print(f"🔍 DEBUG: Running CareerJet API for admin user")
                 try:
                     # Debug region detection  
