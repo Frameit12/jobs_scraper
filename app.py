@@ -981,13 +981,23 @@ def index():
                 info = "⚠️ Please enter a name for your saved search."
             else:
                 form_location = request.form.get("location", "").strip()
+
+                # ADD THESE DEBUG LINES:
+                print("🔍 SAVE DEBUG: All form data received:")
+                for key, value in request.form.items():
+                    print(f"    {key} = '{value}'")
+        
+                source_from_form = request.form.get("source", "DEFAULT_NOT_FOUND")
+                print(f"🔍 SAVE DEBUG: Source from form = '{source_from_form}'")
+                
                 criteria = {
                     "title": request.form.get("title", ""),
                     "location": form_location,
                     "max_jobs": max_jobs,
                     "seniority": request.form.get("seniority", ""),
-                    "source": request.form.get("source", "efinancialcareers")
+                    "source": source_from_form if source_from_form != "DEFAULT_NOT_FOUND" else "efinancialcareers"
                 }
+                print(f"🔍 SAVE DEBUG: Final criteria = {criteria}")
                 if form_location:
                     formatted_name = f"{search_name} - {form_location}"
                 else:
