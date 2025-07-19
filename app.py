@@ -2281,5 +2281,30 @@ def debug_jobspy():
     except Exception as e:
         return f"<pre>Debug route failed: {e}</pre>"
 
+@app.route("/debug_saved_search/<search_name>")
+def debug_saved_search(search_name):
+    engine = get_db_connection()
+    if not engine:
+        return "No database connection"
+    
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT name, criteria FROM saved_searches 
+                WHERE name = :search_name AND user_id = :user_id
+            """), {
+                "search_name": search_name,
+                "user_id": get_current_user_id()
+            })
+            
+            row = result.fetchone()
+            if row:
+                name, criteria = row
+                return f"<pre>Search: {name}\nCriteria: {criteria}</pre>"
+            else:
+                return f"Search '{search_name}' not found"
+    except Exception as e:
+        return f"Error: {e}"
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
