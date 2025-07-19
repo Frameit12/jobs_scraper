@@ -2345,5 +2345,25 @@ def debug_all_searches():
     except Exception as e:
         return f"Error: {e}"
 
+@app.route("/debug_saved_search_source/<int:index>")
+def debug_saved_search_source(index):
+    searches = load_saved_searches()
+    if 0 <= index < len(searches):
+        search = searches[index]
+        criteria = search["criteria"]
+        source = criteria.get("source", "NOT_FOUND")
+        
+        return f"""
+        <pre>
+        Search Name: {search['name']}
+        All Criteria: {criteria}
+        Source Value: '{source}'
+        Source Type: {type(source)}
+        </pre>
+        <br><a href="/app">Back to app</a>
+        """
+    else:
+        return "Invalid search index"
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
