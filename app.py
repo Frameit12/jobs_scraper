@@ -965,8 +965,8 @@ def index():
 
        
         # Admin-only access to Indeed/Both - others get "coming soon" message
-        if source in ["indeed", "both"] and session.get('username') != 'frameit':
-            info = "⏳ Indeed search is coming soon! We're currently testing this feature."
+        if source in ["CareerJet", "both"] and session.get('username') != 'frameit':
+            info = "⏳ CareerJet search is coming soon! We're currently testing this feature."
             print(f"🔍 DEBUG: Non-admin user blocked from {source}")
 
             # Return early with the message, don't run any scraper
@@ -1015,7 +1015,7 @@ def index():
         try:
             # Choose scraper based on source
    
-            if source == "indeed":
+            if source == "careerjet":
                 print(f"🚨 APP.PY DEBUG: About to call CareerJet API - VERSION 2.0")  # ADD THIS
                 print(f"🔍 DEBUG: Running CareerJet API for admin user")
                 try:
@@ -1610,7 +1610,7 @@ def load_saved_search(index):
             print(f"🔍 LOAD DEBUG: All criteria: {criteria}")
 
             # Use the SAVED source, not the form
-            if saved_source == "indeed":
+            if saved_source == "careerjet":
                 print("🔍 LOAD DEBUG: Calling CareerJet because saved search was CareerJet")
                 from careerjet_api import scrape_jobs as scrape_careerjet_jobs
                 jobs = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region=region)
