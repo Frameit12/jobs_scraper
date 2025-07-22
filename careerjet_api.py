@@ -50,6 +50,20 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         # STEP 1: Get job URLs from CareerJet API (your existing code)
         api_url = "http://public.api.careerjet.net/search"
         
+        # Enhanced regional mapping for CareerJet
+        region_mapping = {
+            "US": "en_US",
+            "UK": "en_GB", 
+            "CA": "en_CA",
+            "AU": "en_AU",
+            "DE": "de_DE",
+            "SG": "en_SG",
+            "IN": "en_IN"
+        }
+
+        locale_code = region_mapping.get(region, "en_US")  # Default to US
+        print(f"🌍 Using CareerJet locale: {locale_code} for region: {region}")        
+        
         # API parameters
         params = {
             'keywords': title,
@@ -57,7 +71,7 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             'affid': 'dbeb46864e3514ee44146b52e98c7e8e',
             'user_ip': '127.0.0.1',
             'user_agent': 'FindMeAJob/1.0',
-            'locale_code': 'en_US' if region == "US" else 'en_GB',
+            'locale_code': locale_code,
             'pagesize': min(max_jobs, 20),
             'page': 1
         }
