@@ -128,12 +128,12 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
                 print("🔍 STEP 1 DEBUG: First job structure:")
                 for key, value in first_job.items():
                     print(f"  {key}: {str(value)[:100]}...")
-    
-                # Save to file for detailed analysis
+
+                # Output JSON directly to logs instead of file
                 import json
-                with open("debug_careerjet_response.json", "w") as f:
-                    json.dump(data, f, indent=2)
-                print("💾 Saved full response to debug_careerjet_response.json")
+                print("🔍 FULL API RESPONSE:")
+                print(json.dumps(data, indent=2))
+                print("🔍 END OF API RESPONSE")
             
         except Exception as e:
             print(f"❌ JSON Parse Error: {e}")
@@ -204,7 +204,15 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             print(f"  URL type: {type(job.get('url'))}")
             print(f"  URL length: {len(str(job.get('url', '')))}")
             print(f"  Contains 'clk/': {'clk/' in str(job.get('url', ''))}")
-            print(f"  Contains 'jobviewtrack': {'jobviewtrack' in str(job.get('url', ''))}")            
+            print(f"  Contains 'jobviewtrack': {'jobviewtrack' in str(job.get('url', ''))}")    
+
+            # ADD THIS NEW DEBUG BLOCK HERE:
+            print(f"🔍 JOB URL DEBUG for job {i+1}:")
+            print(f"  ALL job fields: {list(job.keys())}")
+            print(f"  'url' field: {job.get('url', 'NOT_FOUND')}")
+            print(f"  'site' field: {job.get('site', 'NOT_FOUND')}")
+            print(f"  'company_url' field: {job.get('company_url', 'NOT_FOUND')}")
+            print(f"  'redirect_url' field: {job.get('redirect_url', 'NOT_FOUND')}")            
             
             print(f"🔍 Processing job {i+1}: {job_title}")
             print(f"🔍 Short description length: {len(short_description)} chars")
