@@ -176,6 +176,13 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             raw_job_url = job.get('url', '#')
             short_description = job.get('description', 'No description available').strip()
 
+            # DEBUG: Check what CareerJet API actually returns
+            print(f"🔍 CAREERJET DEBUG - Job {i+1}: {job_title}")
+            print(f"🔍 SHORT DESC LENGTH: {len(short_description)} chars")
+            print(f"🔍 SHORT DESC PREVIEW: {short_description[:200]}...")
+            print(f"🔍 ALL JOB FIELDS: {list(job.keys())}")
+            
+
             # Create functional search URL instead of broken tracking URL
             if 'jobviewtrack.com' in raw_job_url:
                 # Extract job title for search
@@ -219,6 +226,12 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             
             # STEP 3: Get full description from individual job page
             full_description = extract_full_careerjet_description(job_url)
+
+
+            # Use full description if available, otherwise use short one
+            print(f"🔍 DESCRIPTION COMPARISON:")
+            print(f"  - Short desc: {len(short_description)} chars")
+            print(f"  - Full desc: {len(full_description) if full_description else 0} chars")
             
             # Use full description if available, otherwise use short one
             if full_description and len(full_description) > len(short_description):
