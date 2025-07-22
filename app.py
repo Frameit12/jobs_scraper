@@ -355,14 +355,22 @@ def detect_user_region(request):
             country_name = data.get('country', 'NOT_FOUND')
             print(f"🔍 Country Code = '{country_code}'")
             print(f"🔍 Country Name = '{country_name}'")
+            
+            # Enhanced mapping for CareerJet regions
             if country_code == "GB":
-                return "UK"
-            elif country_code == "SG":
-                return "SG"
-            elif country_code == "DE":
-                return "DE"            
-            else:
-                return "US" 
+                    return "UK"
+                elif country_code == "CA":
+                    return "CA"
+                elif country_code == "AU":
+                    return "AU"
+                elif country_code == "DE":
+                    return "DE"
+                elif country_code == "SG":
+                    return "SG"
+                elif country_code == "IN":
+                    return "IN"
+                else:
+                    return "US"  # Default 
         else:
             print(f"❌ API returned non-200 status: {response.status_code}")
     except Exception as e:
