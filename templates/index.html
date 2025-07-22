@@ -760,6 +760,45 @@ document.getElementById('feedbackModal').addEventListener('click', function(e) {
     }
 });
 </script>
+
+
+<script>
+function toggleSeniorityUI() {
+    const efcRadio = document.querySelector('input[name="source"][value="efinancialcareers"]');
+    const cjRadio = document.querySelector('input[name="source"][value="careerjet"]');
+    const efcSeniority = document.getElementById('efc-seniority');
+    const cjExperience = document.getElementById('cj-experience');
     
+    console.log('toggleSeniorityUI called');
+    console.log('CareerJet checked:', cjRadio ? cjRadio.checked : 'radio not found');
+    
+    if (cjRadio && cjRadio.checked) {
+        efcSeniority.style.display = 'none';
+        cjExperience.style.display = 'block';
+        console.log('Showing CareerJet experience input');
+    } else {
+        efcSeniority.style.display = 'block';
+        cjExperience.style.display = 'none';
+        console.log('Showing eFC seniority dropdown');
+    }
+}
+
+// Run on page load
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, setting up seniority toggle');
+    toggleSeniorityUI();
+    
+    // Add event listeners to radio buttons
+    document.querySelectorAll('input[name="source"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            console.log('Radio button changed to:', this.value);
+            toggleSeniorityUI();
+        });
+    });
+});
+</script>
+
 </body>
 </html>
+    
+
