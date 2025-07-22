@@ -251,23 +251,35 @@
                         <label for="location" style="display: block; font-weight: bold;">Location:</label>
                         <input type="text" id="location" name="location" value="{{ location }}" placeholder="e.g. New York" style="width: 100%; padding: 8px;">
                     </div>
-
+                    
                     <div style="margin-bottom: 10px;">
-                      <label for="seniority" style="display: block; font-weight: bold;">Seniority Level:</label>
-                      <select id="seniority" name="seniority" style="width: 100%; padding: 8px;">
-                        <option value="">All Levels</option>
-                        <option value="intern" {{ 'selected' if seniority == 'intern' else '' }}>Intern/Graduate</option>
-                        <option value="junior" {{ 'selected' if seniority == 'junior' else '' }}>Junior</option>
-                        <option value="analyst" {{ 'selected' if seniority == 'analyst' else '' }}>Analyst</option>
-                        <option value="associate" {{ 'selected' if seniority == 'associate' else '' }}>Associate/Mid Level</option>
-                        <option value="avp" {{ 'selected' if seniority == 'avp' else '' }}>AVP/Senior</option>
-                        <option value="vp" {{ 'selected' if seniority == 'vp' else '' }}>Vice President/Principal</option>
-                        <option value="svp" {{ 'selected' if seniority == 'svp' else '' }}>Senior Vice President/Head Of</option>
-                        <option value="director" {{ 'selected' if seniority == 'director' else '' }}>Director</option>
-                        <option value="md" {{ 'selected' if seniority == 'md' else '' }}>Managing Director</option>
-                        <option value="csuite" {{ 'selected' if seniority == 'csuite' else '' }}>C Suite</option>
-                      </select>
-                    </div>  
+                      <!-- eFinancialCareers seniority dropdown -->
+                      <div id="efc-seniority">
+                        <label for="seniority" style="display: block; font-weight: bold;">Seniority Level:</label>
+                        <select id="seniority" name="seniority" style="width: 100%; padding: 8px;">
+                          <option value="">All Levels</option>
+                          <option value="intern" {{ 'selected' if seniority == 'intern' else '' }}>Intern/Graduate</option>
+                          <option value="junior" {{ 'selected' if seniority == 'junior' else '' }}>Junior</option>
+                          <option value="analyst" {{ 'selected' if seniority == 'analyst' else '' }}>Analyst</option>
+                          <option value="associate" {{ 'selected' if seniority == 'associate' else '' }}>Associate/Mid Level</option>
+                          <option value="avp" {{ 'selected' if seniority == 'avp' else '' }}>AVP/Senior</option>
+                          <option value="vp" {{ 'selected' if seniority == 'vp' else '' }}>Vice President/Principal</option>
+                          <option value="svp" {{ 'selected' if seniority == 'svp' else '' }}>Senior Vice President/Head Of</option>
+                          <option value="director" {{ 'selected' if seniority == 'director' else '' }}>Director</option>
+                          <option value="md" {{ 'selected' if seniority == 'md' else '' }}>Managing Director</option>
+                          <option value="csuite" {{ 'selected' if seniority == 'csuite' else '' }}>C Suite</option>
+                        </select>
+                      </div>
+  
+                      <!-- CareerJet experience keywords input -->
+                      <div id="cj-experience" style="display: none;">
+                        <label for="experience_keywords" style="display: block; font-weight: bold;">Experience Keywords <span style="font-size: 12px; color: #666;">(optional)</span>:</label>
+                        <input type="text" id="experience_keywords" name="experience_keywords" 
+                               placeholder="e.g., senior, junior, entry level, director" 
+                               style="width: 100%; padding: 8px;" value="{{ experience_keywords or '' }}">
+                        <small style="color: #666; font-size: 11px; display: block; margin-top: 4px;">💡 CareerJet searches by keywords. Add experience terms to refine results.</small>
+                      </div>
+                    </div>                    
 
                     <div style="margin-bottom: 10px;">
                         <label for="max_jobs" style="display: block; font-weight: bold;">
