@@ -116,7 +116,25 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         # Parse JSON response
         try:
             data = response.json()
-            print(f"🔍 API Response keys: {data.keys()}")
+            # STEP 1 DEBUG: Save raw API response
+            print("🔍 STEP 1 DEBUG: Raw API response structure")
+            print(f"Response keys: {data.keys()}")
+            print(f"Response type field: {data.get('type', 'NO_TYPE_FIELD')}")
+            print(f"Number of jobs: {len(data.get('jobs', []))}")
+
+            # Save first job for analysis
+            if data.get('jobs'):
+                first_job = data.get('jobs')[0]
+                print("🔍 STEP 1 DEBUG: First job structure:")
+                for key, value in first_job.items():
+                    print(f"  {key}: {str(value)[:100]}...")
+    
+                # Save to file for detailed analysis
+                import json
+                with open("debug_careerjet_response.json", "w") as f:
+                    json.dump(data, f, indent=2)
+                print("💾 Saved full response to debug_careerjet_response.json")
+            
         except Exception as e:
             print(f"❌ JSON Parse Error: {e}")
             return [{
@@ -157,6 +175,13 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             job_location = job.get('locations', location).strip()
             job_url = job.get('url', '#')
             short_description = job.get('description', 'No description available').strip()
+
+            print(f"🔍 STEP 2 DEBUG: Processing job {i+1}")
+            print(f"  Raw URL from API: {job.get('url', 'NO_URL')}")
+            print(f"  URL type: {type(job.get('url'))}")
+            print(f"  URL length: {len(str(job.get('url', '')))}")
+            print(f"  Contains 'clk/': {'clk/' in str(job.get('url', ''))}")
+            print(f"  Contains 'jobviewtrack': {'jobviewtrack' in str(job.get('url', ''))}")            
             
             print(f"🔍 Processing job {i+1}: {job_title}")
             print(f"🔍 Short description length: {len(short_description)} chars")
@@ -209,6 +234,28 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             "description": f"CareerJet API integration error: {str(e)}",
             "formatted_description": f"CareerJet API integration error: {str(e)}"
         }]
+
+def test_url_patterns():
+    """Test different URL patterns we're seeing"""
+    import requests
+    
+    test_urls = [
+        "https://www.careerjet.co.uk/",
+        "https://jobviewtrack.com/",
+        "Your actual problematic URL here"  # Replace with real URL
+    ]
+    
+    for url in test_urls:
+        try:
+            response = requests.get(url, timeout=10)
+            print(f"✅ {url}: Status {response.status_code}")
+        except requests.exceptions.Timeout:
+            print(f"⏰ {url}: TIMEOUT")
+        except Exception as e:
+            print(f"❌ {url}: ERROR {e}")
+
+# Run this test
+test_url_patterns()
 
 # Test function
 if __name__ == "__main__":
