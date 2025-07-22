@@ -173,8 +173,31 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             job_title = job.get('title', '[Not Found]').strip()
             company = job.get('company', '[Not Found]').strip()
             job_location = job.get('locations', location).strip()
-            job_url = job.get('url', '#')
+            raw_job_url = job.get('url', '#')
             short_description = job.get('description', 'No description available').strip()
+
+            # Create functional search URL instead of broken tracking URL
+            if 'jobviewtrack.com' in raw_job_url:
+                # Extract job title for search
+                safe_title = job_title.replace(' ', '+').replace(',', '')
+                safe_location = job_location.replace(' ', '+').replace(',', '')
+    
+                # Create direct CareerJet search URL
+                region_urls = {
+                    "US": "https://www.careerjet.com",
+                    "UK": "https://www.careerjet.co.uk",
+                    "CA": "https://www.careerjet.ca", 
+                    "AU": "https://www.careerjet.com.au",
+                    "DE": "https://www.careerjet.de",
+                    "SG": "https://www.careerjet.sg",
+                    "IN": "https://www.careerjet.co.in"
+                }
+    
+                base_url = region_urls.get(region, "https://www.careerjet.com")
+                job_url = f"{base_url}/jobs?s={safe_title}&l={safe_location}"
+                print(f"🔄 Using search URL instead of broken tracking: {job_url}")
+            else:
+                job_url = raw_job_url
 
             print(f"🔍 STEP 2 DEBUG: Processing job {i+1}")
             print(f"  Raw URL from API: {job.get('url', 'NO_URL')}")
