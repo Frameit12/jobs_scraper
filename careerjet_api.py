@@ -241,19 +241,27 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
             # STEP 3: Get full description from individual job page
             full_description = extract_full_careerjet_description(job_url)
 
-
             # Use full description if available, otherwise use short one
-            print(f"🔍 DESCRIPTION COMPARISON:")
+            print(f"🔍 DESCRIPTION COMPARISON FOR JOB {i+1}:")
+            print(f"  - Original API URL: {raw_job_url}")
+            print(f"  - Converted URL: {job_url}")
             print(f"  - Short desc: {len(short_description)} chars")
             print(f"  - Full desc: {len(full_description) if full_description else 0} chars")
-            
-            # Use full description if available, otherwise use short one
+            print(f"  - Short desc preview: {short_description[:100]}...")
+            if full_description:
+                print(f"  - Full desc preview: {full_description[:100]}...")
+
             if full_description and len(full_description) > len(short_description):
                 description = full_description
-                print(f"✅ Using full description: {len(description)} chars")
+                print(f"✅ JOB {i+1}: Using FULL description from {job_url}")
+                print(f"✅ JOB {i+1}: Final length: {len(description)} chars")
             else:
                 description = short_description
-                print(f"⚠️ Using short description: {len(description)} chars")
+                print(f"⚠️ JOB {i+1}: Using SHORT description from API")
+                print(f"⚠️ JOB {i+1}: Final length: {len(description)} chars")
+
+            print("=" * 100)
+            
             
             # Basic description cleanup
             import html
