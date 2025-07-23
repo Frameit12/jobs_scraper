@@ -668,9 +668,24 @@ def run_scheduled_searches():
             (schedule == "monthly" and day == 1)
         )
 
+      
         if should_run:
             print(f"🔁 Running {schedule} search: {search['name']}")
-            results = scrape_jobs(title, location, max_jobs)
+            
+            # Get the source from saved criteria and add seniority
+            source = criteria.get("source", "efinancialcareers")
+            seniority = criteria.get("seniority", "")
+            print(f"🔍 SCHEDULER: Using source '{source}' for search '{search['name']}'")
+            
+            # Call appropriate scraper based on saved source
+            if source == "careerjet":
+                from careerjet_api import scrape_jobs as scrape_careerjet_jobs
+                results = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region="US")
+                print(f"🔍 SCHEDULER: Called CareerJet scraper, got {len(results)} results")
+            else:
+                results = scrape_jobs(title, location, max_jobs, seniority=seniority, region="US")
+                print(f"🔍 SCHEDULER: Called eFinancialCareers scraper, got {len(results)} results")
+            
             save_results_to_excel(search["name"], results)
             
             # Build the same filename used in save_results_to_excel()
