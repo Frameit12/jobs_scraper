@@ -151,6 +151,12 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
         if data.get('type') == 'JOBS':
             jobs_data = data.get('jobs', [])
             print(f"🔍 Found {len(jobs_data)} jobs from CareerJet API")
+            # DEBUG: Print ALL job descriptions and their lengths
+            for idx, job in enumerate(jobs_data):
+                desc = job.get('description', '')
+                print(f"🔍 JOB {idx+1} API DESC LENGTH: {len(desc)} chars")
+                print(f"🔍 JOB {idx+1} API DESC: {desc}")
+                print("=" * 80)
         else:
             print(f"❌ API Error: {data.get('type', 'Unknown error')}")
             return [{
