@@ -147,6 +147,14 @@ def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
                 "formatted_description": "Could not parse CareerJet API response. Please try again later."
             }]
         
+        # CRITICAL DEBUG: What is the API actually returning?
+        print("🚨 CRITICAL DEBUG: Full API response analysis:")
+        print(f"🚨 Response type: {type(data)}")
+        print(f"🚨 Response keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+        print(f"🚨 'type' field value: '{data.get('type', 'NO_TYPE_FIELD')}'")
+        print(f"🚨 Raw response preview: {str(data)[:500]}...")
+        
+        
         # Check for API errors
         if data.get('type') == 'JOBS':
             jobs_data = data.get('jobs', [])
