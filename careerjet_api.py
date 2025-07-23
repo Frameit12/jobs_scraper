@@ -8,17 +8,30 @@ from bs4 import BeautifulSoup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def extract_full_careerjet_description(job_url):
     """Extract full description from individual CareerJet job page"""
+    print(f"🚨 EXTRACT FUNCTION: Attempting to scrape from URL: {job_url}")
+    
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
         }
         
+        print(f"🚨 EXTRACT FUNCTION: Making HTTP request to: {job_url}")
         response = requests.get(job_url, headers=headers, timeout=15)
+        print(f"🚨 EXTRACT FUNCTION: Response status: {response.status_code}")
+        print(f"🚨 EXTRACT FUNCTION: Final URL after redirects: {response.url}")
+        
         if response.status_code != 200:
+            print(f"🚨 EXTRACT FUNCTION: Failed - non-200 status")
             return None
             
+        # Save the actual page content for inspection
+        with open(f"debug_job_page_{int(time.time())}.html", "w", encoding="utf-8") as f:
+            f.write(response.text)
+        print(f"🚨 EXTRACT FUNCTION: Saved page content to debug file")
+        
         soup = BeautifulSoup(response.content, 'html.parser')
         
         # Find the content section (from your HTML analysis)
@@ -26,13 +39,16 @@ def extract_full_careerjet_description(job_url):
         if content_section:
             # Get all text content
             full_description = content_section.get_text(separator=' ', strip=True)
-            print(f"🔍 Extracted full description: {len(full_description)} chars")
+            print(f"🚨 EXTRACT FUNCTION: Found content section - {len(full_description)} chars")
+            print(f"🚨 EXTRACT FUNCTION: Content preview: {full_description[:200]}...")
             return full_description
+        else:
+            print(f"🚨 EXTRACT FUNCTION: No content section found")
+            return None
             
     except Exception as e:
-        print(f"⚠️ Could not extract full description from {job_url}: {e}")
-        
-    return None
+        print(f"🚨 EXTRACT FUNCTION: Exception occurred: {e}")
+        return None
 
 def scrape_jobs(title, location, max_jobs=10, seniority=None, region="US"):
     """
