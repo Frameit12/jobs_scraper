@@ -231,12 +231,12 @@
                                 <input type="radio" name="source" value="efinancialcareers" {{ 'checked' if source == 'efinancialcareers' or not source else '' }} style="margin-right: 6px;">
                                 eFinancialCareers
                             </label>
-                            <label style="display: flex; align-items: center; font-weight: 500; color: #6b7280;">
+                            <label style="display: flex; align-items: center; font-weight: 500;">
                                 <input type="radio" name="source" value="careerjet" {{ 'checked' if source == 'careerjet' else '' }} style="margin-right: 6px;">
-                                CareerJet <span style="font-size: 12px; color: #999; margin-left: 4px; font-style: italic;">(Coming Soon)</span>
+                                CareerJet
                             </label>
                             <label style="display: flex; align-items: center; font-weight: 500; color: #6b7280;">
-                                <input type="radio" name="source" value="both" {{ 'checked' if source == 'both' else '' }} style="margin-right: 6px;">
+                                <input type="radio" name="source" value="both" {{ 'checked' if source == 'both' else '' }} style="margin-right: 6px;" opacity: 0.5;" disabled>
                                 Both <span style="font-size: 12px; color: #999; margin-left: 4px; font-style: italic;">(Coming Soon)</span>
                             </label>
                         </div>
