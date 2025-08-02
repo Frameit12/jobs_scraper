@@ -1111,6 +1111,8 @@ def index():
                                       .replace("</b>", "")
                 )
                 job["formatted_description"] = cleaned_description
+                # Add source field
+                job["source"] = "EFC" if source == "efinancialcareers" else "CareerJet"
                 
         except Exception as e:
             print(f"❌ LOAD SEARCH ERROR: {str(e)}")
@@ -1710,6 +1712,11 @@ def download():
 
     # Add the '#' column at the beginning
     df.insert(0, '#', range(1, len(df) + 1))
+
+    # Move Source column to position 1 (after #)
+    if "source" in df.columns:
+        source_col = df.pop("source")
+        df.insert(1, "source", source_col)
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
@@ -2390,4 +2397,5 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
