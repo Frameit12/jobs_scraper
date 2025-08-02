@@ -1022,6 +1022,9 @@ def index():
                     "source": source_from_form if source_from_form != "DEFAULT_NOT_FOUND" else "efinancialcareers"
                 }
                 print(f"🔍 SAVE DEBUG: Final criteria = {criteria}")
+                # Add source abbreviation to saved search name
+                source_abbrev = "EFC" if source_from_form == "efinancialcareers" else "CareerJet"
+                
                 if form_location:
                     formatted_name = f"{search_name} - {form_location}"
                 else:
@@ -2397,5 +2400,6 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
