@@ -430,6 +430,7 @@
                         {% for job in jobs %}
                         <tr>
                             <td>{{ loop.index }}</td>
+                            <td>{{ job.source | default('EFC') }}</td>
                             <td>{{ job.title }}</td>
                             <td>{{ job.company }}</td>
                             <td>{{ job.location }}</td>
