@@ -987,17 +987,17 @@ def index():
         print(f"🔍 DEBUG: Username = '{session.get('username')}'")
 
        
-        # Admin-only access to Indeed/Both - others get "coming soon" message
-        if source in ["CareerJet", "both"] and session.get('username') != 'frameit':
-            info = "⏳ CareerJet search is coming soon! We're currently testing this feature."
-            print(f"🔍 DEBUG: Non-admin user blocked from {source}")
+        # Remove Admin-only access to Indeed/Both - others get "coming soon" message
+        #if source in ["CareerJet", "both"] and session.get('username') != 'frameit':
+        #    info = "⏳ CareerJet search is coming soon! We're currently testing this feature."
+        #    print(f"🔍 DEBUG: Non-admin user blocked from {source}")
 
-            # Return early with the message, don't run any scraper
-            saved_searches = check_excel_files_for_searches(load_saved_searches())
-            print(f"🔍 TEMPLATE DEBUG: Passing source = '{source}' to template")
-            return render_template("index.html", info=info, jobs=jobs, title=title, location=location, source=source, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=saved_searches)
+        #    # Return early with the message, don't run any scraper
+        #    saved_searches = check_excel_files_for_searches(load_saved_searches())
+        #    print(f"🔍 TEMPLATE DEBUG: Passing source = '{source}' to template")
+        #    return render_template("index.html", info=info, jobs=jobs, title=title, location=location, source=source, max_jobs=max_jobs, seniority=seniority, has_scheduling_access=check_feature_access('scheduling'), saved_searches=saved_searches)
 
-        print(f"🔍 DEBUG: Admin user '{session.get('username')}' can access {source}")
+        #print(f"🔍 DEBUG: Admin user '{session.get('username')}' can access {source}")
        
         if request.form.get("action") == "save":
             search_name = request.form.get("search_name", "").strip()
@@ -2390,3 +2390,4 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
