@@ -534,6 +534,14 @@ def save_results_to_excel(search_name, results):
             'valign': 'vcenter'
         })
 
+        # ADD THIS NEW FORMAT:
+        source_format = workbook.add_format({
+            'text_wrap': True,
+            'align': 'center',        # Horizontal center
+            'valign': 'vcenter',      # Vertical middle
+            'font_name': 'Calibri'
+        })
+
         for col_num, value in enumerate(df.drop(columns=["link"]).columns.values):
             formatted_value = str(value).replace("_", " ").title()
             worksheet.write(0, col_num, formatted_value, header_format)
@@ -541,7 +549,7 @@ def save_results_to_excel(search_name, results):
             if value == "#":
                 worksheet.set_column(col_num, col_num, 5, number_format)
             elif value.lower() == "source":
-                worksheet.set_column(col_num, col_num, 10, number_format)  # CENTER ALIGN SOURCE
+                worksheet.set_column(col_num, col_num, 10, source_format)  # CENTER ALIGN SOURCE
             elif value.lower() in ["title", "company", "location"]:
                 worksheet.set_column(col_num, col_num, 23, default_format)
             elif value.lower() == "description":
@@ -2421,6 +2429,7 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
