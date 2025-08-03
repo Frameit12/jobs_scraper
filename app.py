@@ -1777,6 +1777,14 @@ def download():
             'valign': 'vcenter'
         })
 
+        # ADD THIS FORMAT DEFINITION:
+        source_format = workbook.add_format({
+            'text_wrap': True,
+            'align': 'center',
+            'valign': 'vcenter',
+            'font_name': 'Calibri'
+        })
+        
         # Write headers and set column widths/formats
         for col_num, value in enumerate(df.drop(columns=["link"]).columns.values):
             formatted_value = str(value).replace("_", " ").title()
@@ -2440,6 +2448,7 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
