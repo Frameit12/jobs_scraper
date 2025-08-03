@@ -1032,6 +1032,9 @@ def index():
         
                 source_from_form = request.form.get("source", "DEFAULT_NOT_FOUND")
                 print(f"🔍 SAVE DEBUG: Source from form = '{source_from_form}'")
+
+                # Convert source to display name - THIS MUST BE HERE
+                source_display = "EFC" if source_from_form == "efinancialcareers" else "CareerJet"
                 
                 criteria = {
                     "title": request.form.get("title", ""),
@@ -1045,6 +1048,7 @@ def index():
                 source_abbrev = "EFC" if source_from_form == "efinancialcareers" else "CareerJet"
         
                 # Build the formatted name: "User Input - Location - Source"
+        
                 if form_location:
                     formatted_name = f"{search_name} - {form_location} - {source_display}"
                 else:
@@ -2449,6 +2453,7 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
