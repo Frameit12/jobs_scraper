@@ -540,6 +540,8 @@ def save_results_to_excel(search_name, results):
 
             if value == "#":
                 worksheet.set_column(col_num, col_num, 5, number_format)
+            elif value.lower() == "source":
+                worksheet.set_column(col_num, col_num, 10, number_format)  # CENTER ALIGN SOURCE
             elif value.lower() in ["title", "company", "location"]:
                 worksheet.set_column(col_num, col_num, 23, default_format)
             elif value.lower() == "description":
@@ -1800,19 +1802,35 @@ def download():
 
     global last_search_name
     title_from_form = request.form.get("title", "").strip()
-    source_from_form = request.form.get("source", "efinancialcareers")
+
+    # Get source from the current search
+    if hasattr(request, 'form') and request.form.get("source"):
+        source_from_form = request.form.get("source", "efinancialcareers")
+    else:
+        # Try to detect source from job results
+        source_from_form = "efinancialcareers"  # default
+        if last_results and len(last_results) > 0:
+            first_job_source = last_results[0].get("source", "EFC")
+            source_from_form = "careerjet" if first_job_source == "CareerJet" else "efinancialcareers"
+
     source_abbrev = "EFC" if source_from_form == "efinancialcareers" else "CareerJet"
     
     if last_search_name and last_search_name != "Job_Search":
-        name_for_export = last_search_name
+        base_name = last_search_name
+        # Remove existing source suffix if present
+        base_name = base_name.replace(f"_{source_abbrev}", "").replace("_EFC", "").replace("_CareerJet", "")
     elif title_from_form:
-        name_for_export = f"{title_from_form}_{source_abbrev}"
+        base_name = title_from_form
     else:
-        name_for_export = f"Job_Search_{source_abbrev}"
-    
-     
-    filename = f"{name_for_export.replace(' – ', '_')}_{datetime.now().strftime('%d_%B_%Y')}.xlsx"
+        base_name = "Job_Search"
 
+    # Get date string
+    date_str = datetime.now().strftime('%d_%B_%Y')
+
+    # Create filename: Position_Date_Source.xlsx
+    filename = f"{base_name.replace(' – ', '_').replace(' ', '_')}_{date_str}_{source_abbrev}.xlsx"
+        
+ 
     output.seek(0)
     return send_file(
         output,
@@ -2403,6 +2421,7 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
