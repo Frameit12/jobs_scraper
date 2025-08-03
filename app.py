@@ -1800,12 +1800,15 @@ def download():
 
     global last_search_name
     title_from_form = request.form.get("title", "").strip()
+    source_from_form = request.form.get("source", "efinancialcareers")
+    source_abbrev = "EFC" if source_from_form == "efinancialcareers" else "CareerJet"
+    
     if last_search_name and last_search_name != "Job_Search":
         name_for_export = last_search_name
     elif title_from_form:
-        name_for_export = title_from_form
+        name_for_export = f"{title_from_form}_{source_abbrev}"
     else:
-        name_for_export = "Job_Search"
+        name_for_export = f"Job_Search_{source_abbrev}"
     
      
     filename = f"{name_for_export.replace(' – ', '_')}_{datetime.now().strftime('%d_%B_%Y')}.xlsx"
@@ -2400,6 +2403,7 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
