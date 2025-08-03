@@ -1043,11 +1043,12 @@ def index():
                 print(f"🔍 SAVE DEBUG: Final criteria = {criteria}")
                 # Add source abbreviation to saved search name
                 source_abbrev = "EFC" if source_from_form == "efinancialcareers" else "CareerJet"
-                
+        
+                # Build the formatted name: "User Input - Location - Source"
                 if form_location:
-                    formatted_name = f"{search_name} - {form_location}"
+                    formatted_name = f"{search_name} - {form_location} - {source_display}"
                 else:
-                    formatted_name = search_name
+                    formatted_name = f"{search_name} - {source_display}"
                 save_search(formatted_name, criteria)                
                 info = f"✅ Search saved as: {formatted_name}"
             
@@ -2448,6 +2449,7 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
