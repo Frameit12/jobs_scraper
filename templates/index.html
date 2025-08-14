@@ -236,9 +236,17 @@
                                 <input type="radio" name="source" value="careerjet" {{ 'checked' if source == 'careerjet' else '' }} style="margin-right: 6px;">
                                 CareerJet
                             </label>
-                            <label style="display: flex; align-items: center; font-weight: 500; color: #6b7280;">
-                                <input type="radio" name="source" value="both" {{ 'checked' if source == 'both' else '' }} style="margin-right: 6px;" opacity: 0.5;" disabled>
-                                Both <span style="font-size: 12px; color: #999; margin-left: 4px; font-style: italic;">(Coming Soon)</span>
+                            <label style="display: flex; align-items: center; font-weight: 500; {% if not is_admin %}color: #6b7280;{% endif %}">
+                                <input type="radio" name="source" value="both" 
+                                   {{ 'checked' if source == 'both' else '' }} 
+                                   style="margin-right: 6px;" 
+                                   {% if not is_admin %}disabled{% endif %}>
+                                Both 
+                                {% if not is_admin %}
+                                    <span style="font-size: 12px; color: #999; margin-left: 4px; font-style: italic;">(Coming Soon)</span>
+                                {% else %}
+                                    <span style="font-size: 12px; color: #007bff; margin-left: 4px; font-style: italic;">(Admin Testing)</span>
+                                {% endif %}
                             </label>
                         </div>
                     </div>
