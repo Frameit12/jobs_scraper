@@ -1202,7 +1202,7 @@ def index():
     for s in saved_searches:
         print(f"- {s['name']}: has_excel = {s.get('has_excel')}")
 
-    return render_template("index.html", title="", location="", seniority="", max_jobs=10, has_scheduling_access=check_feature_access('scheduling'), saved_searches=saved_searches)
+    return render_template_with_admin("index.html", title="", location="", seniority="", max_jobs=10, has_scheduling_access=check_feature_access('scheduling'), saved_searches=saved_searches)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -2467,6 +2467,7 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
