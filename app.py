@@ -937,7 +937,21 @@ def increment_search_count():
     except Exception as e:
         print(f"Error incrementing search count: {e}")
 
-
+def render_template_with_admin(template_name, **kwargs):
+    """
+    Helper function to automatically include admin status in all template renders
+    """
+    # Check if user is admin
+    is_admin = session.get('username') == 'frameit'
+    
+    # Add admin status to template context
+    kwargs['is_admin'] = is_admin
+    
+    # Add username for debugging if needed
+    kwargs['current_username'] = session.get('username', '')
+    
+    return render_template(template_name, **kwargs)
+    
 @app.route("/")
 def root():
     # If user is logged in, go to main app
@@ -2453,6 +2467,7 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
