@@ -2507,9 +2507,36 @@ def check_beta_dates():
     except Exception as e:
         return f"Error: {e}"
 
-
+@app.route("/update_beta_dates")
+def update_beta_dates():
+    engine = get_db_connection()
+    if not engine:
+        return "No database connection"
+    
+    try:
+        with engine.connect() as conn:
+            # Update all users expiring in August 2025 to December 2025
+            result = conn.execute(text("""
+                UPDATE users 
+                SET beta_expires = '2025-12-31' 
+                WHERE beta_expires = '2025-08-31'
+            """))
+            
+            affected_rows = result.rowcount
+            conn.commit()
+            
+            return f"""
+            <h2>✅ Beta Dates Updated!</h2>
+            <p><strong>{affected_rows} users</strong> updated from August 31 to December 31, 2025</p>
+            <p><a href="/check_beta_dates">→ Verify the changes</a></p>
+            """
+            
+    except Exception as e:
+        return f"❌ Error updating dates: {e}"
+        
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
