@@ -695,45 +695,71 @@ def run_scheduled_searches():
             source = criteria.get("source", "efinancialcareers")
             seniority = criteria.get("seniority", "")
             print(f"🔍 SCHEDULER: Using source '{source}' for search '{search['name']}'")
-            
-            # Call appropriate scraper based on saved source
-            if source == "careerjet":
-                from careerjet_api import scrape_jobs as scrape_careerjet_jobs
-                results = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region="US")
-                print(f"🔍 SCHEDULER: Called CareerJet scraper, got {len(results)} results")
-            else:
-                results = scrape_jobs(title, location, max_jobs, seniority=seniority, region="US")
-                print(f"🔍 SCHEDULER: Called eFinancialCareers scraper, got {len(results)} results")
-            
-            save_results_to_excel(search["name"], results)
-            
-            # Build the same filename used in save_results_to_excel()
-            safe_name = search["name"].replace(" ", "_")
-            date_str = datetime.now().strftime("%d_%B_%Y")
-            output_path = os.path.join("scheduled_results", f"{safe_name}_{date_str}.xlsx")
-            store_excel_in_database(search["name"], output_path, search["user_id"])
 
-            # 📧 Email the file if jobs exist
-            subject = f"Scheduled Results for {search['name']} ({schedule})"
-            body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
-            send_email_with_attachment(subject, body, output_path, config, search["user_email"])
+            try:
+                # Call appropriate scraper based on saved source
+                if source == "careerjet":
+                    from careerjet_api import scrape_jobs as scrape_careerjet_jobs
+                    results = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region="US")
+                    print(f"🔍 SCHEDULER: Called CareerJet scraper, got {len(results)} results")
+                else:
+                    results = scrape_jobs(title, location, max_jobs, seniority=seniority, region="US")
+                    print(f"🔍 SCHEDULER: Called eFinancialCareers scraper, got {len(results)} results")
+        
+                save_results_to_excel(search["name"], results)
 
-            search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
-            updated = True
-            print(f"💾 Saved {len(results)} results to Excel for {search['name']}")
+                # Build the same filename used in save_results_to_excel()
+                safe_name = search["name"].replace(" ", "_")
+                date_str = datetime.now().strftime("%d_%B_%Y")
+                output_path = os.path.join("scheduled_results", f"{safe_name}_{date_str}.xlsx")
+                store_excel_in_database(search["name"], output_path, search["user_id"])
 
-            # Update database immediately for this search
-            with engine.connect() as conn:
-                conn.execute(text("""
-                    UPDATE saved_searches 
-                    SET last_run_date = :last_run_date 
-                    WHERE name = :name AND user_id = :user_id
-                """), {
-                    "last_run_date": search["last_run_date"],
-                    "name": search["name"],
-                    "user_id": search["user_id"]
-                })
-                conn.commit()
+                # 📧 Email the file if jobs exist
+                subject = f"Scheduled Results for {search['name']} ({schedule})"
+                body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
+        
+                send_email_with_attachment(subject, body, output_path, config, search["user_email"])
+
+                search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
+                updated = True
+                print(f"💾 Saved {len(results)} results to Excel for {search['name']}")   
+
+                # Update database immediately for this search
+                with engine.connect() as conn:
+                    conn.execute(text("""
+                        UPDATE saved_searches 
+                        SET last_run_date = :last_run_date 
+                        WHERE name = :name AND user_id = :user_id
+                    """), {
+                        "last_run_date": search["last_run_date"],
+                        "name": search["name"],
+                        "user_id": search["user_id"]
+                    })
+                    conn.commit()
+
+                # 🔧 CRITICAL MEMORY CLEANUP - NEW CODE STARTS HERE
+                print(f"🧹 Cleaning up memory for search: {search['name']}")
+
+                # Clear results data
+                if 'results' in locals():
+                    results.clear()
+                    del results
+        
+                # Force garbage collection
+                import gc
+                gc.collect()
+
+                print(f"✅ Memory cleaned for search: {search['name']}")
+
+            except Exception as e:
+                print(f"❌ Error in scheduled search '{search['name']}': {e}")
+                # Still clean up memory even on error
+                import gc
+                if 'results' in locals():
+                    del results
+                gc.collect()
+                continue
+    
 
 # Add scheduler initialization right after the function
 print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
@@ -2468,6 +2494,7 @@ def debug_saved_search_source(index):
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
