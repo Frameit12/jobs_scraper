@@ -2465,77 +2465,10 @@ def debug_saved_search_source(index):
     else:
         return "Invalid search index"
 
-
-@app.route("/check_beta_dates")
-def check_beta_dates():
-    engine = get_db_connection()
-    if not engine:
-        return "No database connection"
-    
-    try:
-        with engine.connect() as conn:
-            # Check all users and their beta expiry dates
-            result = conn.execute(text("""
-                SELECT username, beta_expires, beta_user 
-                FROM users 
-                ORDER BY beta_expires
-            """))
-            
-            users = result.fetchall()
-            
-            if not users:
-                return "No users found"
-            
-            output = "<h2>Current Beta Expiry Dates:</h2><pre>"
-            august_count = 0
-            
-            for user in users:
-                username, beta_expires, beta_user = user
-                output += f"User: {username} | Beta: {beta_user} | Expires: {beta_expires}\n"
-                
-                if beta_expires and str(beta_expires).startswith('2025-08'):
-                    august_count += 1
-            
-            output += f"\n📊 SUMMARY:\n"
-            output += f"Total users: {len(users)}\n"
-            output += f"Users expiring in August 2025: {august_count}\n"
-            output += f"Need to update: {'YES' if august_count > 0 else 'NO'}\n"
-            output += "</pre>"
-            
-            return output
-            
-    except Exception as e:
-        return f"Error: {e}"
-
-@app.route("/update_beta_dates")
-def update_beta_dates():
-    engine = get_db_connection()
-    if not engine:
-        return "No database connection"
-    
-    try:
-        with engine.connect() as conn:
-            # Update all users expiring in August 2025 to December 2025
-            result = conn.execute(text("""
-                UPDATE users 
-                SET beta_expires = '2025-12-31' 
-                WHERE beta_expires = '2025-08-31'
-            """))
-            
-            affected_rows = result.rowcount
-            conn.commit()
-            
-            return f"""
-            <h2>✅ Beta Dates Updated!</h2>
-            <p><strong>{affected_rows} users</strong> updated from August 31 to December 31, 2025</p>
-            <p><a href="/check_beta_dates">→ Verify the changes</a></p>
-            """
-            
-    except Exception as e:
-        return f"❌ Error updating dates: {e}"
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
