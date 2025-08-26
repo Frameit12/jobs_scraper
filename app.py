@@ -393,7 +393,7 @@ def create_user(username, email, password):
         with engine.connect() as conn:
             conn.execute(text("""
                 INSERT INTO users (username, email, password_hash, beta_user, beta_expires, subscription_status)
-                VALUES (:username, :email, :password_hash, TRUE, '2025-08-31', 'none')
+                VALUES (:username, :email, :password_hash, TRUE, '2025-12-31', 'none')
             """), {
                 "username": username,
                 "email": email,
@@ -2467,6 +2467,7 @@ def debug_saved_search_source(index):
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
