@@ -755,29 +755,15 @@ def run_scheduled_searches():
                     })
                     conn.commit()
 
-                # 🔧 CRITICAL MEMORY CLEANUP - NEW CODE STARTS HERE
-                print(f"🧹 Cleaning up memory for search: {search['name']}")
+                # Memory cleanup temporarily disabled to restore email functionality
+                print(f"✅ Search completed for: {search['name']}")
 
-                # Clear results data
-                if 'results' in locals():
-                    results.clear()
-                    del results
-        
-                # Force garbage collection
-                import gc
-                gc.collect()
-
-                print(f"✅ Memory cleaned for search: {search['name']}")
+                
 
             except Exception as e:
                 print(f"❌ Error in scheduled search '{search['name']}': {e}")
-                # Still clean up memory even on error
-                import gc
-                if 'results' in locals():
-                    del results
-                gc.collect()
                 continue
-    
+                 
 
 # Add scheduler initialization right after the function
 print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
@@ -2524,6 +2510,7 @@ def test_scheduler_now():
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
