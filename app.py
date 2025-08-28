@@ -718,7 +718,25 @@ def run_scheduled_searches():
                 subject = f"Scheduled Results for {search['name']} ({schedule})"
                 body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
         
-                send_email_with_attachment(subject, body, output_path, config, search["user_email"])
+                print(f"🔍 EMAIL DEBUG: About to send email")
+                print(f"🔍 EMAIL DEBUG: Subject = '{subject}'")
+                print(f"🔍 EMAIL DEBUG: To = '{search['user_email']}'")
+                print(f"🔍 EMAIL DEBUG: Attachment path = '{output_path}'")
+                print(f"🔍 EMAIL DEBUG: File exists? {os.path.exists(output_path)}")
+            
+                try:
+                    email_result = send_email_with_attachment(subject, body, output_path, config, search["user_email"])
+                    print(f"🔍 EMAIL DEBUG: send_email_with_attachment returned: {email_result}")
+                    if email_result:
+                        print(f"✅ EMAIL SUCCESS: Email sent successfully")
+                    else:
+                        print(f"❌ EMAIL FAILED: send_email_with_attachment returned False")
+                except Exception as email_error:
+                    print(f"❌ EMAIL EXCEPTION: {type(email_error).__name__}: {email_error}")
+                    import traceback
+                    print(f"❌ EMAIL TRACEBACK: {traceback.format_exc()}")
+                
+                
 
                 search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
                 updated = True
@@ -2494,6 +2512,7 @@ def debug_saved_search_source(index):
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
