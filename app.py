@@ -696,74 +696,47 @@ def run_scheduled_searches():
             seniority = criteria.get("seniority", "")
             print(f"🔍 SCHEDULER: Using source '{source}' for search '{search['name']}'")
 
-            try:
-                # Call appropriate scraper based on saved source
-                if source == "careerjet":
-                    from careerjet_api import scrape_jobs as scrape_careerjet_jobs
-                    results = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region="US")
-                    print(f"🔍 SCHEDULER: Called CareerJet scraper, got {len(results)} results")
-                else:
-                    results = scrape_jobs(title, location, max_jobs, seniority=seniority, region="US")
-                    print(f"🔍 SCHEDULER: Called eFinancialCareers scraper, got {len(results)} results")
-        
-                save_results_to_excel(search["name"], results)
+            # Call appropriate scraper based on saved source
+            if source == "careerjet":
+                from careerjet_api import scrape_jobs as scrape_careerjet_jobs
+                results = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region="US")
+                print(f"🔍 SCHEDULER: Called CareerJet scraper, got {len(results)} results")
+            else:
+                results = scrape_jobs(title, location, max_jobs, seniority=seniority, region="US")
+                print(f"🔍 SCHEDULER: Called eFinancialCareers scraper, got {len(results)} results")
+    
+            save_results_to_excel(search["name"], results)
 
-                # Build the same filename used in save_results_to_excel()
-                safe_name = search["name"].replace(" ", "_")
-                date_str = datetime.now().strftime("%d_%B_%Y")
-                output_path = os.path.join("scheduled_results", f"{safe_name}_{date_str}.xlsx")
-                store_excel_in_database(search["name"], output_path, search["user_id"])
+            # Build the same filename used in save_results_to_excel()
+            safe_name = search["name"].replace(" ", "_")
+            date_str = datetime.now().strftime("%d_%B_%Y")
+            output_path = os.path.join("scheduled_results", f"{safe_name}_{date_str}.xlsx")
+            store_excel_in_database(search["name"], output_path, search["user_id"])
 
-                # 📧 Email the file if jobs exist
-                subject = f"Scheduled Results for {search['name']} ({schedule})"
-                body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
-        
-                print(f"🔍 EMAIL DEBUG: About to send email")
-                print(f"🔍 EMAIL DEBUG: Subject = '{subject}'")
-                print(f"🔍 EMAIL DEBUG: To = '{search['user_email']}'")
-                print(f"🔍 EMAIL DEBUG: Attachment path = '{output_path}'")
-                print(f"🔍 EMAIL DEBUG: File exists? {os.path.exists(output_path)}")
-            
-                try:
-                    email_result = send_email_with_attachment(subject, body, output_path, config, search["user_email"])
-                    print(f"🔍 EMAIL DEBUG: send_email_with_attachment returned: {email_result}")
-                    if email_result:
-                        print(f"✅ EMAIL SUCCESS: Email sent successfully")
-                    else:
-                        print(f"❌ EMAIL FAILED: send_email_with_attachment returned False")
-                except Exception as email_error:
-                    print(f"❌ EMAIL EXCEPTION: {type(email_error).__name__}: {email_error}")
-                    import traceback
-                    print(f"❌ EMAIL TRACEBACK: {traceback.format_exc()}")
-                
-                
+            # 📧 Email the file if jobs exist
+            subject = f"Scheduled Results for {search['name']} ({schedule})"
+            body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
 
-                search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
-                updated = True
-                print(f"💾 Saved {len(results)} results to Excel for {search['name']}")   
+            send_email_with_attachment(subject, body, output_path, config, search["user_email"])
 
-                # Update database immediately for this search
-                with engine.connect() as conn:
-                    conn.execute(text("""
-                        UPDATE saved_searches 
-                        SET last_run_date = :last_run_date 
-                        WHERE name = :name AND user_id = :user_id
-                    """), {
-                        "last_run_date": search["last_run_date"],
-                        "name": search["name"],
-                        "user_id": search["user_id"]
-                    })
-                    conn.commit()
+            search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
+            updated = True
+            print(f"💾 Saved {len(results)} results to Excel for {search['name']}")
 
-                # Memory cleanup temporarily disabled to restore email functionality
-                print(f"✅ Search completed for: {search['name']}")
+            # Update database immediately for this search
+            with engine.connect() as conn:
+                conn.execute(text("""
+                UPDATE saved_searches 
+                SET last_run_date = :last_run_date 
+                WHERE name = :name AND user_id = :user_id
+            """), {
+                "last_run_date": search["last_run_date"],
+                "name": search["name"],
+                "user_id": search["user_id"]
+            })
+            conn.commit()
 
                 
-
-            except Exception as e:
-                print(f"❌ Error in scheduled search '{search['name']}': {e}")
-                continue
-                 
 
 # Add scheduler initialization right after the function
 print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
@@ -2510,6 +2483,7 @@ def test_scheduler_now():
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
