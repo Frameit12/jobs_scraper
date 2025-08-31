@@ -631,6 +631,7 @@ def store_excel_in_database(search_name, file_path,user_id):
 
 def run_scheduled_searches():
     print("🕓 Checking scheduled searches...")
+    print(f"🕓 DEBUG: Today's date string = '{datetime.now().strftime('%d %B %Y')}'")
 
     search_history = []
     engine = get_db_connection()
@@ -671,6 +672,11 @@ def run_scheduled_searches():
         schedule = search.get("schedule", "none")
         last_run_raw = search.get("last_run_date", "") #e.g., 21 June 2025 07:03
         last_run_date_only = " ".join(last_run_raw.split(" ")[:3]) # 21 June 2025
+
+        print(f"🕓 DEBUG: Search '{search['name']}' - schedule: {schedule}")
+        print(f"🕓 DEBUG: Last run raw: '{last_run_raw}'")
+        print(f"🕓 DEBUG: Last run date only: '{last_run_date_only}'")
+        print(f"🕓 DEBUG: Should skip? {last_run_date_only == today_str}")
 
         # skip if already ran today
         if last_run_date_only ==today_str:
@@ -2480,6 +2486,7 @@ def force_scheduler_test():
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
