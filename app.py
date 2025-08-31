@@ -2487,9 +2487,15 @@ def force_scheduler_test():
         return "Forced scheduler test completed - check Railway logs for email results"
     except Exception as e:
         return f"Scheduler test failed: {e}"
+
+@app.route("/basic_test")
+def basic_test():
+    print("BASIC TEST: This message should appear in logs")
+    return "Basic test completed"
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
