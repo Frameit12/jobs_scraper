@@ -735,7 +735,7 @@ def run_scheduled_searches():
             subject = f"Scheduled Results for {search['name']} ({schedule})"
             body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
             send_email_with_attachment(subject, body, output_path, config, search["user_email"])
-            logger.info(f"🔍 EMAIL DEBUG: Attempting SMTP connection to {smtp_server}:{smtp_port}")
+            
 
             search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
             updated = True
@@ -826,6 +826,7 @@ def send_email_with_attachment(subject, body, attachment_path, config, user_emai
         sender_email = config["email_settings"]["sender_email"]
         sender_password = config["email_settings"]["sender_password"]
         recipients = [user_email] if user_email else []
+        logger.info(f"🔍 EMAIL DEBUG: Attempting SMTP connection to {smtp_server}:{smtp_port}")  # ADD THIS LINE HERE
 
         msg = EmailMessage()
         msg["Subject"] = subject
@@ -844,10 +845,11 @@ def send_email_with_attachment(subject, body, attachment_path, config, user_emai
             smtp.login(sender_email, sender_password)
             smtp.send_message(msg)
 
-        print(f"✅ Email sent to {recipients} with: {file_name}")
+        logger.info(f"✅ Email sent to {recipients} with: {file_name}")  # ADD THIS LINE HERE
         return True
+
     except Exception as e:
-        print(f"❌ Failed to send email: {e}")
+        logger.error(f"❌ Failed to send email: {e}")
         return False
 
 # ADD THESE FUNCTIONS AFTER send_email_with_attachment FUNCTION
@@ -2507,6 +2509,7 @@ def basic_test():
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
