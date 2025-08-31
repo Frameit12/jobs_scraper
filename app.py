@@ -2465,9 +2465,21 @@ def debug_saved_search_source(index):
     else:
         return "Invalid search index"
 
+@app.route("/force_scheduler_test")
+def force_scheduler_test():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+    
+    try:
+        run_scheduled_searches()
+        return "Forced scheduler test completed - check Railway logs for email results"
+    except Exception as e:
+        return f"Scheduler test failed: {e}"
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
