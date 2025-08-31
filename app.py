@@ -2526,9 +2526,23 @@ def debug_scheduled_searches():
     except Exception as e:
         return f"Error: {e}"
 
+
+@app.route("/test_scheduler_now")
+def test_scheduler_now():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+    
+    try:
+        run_scheduled_searches()
+        return "Manual scheduler test completed - check logs"
+    except Exception as e:
+        return f"Manual scheduler test failed: {e}"
+
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
