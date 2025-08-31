@@ -717,6 +717,7 @@ def run_scheduled_searches():
             subject = f"Scheduled Results for {search['name']} ({schedule})"
             body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
             send_email_with_attachment(subject, body, output_path, config, search["user_email"])
+            print(f"🔍 EMAIL DEBUG: Attempting SMTP connection to {smtp_server}:{smtp_port}")
 
             search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
             updated = True
@@ -2479,6 +2480,7 @@ def force_scheduler_test():
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
