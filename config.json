@@ -1,9 +1,10 @@
 {
     "email_settings": {
         "smtp_server": "smtp.gmail.com",
-        "smtp_port": 587,
+        "smtp_port": 465,
         "sender_email": "FMAJ.app@gmail.com",
         "sender_password": "dwnsjljnnzzomhuo",
         "recipients": ["FMAJ.app@gmail.com"]
     }
 }    
+
