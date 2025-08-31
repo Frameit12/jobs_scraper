@@ -2230,10 +2230,14 @@ def check_files():
 
 @app.route("/test_manual_run")
 def test_manual_run():
+    print("🚨 TEST_MANUAL_RUN: Route was called!")
     try:
+        print("🚨 TEST_MANUAL_RUN: About to call run_scheduled_searches()")
         run_scheduled_searches()
+        print("🚨 TEST_MANUAL_RUN: run_scheduled_searches() completed")
         return "Manual test completed - check logs and /check_files"
     except Exception as e:
+        print(f"🚨 TEST_MANUAL_RUN: Exception caught: {e}")
         return f"Error: {e}"
 
 @app.route("/debug_excel_detection")
@@ -2486,6 +2490,7 @@ def force_scheduler_test():
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
