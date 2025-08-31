@@ -695,7 +695,7 @@ def run_scheduled_searches():
             source = criteria.get("source", "efinancialcareers")
             seniority = criteria.get("seniority", "")
             print(f"🔍 SCHEDULER: Using source '{source}' for search '{search['name']}'")
-
+            
             # Call appropriate scraper based on saved source
             if source == "careerjet":
                 from careerjet_api import scrape_jobs as scrape_careerjet_jobs
@@ -704,9 +704,9 @@ def run_scheduled_searches():
             else:
                 results = scrape_jobs(title, location, max_jobs, seniority=seniority, region="US")
                 print(f"🔍 SCHEDULER: Called eFinancialCareers scraper, got {len(results)} results")
-    
+            
             save_results_to_excel(search["name"], results)
-
+            
             # Build the same filename used in save_results_to_excel()
             safe_name = search["name"].replace(" ", "_")
             date_str = datetime.now().strftime("%d_%B_%Y")
@@ -716,7 +716,6 @@ def run_scheduled_searches():
             # 📧 Email the file if jobs exist
             subject = f"Scheduled Results for {search['name']} ({schedule})"
             body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
-
             send_email_with_attachment(subject, body, output_path, config, search["user_email"])
 
             search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
@@ -726,17 +725,15 @@ def run_scheduled_searches():
             # Update database immediately for this search
             with engine.connect() as conn:
                 conn.execute(text("""
-                UPDATE saved_searches 
-                SET last_run_date = :last_run_date 
-                WHERE name = :name AND user_id = :user_id
-            """), {
-                "last_run_date": search["last_run_date"],
-                "name": search["name"],
-                "user_id": search["user_id"]
-            })
-            conn.commit()
-
-                
+                    UPDATE saved_searches 
+                    SET last_run_date = :last_run_date 
+                    WHERE name = :name AND user_id = :user_id
+                """), {
+                    "last_run_date": search["last_run_date"],
+                    "name": search["name"],
+                    "user_id": search["user_id"]
+                })
+                conn.commit()
 
 # Add scheduler initialization right after the function
 print("🚀 SCHEDULER DEBUG: About to initialize scheduler...")
@@ -2468,76 +2465,9 @@ def debug_saved_search_source(index):
     else:
         return "Invalid search index"
 
-
-@app.route("/debug_scheduled_searches")
-def debug_scheduled_searches():
-    login_redirect = require_login()
-    if login_redirect:
-        return login_redirect
-    
-    engine = get_db_connection()
-    if not engine:
-        return "No database connection"
-    
-    try:
-        from datetime import datetime
-        with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT s.name, s.schedule, s.last_run_date, s.user_id, u.email
-                FROM saved_searches s
-                JOIN users u ON s.user_id = u.id
-                WHERE s.schedule != 'none' AND s.user_id IS NOT NULL
-                ORDER BY s.id DESC
-            """))
-            
-            searches = []
-            for row in result:
-                searches.append({
-                    "name": row[0],
-                    "schedule": row[1],
-                    "last_run_date": row[2],
-                    "user_id": row[3],
-                    "email": row[4]
-                })
-            
-            today_str = datetime.now().strftime("%d %B %Y")
-            
-            debug_info = {
-                "today_date": today_str,
-                "scheduled_searches": searches,
-                "search_count": len(searches)
-            }
-            
-            return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
-            
-    except Exception as e:
-        return f"Error: {e}"
-
-
-@app.route("/test_scheduler_now")
-def test_scheduler_now():
-    login_redirect = require_login()
-    if login_redirect:
-        return login_redirect
-    
-    try:
-        run_scheduled_searches()
-        return "Manual scheduler test completed - check logs"
-    except Exception as e:
-        return f"Manual scheduler test failed: {e}"
-
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
-
-
-
-
-
-
-
-
-
 
 
 
