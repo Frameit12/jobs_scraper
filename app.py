@@ -19,6 +19,18 @@ from sqlalchemy import create_engine, text
 import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import session
+import logging
+import sys
+
+# Configure logging to show in Railway
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 
 # Database setup
@@ -630,13 +642,13 @@ def store_excel_in_database(search_name, file_path,user_id):
         print(f"❌ Error storing file in database: {e}")
 
 def run_scheduled_searches():
-    print("🕓 Checking scheduled searches...")
-    print(f"🕓 DEBUG: Today's date string = '{datetime.now().strftime('%d %B %Y')}'")
+    logger.info("🕓 Checking scheduled searches...")
+    logger.info(f"🕓 DEBUG: Today's date string = '{datetime.now().strftime('%d %B %Y')}'")
 
     search_history = []
     engine = get_db_connection()
     if not engine:
-        print("❌ No database connection in scheduler")
+        logger.info("❌ No database connection in scheduler")
         return
     try:
         with engine.connect() as conn:
@@ -660,7 +672,7 @@ def run_scheduled_searches():
                 }
                 search_history.append(search)
     except Exception as e:
-        print(f"❌ Database error in scheduler: {e}")
+        logger.info(f"❌ Database error in scheduler: {e}")
         return
     today_str = datetime.now().strftime("%d %B %Y")
     weekday = datetime.now().weekday()
@@ -673,10 +685,10 @@ def run_scheduled_searches():
         last_run_raw = search.get("last_run_date", "") #e.g., 21 June 2025 07:03
         last_run_date_only = " ".join(last_run_raw.split(" ")[:3]) # 21 June 2025
 
-        print(f"🕓 DEBUG: Search '{search['name']}' - schedule: {schedule}")
-        print(f"🕓 DEBUG: Last run raw: '{last_run_raw}'")
-        print(f"🕓 DEBUG: Last run date only: '{last_run_date_only}'")
-        print(f"🕓 DEBUG: Should skip? {last_run_date_only == today_str}")
+        logger.info(f"🕓 DEBUG: Search '{search['name']}' - schedule: {schedule}")
+        logger.info(f"🕓 DEBUG: Last run raw: '{last_run_raw}'")
+        logger.info(f"🕓 DEBUG: Last run date only: '{last_run_date_only}'")
+        logger.info(f"🕓 DEBUG: Should skip? {last_run_date_only == today_str}")
 
         # skip if already ran today
         if last_run_date_only ==today_str:
@@ -695,21 +707,21 @@ def run_scheduled_searches():
 
       
         if should_run:
-            print(f"🔁 Running {schedule} search: {search['name']}")
+            logger.info(f"🔁 Running {schedule} search: {search['name']}")
             
             # Get the source from saved criteria and add seniority
             source = criteria.get("source", "efinancialcareers")
             seniority = criteria.get("seniority", "")
-            print(f"🔍 SCHEDULER: Using source '{source}' for search '{search['name']}'")
+            logger.info(f"🔍 SCHEDULER: Using source '{source}' for search '{search['name']}'")
             
             # Call appropriate scraper based on saved source
             if source == "careerjet":
                 from careerjet_api import scrape_jobs as scrape_careerjet_jobs
                 results = scrape_careerjet_jobs(title, location, max_jobs, seniority=seniority, region="US")
-                print(f"🔍 SCHEDULER: Called CareerJet scraper, got {len(results)} results")
+                logger.info(f"🔍 SCHEDULER: Called CareerJet scraper, got {len(results)} results")
             else:
                 results = scrape_jobs(title, location, max_jobs, seniority=seniority, region="US")
-                print(f"🔍 SCHEDULER: Called eFinancialCareers scraper, got {len(results)} results")
+                logger.info(f"🔍 SCHEDULER: Called eFinancialCareers scraper, got {len(results)} results")
             
             save_results_to_excel(search["name"], results)
             
@@ -723,11 +735,11 @@ def run_scheduled_searches():
             subject = f"Scheduled Results for {search['name']} ({schedule})"
             body = f"Attached are the latest job search results for '{search['name']}' scheduled to run {schedule}."
             send_email_with_attachment(subject, body, output_path, config, search["user_email"])
-            print(f"🔍 EMAIL DEBUG: Attempting SMTP connection to {smtp_server}:{smtp_port}")
+            logger.info(f"🔍 EMAIL DEBUG: Attempting SMTP connection to {smtp_server}:{smtp_port}")
 
             search["last_run_date"] = datetime.now().strftime("%d %B %Y %H:%M")
             updated = True
-            print(f"💾 Saved {len(results)} results to Excel for {search['name']}")
+            logger.info(f"💾 Saved {len(results)} results to Excel for {search['name']}")
 
             # Update database immediately for this search
             with engine.connect() as conn:
@@ -2490,11 +2502,12 @@ def force_scheduler_test():
 
 @app.route("/basic_test")
 def basic_test():
-    print("BASIC TEST: This message should appear in logs")
+    logger.info("BASIC TEST: This message should appear in logs")
     return "Basic test completed"
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
