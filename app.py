@@ -2480,9 +2480,56 @@ def test_scheduler_now():
         return "Manual scheduler test completed - check logs for email debug info"
     except Exception as e:
         return f"Manual scheduler test failed: {e}"
+
+
+@app.route("/debug_scheduled_searches")
+def debug_scheduled_searches():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+    
+    engine = get_db_connection()
+    if not engine:
+        return "No database connection"
+    
+    try:
+        from datetime import datetime
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT s.name, s.schedule, s.last_run_date, s.user_id, u.email
+                FROM saved_searches s
+                JOIN users u ON s.user_id = u.id
+                WHERE s.schedule != 'none' AND s.user_id IS NOT NULL
+                ORDER BY s.id DESC
+            """))
+            
+            searches = []
+            for row in result:
+                searches.append({
+                    "name": row[0],
+                    "schedule": row[1],
+                    "last_run_date": row[2],
+                    "user_id": row[3],
+                    "email": row[4]
+                })
+            
+            today_str = datetime.now().strftime("%d %B %Y")
+            
+            debug_info = {
+                "today_date": today_str,
+                "scheduled_searches": searches,
+                "search_count": len(searches)
+            }
+            
+            return f"<pre>{json.dumps(debug_info, indent=2)}</pre>"
+            
+    except Exception as e:
+        return f"Error: {e}"
+
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
