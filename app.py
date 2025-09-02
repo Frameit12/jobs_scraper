@@ -2506,9 +2506,48 @@ def force_scheduler_test():
 def basic_test():
     logger.info("BASIC TEST: This message should appear in logs")
     return "Basic test completed"
+
+
+@app.route("/test_gmail_direct")
+def test_gmail_direct():
+    login_redirect = require_login()
+    if login_redirect:
+        return login_redirect
+    
+    try:
+        import smtplib
+        from email.message import EmailMessage
+        
+        # Use your exact Gmail settings
+        smtp_server = config["email_settings"]["smtp_server"] 
+        smtp_port = config["email_settings"]["smtp_port"]
+        sender_email = config["email_settings"]["sender_email"]
+        sender_password = config["email_settings"]["sender_password"]
+        
+        logger.info(f"Testing direct Gmail connection to {smtp_server}:{smtp_port}")
+        
+        # Simple test email
+        msg = EmailMessage()
+        msg["Subject"] = "Railway Gmail Test"
+        msg["From"] = sender_email
+        msg["To"] = sender_email  # Send to yourself
+        msg.set_content("This is a test email to verify Gmail SMTP works from Railway")
+        
+        with smtplib.SMTP(smtp_server, smtp_port) as smtp:
+            smtp.starttls()
+            smtp.login(sender_email, sender_password)
+            smtp.send_message(msg)
+        
+        logger.info("✅ Gmail SMTP test successful")
+        return "Gmail test successful - check your email"
+        
+    except Exception as e:
+        logger.error(f"❌ Gmail SMTP test failed: {e}")
+        return f"Gmail test failed: {e}"
         
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
+
 
 
 
