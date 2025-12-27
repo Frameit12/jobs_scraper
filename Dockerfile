@@ -26,8 +26,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Expose port
-EXPOSE 5000
+# Expose port (Railway will override with its own PORT env var)
+EXPOSE 8080
 
 # Run the application
 CMD ["python", "app.py"]

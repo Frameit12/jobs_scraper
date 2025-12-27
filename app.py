@@ -58,106 +58,146 @@ def init_database():
             conn.commit()
 
 def init_users_table():
-    engine = get_db_connection()
-    if engine:
-        with engine.connect() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    username VARCHAR(255) UNIQUE NOT NULL,
-                    email VARCHAR(255) UNIQUE NOT NULL,
-                    password_hash VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            
-            # Add email column to existing users table if it doesn't exist
-            conn.execute(text("""
-                ALTER TABLE users 
-                ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE
-            """))
-            
-            # Add user_id columns to saved_searches table
-            conn.execute(text("""
-                ALTER TABLE saved_searches 
-                ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)
-            """))
-            conn.commit()
+    try:
+        engine = get_db_connection()
+        if engine:
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id SERIAL PRIMARY KEY,
+                        username VARCHAR(255) UNIQUE NOT NULL,
+                        email VARCHAR(255) UNIQUE NOT NULL,
+                        password_hash VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        beta_user BOOLEAN DEFAULT FALSE,
+                        beta_expires DATE,
+                        subscription_status VARCHAR(50) DEFAULT 'none'
+                    )
+                """))
+
+                # Add missing columns to existing users table if they don't exist
+                conn.execute(text("""
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE
+                """))
+
+                conn.execute(text("""
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS beta_user BOOLEAN DEFAULT FALSE
+                """))
+
+                conn.execute(text("""
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS beta_expires DATE
+                """))
+
+                conn.execute(text("""
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50) DEFAULT 'none'
+                """))
+
+                # Add user_id columns to saved_searches table
+                conn.execute(text("""
+                    ALTER TABLE saved_searches
+                    ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)
+                """))
+                conn.commit()
+            logger.info("✅ Users table initialized successfully")
+        else:
+            logger.warning("⚠️ No database connection - running without database")
+    except Exception as e:
+        logger.error(f"❌ Error initializing users table: {e}")
 
 init_users_table()
 
 def init_files_table():
-    engine = get_db_connection()
-    if engine:
-        with engine.connect() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS scheduled_files (
-                    id SERIAL PRIMARY KEY,
-                    search_name VARCHAR(255) NOT NULL,
-                    user_id INTEGER REFERENCES users(id),
-                    file_data BYTEA NOT NULL,
-                    filename VARCHAR(255) NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(search_name, user_id)
-                )
-            """))
-            conn.commit()
+    try:
+        engine = get_db_connection()
+        if engine:
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS scheduled_files (
+                        id SERIAL PRIMARY KEY,
+                        search_name VARCHAR(255) NOT NULL,
+                        user_id INTEGER REFERENCES users(id),
+                        file_data BYTEA NOT NULL,
+                        filename VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(search_name, user_id)
+                    )
+                """))
+                conn.commit()
+            logger.info("✅ Files table initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Error initializing files table: {e}")
 
 init_files_table()
 
 
 def init_password_reset_table():
-    engine = get_db_connection()
-    if engine:
-        with engine.connect() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS password_reset_tokens (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id),
-                    token VARCHAR(255) UNIQUE NOT NULL,
-                    expires_at TIMESTAMP NOT NULL,
-                    used BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            conn.commit()
+    try:
+        engine = get_db_connection()
+        if engine:
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id),
+                        token VARCHAR(255) UNIQUE NOT NULL,
+                        expires_at TIMESTAMP NOT NULL,
+                        used BOOLEAN DEFAULT FALSE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                conn.commit()
+            logger.info("✅ Password reset table initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Error initializing password reset table: {e}")
 
 init_password_reset_table()
 
 def init_user_activity_table():
-    engine = get_db_connection()
-    if engine:
-        with engine.connect() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS user_activity (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id),
-                    action_type VARCHAR(50) NOT NULL,
-                    action_details TEXT,
-                    ip_address VARCHAR(45),
-                    user_agent TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            conn.commit()
+    try:
+        engine = get_db_connection()
+        if engine:
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS user_activity (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id),
+                        action_type VARCHAR(50) NOT NULL,
+                        action_details TEXT,
+                        ip_address VARCHAR(45),
+                        user_agent TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                conn.commit()
+            logger.info("✅ User activity table initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Error initializing user activity table: {e}")
 
 init_user_activity_table()
 
 def init_search_limits_table():
-    engine = get_db_connection()
-    if engine:
-        with engine.connect() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS daily_search_limits (
-                    id SERIAL PRIMARY KEY,
-                    user_id INTEGER REFERENCES users(id),
-                    search_date DATE NOT NULL,
-                    search_count INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(user_id, search_date)
-                )
-            """))
-            conn.commit()
+    try:
+        engine = get_db_connection()
+        if engine:
+            with engine.connect() as conn:
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS daily_search_limits (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id),
+                        search_date DATE NOT NULL,
+                        search_count INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, search_date)
+                    )
+                """))
+                conn.commit()
+            logger.info("✅ Search limits table initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Error initializing search limits table: {e}")
 
 init_search_limits_table()
 
@@ -2546,7 +2586,14 @@ def test_gmail_direct():
         return f"Gmail test failed: {e}"
         
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    # Use Railway's PORT environment variable, fallback to 8080 for local dev
+    port = int(os.environ.get('PORT', 8080))
+    logger.info("=" * 50)
+    logger.info(f"🚀 Starting Jobs Scraper Application")
+    logger.info(f"🌐 Port: {port}")
+    logger.info(f"🗄️ Database: {'Connected' if get_db_connection() else 'Not Connected'}")
+    logger.info("=" * 50)
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 
 
