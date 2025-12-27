@@ -859,38 +859,71 @@ def clean_description_for_excel(html):
     )
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
-def send_email_with_attachment(subject, body, attachment_path, config, user_email=None):
+def send_email_sendgrid(to_email, subject, body, attachment_path=None):
+    """Send email using SendGrid API (with optional attachment)"""
     try:
-        smtp_server = config["email_settings"]["smtp_server"]
-        smtp_port = config["email_settings"]["smtp_port"]
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail, Attachment, FileContent, FileName, FileType, Disposition
+        import base64
+
+        # Get SendGrid API key from environment variable (recommended) or config (fallback)
+        api_key = os.environ.get('SENDGRID_API_KEY') or config["email_settings"].get("sendgrid_api_key")
+        if not api_key:
+            logger.error("❌ SENDGRID_API_KEY not found in environment or config")
+            return False
+
         sender_email = config["email_settings"]["sender_email"]
-        sender_password = config["email_settings"]["sender_password"]
-        recipients = [user_email] if user_email else []
-        logger.info(f"🔍 EMAIL DEBUG: Attempting SMTP connection to {smtp_server}:{smtp_port}")  # ADD THIS LINE HERE
+        sender_name = config["email_settings"].get("sender_name", "Find Me A Job")
 
-        msg = EmailMessage()
-        msg["Subject"] = subject
-        msg["From"] = "Find Me A Job <fmaj.app@gmail.com>"
-        msg["To"] = ", ".join(recipients)
-        msg.set_content(body)
+        if not to_email:
+            logger.error("❌ No recipient email provided")
+            return False
 
-        # Attach the Excel file
-        with open(attachment_path, "rb") as f:
-            file_data = f.read()
-            file_name = os.path.basename(attachment_path)
-        msg.add_attachment(file_data, maintype="application", subtype="octet-stream", filename=file_name)
+        logger.info(f"📧 EMAIL DEBUG: Sending via SendGrid API to {to_email}")
 
-        with smtplib.SMTP(smtp_server, smtp_port) as smtp:
-            smtp.starttls()
-            smtp.login(sender_email, sender_password)
-            smtp.send_message(msg)
+        # Create email message
+        message = Mail(
+            from_email=(sender_email, sender_name),
+            to_emails=to_email,
+            subject=subject,
+            html_content=f"<div>{body}</div>"
+        )
 
-        logger.info(f"✅ Email sent to {recipients} with: {file_name}")  # ADD THIS LINE HERE
+        # Add attachment if provided
+        if attachment_path:
+            with open(attachment_path, "rb") as f:
+                file_data = f.read()
+                file_name = os.path.basename(attachment_path)
+
+            encoded_file = base64.b64encode(file_data).decode()
+
+            attached_file = Attachment(
+                FileContent(encoded_file),
+                FileName(file_name),
+                FileType('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+                Disposition('attachment')
+            )
+            message.attachment = attached_file
+
+        # Send via SendGrid API
+        sg = SendGridAPIClient(api_key)
+        response = sg.send(message)
+
+        logger.info(f"✅ Email sent successfully via SendGrid to {to_email}")
+        logger.info(f"   Status Code: {response.status_code}")
+        if attachment_path:
+            logger.info(f"   Attachment: {file_name}")
         return True
 
     except Exception as e:
-        logger.error(f"❌ Failed to send email: {e}")
+        logger.error(f"❌ Failed to send email via SendGrid: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
+
+def send_email_with_attachment(subject, body, attachment_path, config, user_email=None):
+    """Send email with attachment using SendGrid API (legacy wrapper)"""
+    return send_email_sendgrid(user_email, subject, body, attachment_path)
 
 # ADD THESE FUNCTIONS AFTER send_email_with_attachment FUNCTION
 def check_feature_access(feature_name):
@@ -2619,42 +2652,35 @@ def test_network_smtp():
     return "<br>".join(results)
 
 
-@app.route("/test_gmail_direct")
-def test_gmail_direct():
+@app.route("/test_sendgrid")
+def test_sendgrid():
+    """Test SendGrid email sending"""
     login_redirect = require_login()
     if login_redirect:
         return login_redirect
-    
+
     try:
-        import smtplib
-        from email.message import EmailMessage
-        
-        # Use your exact Gmail settings
-        smtp_server = config["email_settings"]["smtp_server"] 
-        smtp_port = config["email_settings"]["smtp_port"]
         sender_email = config["email_settings"]["sender_email"]
-        sender_password = config["email_settings"]["sender_password"]
-        
-        logger.info(f"Testing direct Gmail connection to {smtp_server}:{smtp_port}")
-        
-        # Simple test email
-        msg = EmailMessage()
-        msg["Subject"] = "Railway Gmail Test"
-        msg["From"] = sender_email
-        msg["To"] = sender_email  # Send to yourself
-        msg.set_content("This is a test email to verify Gmail SMTP works from Railway")
-        
-        with smtplib.SMTP(smtp_server, smtp_port) as smtp:
-            smtp.starttls()
-            smtp.login(sender_email, sender_password)
-            smtp.send_message(msg)
-        
-        logger.info("✅ Gmail SMTP test successful")
-        return "Gmail test successful - check your email"
-        
+
+        logger.info(f"Testing SendGrid API email to {sender_email}")
+
+        # Send test email to yourself
+        success = send_email_sendgrid(
+            to_email=sender_email,
+            subject="Railway SendGrid Test",
+            body="<p>This is a test email to verify SendGrid API works from Railway!</p><p>If you receive this, scheduled emails will work. ✅</p>"
+        )
+
+        if success:
+            logger.info("✅ SendGrid test successful")
+            return "SendGrid test successful - check your email at " + sender_email
+        else:
+            logger.error("❌ SendGrid test failed")
+            return "SendGrid test failed - check Railway logs for details"
+
     except Exception as e:
-        logger.error(f"❌ Gmail SMTP test failed: {e}")
-        return f"Gmail test failed: {e}"
+        logger.error(f"❌ SendGrid test failed: {e}")
+        return f"SendGrid test failed: {e}"
         
 if __name__ == "__main__":
     # Use Railway's PORT environment variable, fallback to 8080 for local dev
