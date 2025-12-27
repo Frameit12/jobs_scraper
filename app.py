@@ -2547,6 +2547,77 @@ def basic_test():
     logger.info("BASIC TEST: This message should appear in logs")
     return "Basic test completed"
 
+@app.route("/test_network_smtp")
+def test_network_smtp():
+    """Comprehensive SMTP connectivity test"""
+    results = []
+
+    # Test 1: DNS Resolution
+    try:
+        import socket
+        ip = socket.gethostbyname('smtp.gmail.com')
+        results.append(f"✅ DNS Resolution: smtp.gmail.com = {ip}")
+    except Exception as e:
+        results.append(f"❌ DNS Resolution FAILED: {e}")
+
+    # Test 2: TCP Connection to port 587
+    try:
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)
+        result = sock.connect_ex(('smtp.gmail.com', 587))
+        sock.close()
+        if result == 0:
+            results.append(f"✅ TCP Connection to smtp.gmail.com:587 SUCCESS")
+        else:
+            results.append(f"❌ TCP Connection to smtp.gmail.com:587 FAILED (error code: {result})")
+    except Exception as e:
+        results.append(f"❌ TCP Connection test FAILED: {e}")
+
+    # Test 3: TCP Connection to port 465
+    try:
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)
+        result = sock.connect_ex(('smtp.gmail.com', 465))
+        sock.close()
+        if result == 0:
+            results.append(f"✅ TCP Connection to smtp.gmail.com:465 SUCCESS")
+        else:
+            results.append(f"❌ TCP Connection to smtp.gmail.com:465 FAILED (error code: {result})")
+    except Exception as e:
+        results.append(f"❌ TCP Connection test FAILED: {e}")
+
+    # Test 4: SMTP Protocol Test (port 587)
+    try:
+        import smtplib
+        smtp = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
+        smtp.ehlo()
+        results.append(f"✅ SMTP Protocol handshake SUCCESS on port 587")
+        smtp.quit()
+    except Exception as e:
+        results.append(f"❌ SMTP Protocol test port 587 FAILED: {e}")
+
+    # Test 5: Alternative SMTP server (to see if Gmail is specifically blocked)
+    try:
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(10)
+        result = sock.connect_ex(('smtp.sendgrid.net', 587))
+        sock.close()
+        if result == 0:
+            results.append(f"✅ TCP Connection to smtp.sendgrid.net:587 SUCCESS (Gmail might be specifically blocked)")
+        else:
+            results.append(f"❌ TCP Connection to smtp.sendgrid.net:587 ALSO FAILED (general SMTP block)")
+    except Exception as e:
+        results.append(f"❌ Alternative SMTP test FAILED: {e}")
+
+    logger.info("NETWORK SMTP TEST RESULTS:")
+    for result in results:
+        logger.info(result)
+
+    return "<br>".join(results)
+
 
 @app.route("/test_gmail_direct")
 def test_gmail_direct():
