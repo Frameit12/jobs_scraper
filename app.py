@@ -1385,6 +1385,140 @@ IMPORTANT: Return ONLY the JSON object above. No explanations, no markdown forma
         raise  # Re-raise the exception instead of returning None
 
 
+def analyze_job_match_with_master_template(template_text, job_title, job_company, job_description, user_id):
+    """
+    Use Claude AI to analyze job match using master template with PROMPT CACHING.
+    This significantly reduces API costs by caching the master resume template.
+    """
+    client = get_anthropic_client()
+
+    try:
+        # Get user's system prompt from their template selection
+        system_prompt = get_user_system_prompt(user_id)
+
+        # Build the prompt with caching - the master template is cached
+        # Reference: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"}  # Cache the system prompt
+                    },
+                    {
+                        "type": "text",
+                        "text": f"""**CANDIDATE'S MASTER RESUME TEMPLATE:**
+{template_text}""",
+                        "cache_control": {"type": "ephemeral"}  # Cache the master template (most important!)
+                    },
+                    {
+                        "type": "text",
+                        "text": f"""**JOB DETAILS:**
+Title: {job_title}
+Company: {job_company or 'Not specified'}
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**YOUR TASK:**
+From the master resume template above, identify which headline variations and which bullet points best match this specific job description. Provide a comprehensive match analysis.
+
+**INSTRUCTIONS:**
+Respond ONLY with valid JSON (no markdown, no code blocks, no other text). Use this exact structure:
+
+{{
+    "match_score": <integer 0-100>,
+    "skills_match": [
+        {{
+            "skill": "Skill name",
+            "evidence": "Where in resume template this is demonstrated",
+            "strength": "strong|moderate|basic"
+        }}
+    ],
+    "skills_missing": [
+        {{
+            "skill": "Required skill name",
+            "importance": "required|preferred|nice-to-have",
+            "impact": "Brief explanation of gap impact"
+        }}
+    ],
+    "experience_match": [
+        "Bullet point of matching experience from template"
+    ],
+    "experience_gaps": [
+        "Bullet point of experience gaps"
+    ],
+    "recommendations": [
+        {{
+            "priority": "high|medium|low",
+            "recommendation": "Specific actionable advice (e.g., which bullets to emphasize)"
+        }}
+    ],
+    "overall_assessment": "2-3 sentence summary of candidacy strength"
+}}
+
+IMPORTANT: Return ONLY the JSON object above. No explanations, no markdown formatting, just pure JSON. Be honest and objective."""
+                    }
+                ]
+            }
+        ]
+
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4000,
+            temperature=0.3,
+            messages=messages
+        )
+
+        response_text = message.content[0].text
+
+        # Track usage (prompt caching will show reduced costs!)
+        track_ai_usage(
+            feature_type='job_match_analysis_cached',
+            tokens_input=message.usage.input_tokens,
+            tokens_output=message.usage.output_tokens
+        )
+
+        # Log cache performance for monitoring
+        if hasattr(message.usage, 'cache_creation_input_tokens'):
+            print(f"📊 Cache stats - Creation: {message.usage.cache_creation_input_tokens}, "
+                  f"Read: {getattr(message.usage, 'cache_read_input_tokens', 0)}, "
+                  f"Regular: {message.usage.input_tokens}")
+
+        # Parse JSON response
+        import json
+        import re
+
+        # Extract JSON from response (handle markdown code blocks)
+        json_text = response_text.strip()
+
+        # Check if response is wrapped in markdown code blocks
+        if json_text.startswith('```'):
+            # Extract JSON from markdown code block
+            match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', json_text, re.DOTALL)
+            if match:
+                json_text = match.group(1).strip()
+
+        try:
+            analysis = json.loads(json_text)
+        except json.JSONDecodeError as json_err:
+            print(f"JSON parsing error: {json_err}")
+            print(f"Raw response (first 1000 chars): {response_text[:1000]}")
+            # Return more helpful error to user
+            raise Exception(f"AI response was not valid JSON. This might be a prompt issue. First 300 chars: {response_text[:300]}")
+
+        return analysis
+
+    except Exception as e:
+        print(f"Error analyzing job match with master template: {e}")
+        import traceback
+        traceback.print_exc()
+        raise  # Re-raise the exception instead of returning None
+
+
 def track_ai_usage(feature_type, tokens_input, tokens_output):
     """Track AI API usage for cost monitoring"""
     user_id = get_current_user_id()
@@ -3991,10 +4125,15 @@ def ai_match():
     # Get recent analyses
     recent_analyses = get_user_analyses(user_id, limit=5)
 
+    # Check if user has a master template
+    master_template = get_user_master_template(user_id)
+    has_master_template = master_template is not None
+
     return render_template('ai_match.html',
                          username=username,
                          user_cvs=user_cvs,
-                         recent_analyses=recent_analyses)
+                         recent_analyses=recent_analyses,
+                         has_master_template=has_master_template)
 
 
 @app.route("/upload-cv", methods=["POST"])
@@ -4188,6 +4327,74 @@ def analyze_match():
 
     except Exception as e:
         print(f"Error analyzing match: {e}")
+        import traceback
+        traceback.print_exc()
+        error_msg = str(e)
+        # Check for common API errors
+        if "api_key" in error_msg.lower() or "anthropic_api_key" in error_msg.lower():
+            error_msg = "API key not configured. Please set ANTHROPIC_API_KEY environment variable in Railway."
+        elif "json" in error_msg.lower():
+            error_msg = "AI returned invalid response format. Please try again."
+        elif "anthropic" in error_msg.lower():
+            error_msg = "Anthropic API error. Check API key and try again."
+        return jsonify({'error': f'Analysis failed: {error_msg}'}), 500
+
+
+@app.route("/analyze-match-with-template", methods=["POST"])
+def analyze_match_with_template():
+    """Analyze job match using AI with master template and prompt caching"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.get_json()
+        job_posting = data.get('job_posting')
+
+        # Validate input
+        if not job_posting:
+            return jsonify({'error': 'Missing job posting'}), 400
+
+        # Get user's master template
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return jsonify({'error': 'No master template found. Please upload one first.'}), 404
+
+        template_text = master_template['template_text']
+
+        # Extract job title and company from posting using AI
+        job_title, job_company = extract_job_info_from_posting(job_posting)
+
+        # Analyze with AI using master template with caching
+        analysis_result = analyze_job_match_with_master_template(
+            template_text,
+            job_title,
+            job_company,
+            job_posting,
+            user_id
+        )
+
+        # Save analysis to database (use NULL for cv_id since we're using master template)
+        analysis_id = save_job_analysis(
+            user_id,
+            None,  # No specific CV, using master template
+            job_title,
+            job_company,
+            job_posting,
+            analysis_result
+        )
+
+        log_user_activity('job_match_analysis_cached', f'Analyzed with master template: {job_title}')
+
+        return jsonify({
+            'success': True,
+            'analysis_id': analysis_id,
+            'analysis': analysis_result
+        })
+
+    except Exception as e:
+        print(f"Error analyzing match with template: {e}")
         import traceback
         traceback.print_exc()
         error_msg = str(e)
