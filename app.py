@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, make_response, redirect
+from flask import Flask, render_template, request, send_file, make_response, redirect, jsonify
 import pandas as pd
 from io import BytesIO
 from flask import Response
