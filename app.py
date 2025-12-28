@@ -3240,6 +3240,56 @@ def ai_usage_stats():
         return jsonify({'error': 'Failed to get stats'}), 500
 
 
+@app.route("/ai-diagnostic", methods=["GET"])
+def ai_diagnostic():
+    """Diagnostic endpoint to check AI setup"""
+    import os
+    diagnostics = {}
+
+    # Check API key
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    diagnostics['api_key_set'] = api_key is not None
+    diagnostics['api_key_length'] = len(api_key) if api_key else 0
+
+    # Check Anthropic library
+    try:
+        import anthropic
+        diagnostics['anthropic_installed'] = True
+        diagnostics['anthropic_version'] = anthropic.__version__ if hasattr(anthropic, '__version__') else 'unknown'
+    except ImportError:
+        diagnostics['anthropic_installed'] = False
+        diagnostics['anthropic_version'] = None
+
+    # Check PyPDF2
+    try:
+        import PyPDF2
+        diagnostics['pypdf2_installed'] = True
+    except ImportError:
+        diagnostics['pypdf2_installed'] = False
+
+    # Check python-docx
+    try:
+        import docx
+        diagnostics['python_docx_installed'] = True
+    except ImportError:
+        diagnostics['python_docx_installed'] = False
+
+    # Check database connection
+    try:
+        engine = get_db_connection()
+        diagnostics['database_connected'] = engine is not None
+        if engine:
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT COUNT(*) FROM user_cvs"))
+                diagnostics['cv_table_accessible'] = True
+                diagnostics['total_cvs'] = result.fetchone()[0]
+    except Exception as e:
+        diagnostics['database_connected'] = False
+        diagnostics['database_error'] = str(e)
+
+    return jsonify(diagnostics)
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
 
