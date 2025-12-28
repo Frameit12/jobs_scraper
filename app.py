@@ -736,6 +736,70 @@ def get_user_analyses(user_id, limit=10):
         return []
 
 
+def get_analysis_by_id(analysis_id, user_id):
+    """Get full analysis details by ID"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT ja.id, ja.job_title, ja.job_company, ja.job_description,
+                       ja.match_score, ja.skills_match, ja.skills_missing,
+                       ja.recommendations, ja.full_analysis, ja.created_at,
+                       cv.cv_name
+                FROM job_analyses ja
+                JOIN user_cvs cv ON ja.cv_id = cv.id
+                WHERE ja.id = :analysis_id AND ja.user_id = :user_id
+            """), {"analysis_id": analysis_id, "user_id": user_id})
+
+            row = result.fetchone()
+            if not row:
+                return None
+
+            import json
+            return {
+                'id': row[0],
+                'job_title': row[1],
+                'job_company': row[2],
+                'job_description': row[3],
+                'match_score': row[4],
+                'skills_match': json.loads(row[5]) if row[5] else [],
+                'skills_missing': json.loads(row[6]) if row[6] else [],
+                'recommendations': json.loads(row[7]) if row[7] else [],
+                'full_analysis': row[8],
+                'created_at': row[9],
+                'cv_name': row[10]
+            }
+    except Exception as e:
+        print(f"Error getting analysis by ID: {e}")
+        return None
+
+
+def delete_analysis_by_id(analysis_id, user_id):
+    """Delete an analysis by ID"""
+    engine = get_db_connection()
+    if not engine:
+        return False
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                DELETE FROM job_analyses
+                WHERE id = :analysis_id AND user_id = :user_id
+                RETURNING job_title
+            """), {"analysis_id": analysis_id, "user_id": user_id})
+
+            deleted = result.fetchone()
+            conn.commit()
+
+            return deleted is not None
+    except Exception as e:
+        print(f"Error deleting analysis: {e}")
+        return False
+
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
 
@@ -3269,6 +3333,53 @@ def delete_cv(cv_id):
     except Exception as e:
         print(f"Error deleting CV: {e}")
         return jsonify({'error': 'Failed to delete CV'}), 500
+
+
+@app.route("/get-analysis/<int:analysis_id>", methods=["GET"])
+def get_analysis(analysis_id):
+    """Get full analysis by ID"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        analysis = get_analysis_by_id(analysis_id, user_id)
+
+        if not analysis:
+            return jsonify({'error': 'Analysis not found'}), 404
+
+        return jsonify({
+            'success': True,
+            'analysis': analysis
+        })
+
+    except Exception as e:
+        print(f"Error getting analysis: {e}")
+        return jsonify({'error': 'Failed to get analysis'}), 500
+
+
+@app.route("/delete-analysis/<int:analysis_id>", methods=["POST"])
+def delete_analysis(analysis_id):
+    """Delete an analysis"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        success = delete_analysis_by_id(analysis_id, user_id)
+
+        if not success:
+            return jsonify({'error': 'Analysis not found'}), 404
+
+        log_user_activity('analysis_delete', f'Deleted analysis ID: {analysis_id}')
+
+        return jsonify({'success': True, 'message': 'Analysis deleted'})
+
+    except Exception as e:
+        print(f"Error deleting analysis: {e}")
+        return jsonify({'error': 'Failed to delete analysis'}), 500
 
 
 @app.route("/ai-usage-stats", methods=["GET"])
