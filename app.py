@@ -3272,7 +3272,7 @@ def analyze_match():
             cv_id,
             job_title,
             job_company,
-            job_description,
+            job_posting,
             analysis_result
         )
 
