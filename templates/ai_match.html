@@ -587,6 +587,11 @@ We're looking for a Senior VP to lead our AI Risk team...
             const file = e.target.files[0];
             if (!file) return;
 
+            await uploadCVFile(file);
+        });
+
+        // Helper function to upload CV file
+        async function uploadCVFile(file) {
             const formData = new FormData();
             formData.append('cv_file', file);
             formData.append('cv_name', file.name.replace(/\.[^/.]+$/, '')); // Remove extension
@@ -609,6 +614,52 @@ We're looking for a Senior VP to lead our AI Risk team...
                 console.error('Upload error:', error);
                 alert('Failed to upload CV');
             }
+        }
+
+        // Drag & Drop functionality
+        const dropzone = document.getElementById('upload-dropzone');
+
+        dropzone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.style.borderColor = '#10b981';
+            dropzone.style.background = '#f0fdf4';
+        });
+
+        dropzone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.style.borderColor = '#cbd5e1';
+            dropzone.style.background = '';
+        });
+
+        dropzone.addEventListener('drop', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Reset visual feedback
+            dropzone.style.borderColor = '#cbd5e1';
+            dropzone.style.background = '';
+
+            const files = e.dataTransfer.files;
+            if (files.length === 0) return;
+
+            const file = files[0];
+
+            // Validate file type
+            const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Invalid file type. Please upload PDF or DOCX files only.');
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File too large. Maximum size is 5MB.');
+                return;
+            }
+
+            await uploadCVFile(file);
         });
 
         // Delete CV
