@@ -13,4 +13,4 @@ seleniumbase
 nodriver
 PyPDF2==3.0.1
 python-docx==1.1.0
-anthropic==0.18.1
+anthropic>=0.23.0
