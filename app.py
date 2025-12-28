@@ -531,41 +531,56 @@ seed_initial_prompt_templates()
 
 
 def assign_user_to_finance_vp_template():
-    """Assign user_id=1 (Grace) to the Finance VP template"""
+    """Assign user_id=1 (Grace) to the Finance VP template if user exists"""
     engine = get_db_connection()
     if not engine:
         return
 
-    with engine.connect() as conn:
-        # Check if user_id=1 already has a preference assigned
-        result = conn.execute(text("""
-            SELECT COUNT(*) FROM user_prompt_preferences WHERE user_id = 1
-        """))
-        count = result.fetchone()[0]
+    try:
+        with engine.connect() as conn:
+            # First, check if user_id=1 exists in users table
+            user_check = conn.execute(text("""
+                SELECT COUNT(*) FROM users WHERE id = 1
+            """))
+            user_exists = user_check.fetchone()[0] > 0
 
-        if count > 0:
-            return  # User already has a template assigned
+            if not user_exists:
+                # User doesn't exist yet, skip gracefully (don't crash)
+                return
 
-        # Get the Finance VP template ID
-        template = conn.execute(text("""
-            SELECT id FROM prompt_templates WHERE name = 'Finance VP (Tier-1 IB)'
-        """))
-        template_row = template.fetchone()
+            # Check if user_id=1 already has a preference assigned
+            result = conn.execute(text("""
+                SELECT COUNT(*) FROM user_prompt_preferences WHERE user_id = 1
+            """))
+            count = result.fetchone()[0]
 
-        if not template_row:
-            print("⚠ Finance VP template not found, skipping user assignment")
-            return
+            if count > 0:
+                return  # User already has a template assigned
 
-        template_id = template_row[0]
+            # Get the Finance VP template ID
+            template = conn.execute(text("""
+                SELECT id FROM prompt_templates WHERE name = 'Finance VP (Tier-1 IB)'
+            """))
+            template_row = template.fetchone()
 
-        # Assign user_id=1 to this template
-        conn.execute(text("""
-            INSERT INTO user_prompt_preferences (user_id, template_id, is_active)
-            VALUES (:user_id, :template_id, TRUE)
-        """), {"user_id": 1, "template_id": template_id})
+            if not template_row:
+                print("⚠ Finance VP template not found, skipping user assignment")
+                return
 
-        conn.commit()
-        print(f"✓ Assigned user_id=1 to Finance VP (Tier-1 IB) template (template_id={template_id})")
+            template_id = template_row[0]
+
+            # Assign user_id=1 to this template
+            conn.execute(text("""
+                INSERT INTO user_prompt_preferences (user_id, template_id, is_active)
+                VALUES (:user_id, :template_id, TRUE)
+            """), {"user_id": 1, "template_id": template_id})
+
+            conn.commit()
+            print(f"✓ Assigned user_id=1 to Finance VP (Tier-1 IB) template (template_id={template_id})")
+    except Exception as e:
+        # Gracefully handle any errors during assignment (don't crash the app)
+        print(f"⚠ Could not auto-assign template to user_id=1: {e}")
+        return
 
 assign_user_to_finance_vp_template()
 
