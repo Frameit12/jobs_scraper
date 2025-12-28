@@ -832,9 +832,9 @@ def get_analysis_by_id(analysis_id, user_id):
                 'job_company': row[2],
                 'job_description': row[3],
                 'match_score': row[4],
-                'skills_match': json.loads(row[5]) if row[5] else [],
-                'skills_missing': json.loads(row[6]) if row[6] else [],
-                'recommendations': json.loads(row[7]) if row[7] else [],
+                'skills_match': row[5] if row[5] else [],  # Already deserialized from JSONB
+                'skills_missing': row[6] if row[6] else [],  # Already deserialized from JSONB
+                'recommendations': row[7] if row[7] else [],  # Already deserialized from JSONB
                 'full_analysis': row[8],
                 'created_at': row[9],
                 'cv_name': row[10]
