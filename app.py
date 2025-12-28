@@ -694,11 +694,14 @@ def save_job_analysis(user_id, cv_id, job_title, job_company, job_description, a
                 "recommendations": json.dumps(analysis_result.get('recommendations', [])),
                 "full_analysis": json.dumps(analysis_result)
             })
-            conn.commit()
+            # Fetch the ID BEFORE committing
             analysis_id = result.fetchone()[0]
+            conn.commit()
             return analysis_id
     except Exception as e:
         print(f"Error saving job analysis: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
