@@ -284,6 +284,34 @@ def init_user_prompt_preferences_table():
 init_user_prompt_preferences_table()
 
 
+def init_master_templates_table():
+    """Initialize table for storing user master resume templates"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_master_templates (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    template_text TEXT NOT NULL,
+                    original_filename VARCHAR(255),
+                    version INTEGER DEFAULT 1,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, is_active) WHERE is_active = TRUE
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_user_master_template_active
+                ON user_master_templates(user_id, is_active)
+            """))
+            conn.commit()
+
+init_master_templates_table()
+
+
 def seed_initial_prompt_templates():
     """Seed initial prompt templates if they don't exist"""
     engine = get_db_connection()
@@ -997,6 +1025,124 @@ def get_cv_by_id(cv_id, user_id):
             return None
     except Exception as e:
         print(f"Error getting CV: {e}")
+        return None
+
+
+# ==================== AI MATCH TOOL: MASTER TEMPLATE FUNCTIONS ====================
+
+def save_master_template(user_id, template_text, filename):
+    """Save or update user's master resume template"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            # Deactivate any existing active templates for this user
+            conn.execute(text("""
+                UPDATE user_master_templates
+                SET is_active = FALSE
+                WHERE user_id = :user_id AND is_active = TRUE
+            """), {"user_id": user_id})
+
+            # Get the next version number
+            version_result = conn.execute(text("""
+                SELECT COALESCE(MAX(version), 0) + 1
+                FROM user_master_templates
+                WHERE user_id = :user_id
+            """), {"user_id": user_id})
+            version = version_result.fetchone()[0]
+
+            # Insert new template
+            result = conn.execute(text("""
+                INSERT INTO user_master_templates
+                (user_id, template_text, original_filename, version, is_active)
+                VALUES (:user_id, :template_text, :filename, :version, TRUE)
+                RETURNING id
+            """), {
+                "user_id": user_id,
+                "template_text": template_text,
+                "filename": filename,
+                "version": version
+            })
+
+            template_id = result.fetchone()[0]
+            conn.commit()
+
+            return template_id
+
+    except Exception as e:
+        print(f"Error saving master template: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def get_user_master_template(user_id):
+    """Get user's active master resume template"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, template_text, original_filename, version, created_at, updated_at
+                FROM user_master_templates
+                WHERE user_id = :user_id AND is_active = TRUE
+                ORDER BY created_at DESC
+                LIMIT 1
+            """), {"user_id": user_id})
+
+            row = result.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'template_text': row[1],
+                    'original_filename': row[2],
+                    'version': row[3],
+                    'created_at': row[4],
+                    'updated_at': row[5]
+                }
+            return None
+
+    except Exception as e:
+        print(f"Error getting master template: {e}")
+        return None
+
+
+def extract_text_from_docx(file_data):
+    """Extract text from .docx file while preserving structure"""
+    try:
+        from docx import Document
+        from io import BytesIO
+
+        # Load document from binary data
+        doc = Document(BytesIO(file_data))
+
+        text_parts = []
+
+        for para in doc.paragraphs:
+            # Preserve heading levels
+            if para.style.name.startswith('Heading'):
+                text_parts.append(f"\n## {para.text}\n")
+            elif para.text.strip():
+                # Check if it's a list item (starts with bullet or number)
+                text = para.text.strip()
+                if text.startswith('•') or text.startswith('-') or (len(text) > 2 and text[0].isdigit() and text[1] in '.):'):
+                    text_parts.append(f"  {text}")
+                else:
+                    text_parts.append(text)
+
+        # Join with newlines to preserve structure
+        extracted_text = '\n'.join(text_parts)
+
+        return extracted_text
+
+    except Exception as e:
+        print(f"Error extracting text from docx: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -3907,6 +4053,79 @@ def upload_cv():
 
     except Exception as e:
         print(f"Error uploading CV: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Upload error: {str(e)}'}), 500
+
+
+@app.route("/my-resume-template", methods=["GET"])
+def my_resume_template():
+    """Display master resume template management page"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    # Get user's current master template
+    master_template = get_user_master_template(user_id)
+
+    return render_template('my_resume_template.html',
+                         master_template=master_template)
+
+
+@app.route("/upload-master-template", methods=["POST"])
+def upload_master_template():
+    """Handle master resume template upload"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        # Get uploaded file
+        if 'template_file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['template_file']
+
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Validate file type - only .docx allowed
+        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+
+        if file_ext != 'docx':
+            return jsonify({'error': 'Invalid file type. Only .docx files are allowed'}), 400
+
+        # Read file data
+        file_data = file.read()
+
+        # Check file size (max 2MB for templates)
+        if len(file_data) > 2 * 1024 * 1024:
+            return jsonify({'error': 'File too large. Maximum size is 2MB'}), 400
+
+        # Extract text from docx
+        extracted_text = extract_text_from_docx(file_data)
+
+        if not extracted_text or not extracted_text.strip():
+            return jsonify({'error': 'Template appears to be empty or text extraction failed'}), 400
+
+        # Save to database
+        template_id = save_master_template(user_id, extracted_text, file.filename)
+
+        if not template_id:
+            return jsonify({'error': 'Failed to save template'}), 500
+
+        log_user_activity('master_template_upload', f'Uploaded master template: {file.filename}')
+
+        return jsonify({
+            'success': True,
+            'template_id': template_id,
+            'message': 'Master template uploaded successfully'
+        })
+
+    except Exception as e:
+        print(f"Error uploading master template: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Upload error: {str(e)}'}), 500
