@@ -470,6 +470,63 @@ def get_anthropic_client():
         raise
 
 
+def extract_job_info_from_posting(job_posting):
+    """Extract job title and company from full job posting using AI"""
+    client = get_anthropic_client()
+
+    try:
+        prompt = f"""Extract the job title and company name from this job posting.
+
+JOB POSTING:
+{job_posting}
+
+Respond ONLY with valid JSON (no markdown, no code blocks). Use this exact structure:
+{{
+    "job_title": "The job title",
+    "company": "Company name"
+}}
+
+If you cannot find the company name, use "Not specified". Return ONLY the JSON object."""
+
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=200,
+            temperature=0.1,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        response_text = message.content[0].text.strip()
+
+        # Track usage
+        track_ai_usage(
+            feature_type='job_info_extraction',
+            tokens_input=message.usage.input_tokens,
+            tokens_output=message.usage.output_tokens
+        )
+
+        # Parse JSON
+        import json
+        import re
+
+        # Handle markdown code blocks
+        if response_text.startswith('```'):
+            match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', response_text, re.DOTALL)
+            if match:
+                response_text = match.group(1).strip()
+
+        job_info = json.loads(response_text)
+        return job_info['job_title'], job_info.get('company', 'Not specified')
+
+    except Exception as e:
+        print(f"Error extracting job info: {e}")
+        # Fallback: try to extract first line as title
+        lines = job_posting.strip().split('\n')
+        job_title = lines[0][:200] if lines else "Job Position"
+        return job_title, "Not specified"
+
+
 def analyze_job_match_with_ai(cv_text, job_title, job_company, job_description):
     """Use Claude AI to analyze CV-to-job match"""
     # This will raise an exception if API key is not set
@@ -1454,9 +1511,9 @@ def render_template_with_admin(template_name, **kwargs):
     
 @app.route("/")
 def root():
-    # If user is logged in, go to main app
+    # If user is logged in, go to AI Match Tool (main feature)
     if get_current_user_id():
-        return redirect("/app")
+        return redirect("/ai-match")
     else:
         # New visitor sees landing page
         return render_template("landing-page.html")
@@ -3121,12 +3178,10 @@ def analyze_match():
         data = request.get_json()
 
         cv_id = data.get('cv_id')
-        job_title = data.get('job_title')
-        job_company = data.get('job_company', '')
-        job_description = data.get('job_description')
+        job_posting = data.get('job_posting')
 
         # Validate inputs
-        if not cv_id or not job_title or not job_description:
+        if not cv_id or not job_posting:
             return jsonify({'error': 'Missing required fields'}), 400
 
         # Get CV
@@ -3136,12 +3191,15 @@ def analyze_match():
 
         cv_text = cv_data['extracted_text']
 
+        # Extract job title and company from posting using AI
+        job_title, job_company = extract_job_info_from_posting(job_posting)
+
         # Analyze with AI (this will raise exception if it fails)
         analysis_result = analyze_job_match_with_ai(
             cv_text,
             job_title,
             job_company,
-            job_description
+            job_posting
         )
 
         # Save analysis to database
