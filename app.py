@@ -459,19 +459,21 @@ def get_anthropic_client():
         import anthropic
         api_key = os.environ.get('ANTHROPIC_API_KEY')
         if not api_key:
-            print("Warning: ANTHROPIC_API_KEY not found in environment variables")
-            return None
+            print("ERROR: ANTHROPIC_API_KEY not found in environment variables")
+            raise Exception("ANTHROPIC_API_KEY environment variable is not set. Please add it in Railway settings.")
         return anthropic.Anthropic(api_key=api_key)
+    except ImportError as e:
+        print(f"Anthropic library not installed: {e}")
+        raise Exception("Anthropic library not installed. Please check Railway build logs.")
     except Exception as e:
         print(f"Error initializing Anthropic client: {e}")
-        return None
+        raise
 
 
 def analyze_job_match_with_ai(cv_text, job_title, job_company, job_description):
     """Use Claude AI to analyze CV-to-job match"""
+    # This will raise an exception if API key is not set
     client = get_anthropic_client()
-    if not client:
-        return None
 
     try:
         prompt = f"""You are an expert career coach and recruiter. Analyze how well this candidate's CV matches the job description.
@@ -542,13 +544,20 @@ Be honest and objective. Focus on facts from the CV and job description."""
 
         # Parse JSON response
         import json
-        analysis = json.loads(response_text)
+        try:
+            analysis = json.loads(response_text)
+        except json.JSONDecodeError as json_err:
+            print(f"JSON parsing error: {json_err}")
+            print(f"Raw response: {response_text[:500]}")  # Log first 500 chars
+            raise Exception(f"AI returned invalid JSON. Raw response: {response_text[:200]}")
 
         return analysis
 
     except Exception as e:
         print(f"Error analyzing job match: {e}")
-        return None
+        import traceback
+        traceback.print_exc()
+        raise  # Re-raise the exception instead of returning None
 
 
 def track_ai_usage(feature_type, tokens_input, tokens_output):
@@ -3114,16 +3123,13 @@ def analyze_match():
 
         cv_text = cv_data['extracted_text']
 
-        # Analyze with AI
+        # Analyze with AI (this will raise exception if it fails)
         analysis_result = analyze_job_match_with_ai(
             cv_text,
             job_title,
             job_company,
             job_description
         )
-
-        if not analysis_result:
-            return jsonify({'error': 'AI analysis failed'}), 500
 
         # Save analysis to database
         analysis_id = save_job_analysis(
@@ -3147,7 +3153,15 @@ def analyze_match():
         print(f"Error analyzing match: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'An error occurred during analysis'}), 500
+        error_msg = str(e)
+        # Check for common API errors
+        if "api_key" in error_msg.lower() or "anthropic_api_key" in error_msg.lower():
+            error_msg = "API key not configured. Please set ANTHROPIC_API_KEY environment variable in Railway."
+        elif "json" in error_msg.lower():
+            error_msg = "AI returned invalid response format. Please try again."
+        elif "anthropic" in error_msg.lower():
+            error_msg = "Anthropic API error. Check API key and try again."
+        return jsonify({'error': f'Analysis failed: {error_msg}'}), 500
 
 
 @app.route("/delete-cv/<int:cv_id>", methods=["POST"])
