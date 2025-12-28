@@ -235,6 +235,341 @@ def init_ai_usage_tracking_table():
 init_ai_usage_tracking_table()
 
 
+def init_prompt_templates_table():
+    """Initialize table for storing system prompt templates"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS prompt_templates (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    description TEXT,
+                    prompt_text TEXT NOT NULL,
+                    target_profile VARCHAR(100),
+                    is_default BOOLEAN DEFAULT FALSE,
+                    version VARCHAR(20) DEFAULT 'v1',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+
+init_prompt_templates_table()
+
+
+def init_user_prompt_preferences_table():
+    """Initialize table for storing user prompt preferences"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_prompt_preferences (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    template_id INTEGER REFERENCES prompt_templates(id),
+                    custom_prompt_text TEXT,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    ab_test_group VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_user_prompt_active
+                ON user_prompt_preferences(user_id, is_active)
+            """))
+            conn.commit()
+
+init_user_prompt_preferences_table()
+
+
+def seed_initial_prompt_templates():
+    """Seed initial prompt templates if they don't exist"""
+    engine = get_db_connection()
+    if not engine:
+        return
+
+    with engine.connect() as conn:
+        # Check if templates already exist
+        result = conn.execute(text("SELECT COUNT(*) FROM prompt_templates"))
+        count = result.fetchone()[0]
+
+        if count > 0:
+            return  # Templates already seeded
+
+        # Template #1: Default - General Professional
+        default_prompt = """You are an expert career coach and recruiter with 15+ years of experience evaluating candidates across various industries. Your goal is to provide honest, accurate assessments of how well a candidate's background matches a specific job opportunity.
+
+**YOUR TASK:**
+Analyze the candidate's CV against the job description and provide a comprehensive match assessment.
+
+**EVALUATION CRITERIA:**
+1. **Relevant Experience (40%):** How closely does their work history align with the role's requirements?
+2. **Skills Match (30%):** Do they possess the technical and soft skills needed?
+3. **Industry Fit (20%):** Does their industry background prepare them for this role?
+4. **Seniority Match (10%):** Does their career level align with the role's expectations?
+
+**SCORING GUIDELINES:**
+- **90-100%:** Exceptional match - candidate exceeds most requirements
+- **75-89%:** Strong match - candidate meets most key requirements with minor gaps
+- **60-74%:** Good match - candidate meets many requirements but has notable gaps
+- **50-59%:** Fair match - candidate has transferable skills but significant gaps
+- **Below 50%:** Poor match - major gaps in experience or skills
+
+**OUTPUT REQUIREMENTS:**
+Respond with valid JSON containing:
+- match_score (0-100)
+- skills_match: Array of matched skills with evidence
+- skills_missing: Array of skills needed but not demonstrated
+- recommendations: Array of specific suggestions for the candidate"""
+
+        # Template #2: Finance VP (Tier-1 IB) - Enhanced RECRUITER_SYSTEM_PROMPT
+        finance_vp_prompt = """You are Elena Rodriguez, Managing Director of Executive Recruitment at a top-tier executive search firm. You have 23 years of experience placing VP, SVP, and ED-level candidates at tier-1 investment banks (Goldman Sachs, JP Morgan, Morgan Stanley, Citi, etc.). You specialize in evaluating senior financial services talent for AI/ML governance, risk management, and product leadership roles.
+
+**YOUR EXPERTISE:**
+You have personally placed 200+ VPs and 50+ SVPs/EDs in financial services. You understand what separates a 92% match from an 85% match. You are known for calibrated, consistent evaluations that help candidates understand exactly where they stand.
+
+**CANDIDATE CONTEXT (Grace):**
+- 15+ years in financial services at tier-1 institutions (JP Morgan, Citi, Morgan Stanley)
+- Currently VP, AI Governance at JP Morgan
+- Deep expertise in AI/ML risk management, model validation, regulatory compliance
+- Led enterprise-wide AI governance frameworks
+- Looking for VP/SVP/ED roles in AI governance, risk management, or product management at financial institutions
+
+**YOUR EVALUATION FRAMEWORK (100-Point System):**
+
+**1. DIRECT EXPERIENCE MATCH (40 points)**
+- Exact role type match (AI Governance, Risk, Product)
+- Institution type match (tier-1 IB vs fintech vs tech)
+- Relevant domain expertise (AI/ML, regulatory, model risk)
+- Years of experience at appropriate level
+
+**2. TRANSFERABLE SKILLS (25 points)**
+- Technical skills (AI/ML, data governance, model validation)
+- Leadership skills (stakeholder management, cross-functional leadership)
+- Regulatory expertise (Fed, OCC, GDPR, AI regulations)
+- Strategic capabilities (framework design, policy development)
+
+**3. INDUSTRY FIT (20 points)**
+- Financial services background
+- Regulatory environment familiarity
+- Enterprise scale experience
+- Cultural fit (bank vs tech vs consulting)
+
+**4. SENIORITY MATCH (15 points)**
+- Title level alignment (VP to VP, VP to SVP, etc.)
+- Scope of responsibility match
+- People management experience
+- P&L or budget ownership
+
+**CALIBRATION EXAMPLES (Learn these scoring patterns):**
+
+**90-100% Matches:**
+1. VP AI Governance at Goldman Sachs → VP AI Governance at Morgan Stanley (95%)
+2. VP Model Risk at JP Morgan → VP AI Risk at Citi (92%)
+3. SVP AI Strategy at Bank of America → SVP AI Governance at Wells Fargo (94%)
+
+**75-89% Matches:**
+4. VP AI Governance at JP Morgan → VP AI Governance at Stripe (fintech) (82%)
+   - Reason: Strong role match but institution type shift (bank → fintech)
+5. VP AI Governance at JP Morgan → VP Product Management (AI) at Capital One (78%)
+   - Reason: Pivot from governance to product, different institution tier
+6. VP Model Risk at JP Morgan → Director AI Strategy at McKinsey (consulting) (76%)
+   - Reason: Title step down, industry shift to consulting
+
+**60-74% Matches:**
+7. VP AI Governance at JP Morgan → VP Product Management at tech company (68%)
+   - Reason: Industry shift (finance → tech), role pivot (governance → product)
+8. VP Model Risk at JP Morgan → VP Program Management (AI initiatives) at Citi (72%)
+   - Reason: Shift from risk to program management, less specialized role
+9. Senior Manager AI Governance at JP Morgan → VP AI Governance at regional bank (65%)
+   - Reason: Title promotion needed, institution tier drop
+
+**55-70% Matches:**
+10. VP AI Governance at JP Morgan → VP Risk Management (no AI focus) at Morgan Stanley (65%)
+    - Reason: Loses AI specialization, becomes generic risk role
+11. VP Model Risk at JP Morgan → Senior Director Analytics at tech company (62%)
+    - Reason: Title ambiguity, industry shift, role is more analytics than governance
+
+**Below 55% Matches:**
+12. VP AI Governance at JP Morgan → Head of Data Science at startup (48%)
+    - Reason: Major industry shift, completely different role (governance → IC technical)
+13. VP AI Governance at JP Morgan → Chief Risk Officer at small fintech (52%)
+    - Reason: Title seems senior but scope much smaller, institution scale mismatch
+14. VP Model Risk at JP Morgan → Product Manager (AI tools) at Series A startup (45%)
+    - Reason: Title demotion, industry shift, completely different scope/scale
+
+**CONSISTENCY RULES (Apply these strictly):**
+
+1. **Exact Title + Institution Type Match = Minimum 85%**
+   - VP AI Governance (bank) → VP AI Governance (bank) = 85-95%
+   - Only deduct for scope, team size, or institution prestige differences
+
+2. **Competitor Bank Match = Minimum 88%**
+   - JP Morgan ↔ Goldman/Morgan Stanley/Citi = very high match
+   - These are peer institutions with comparable complexity
+
+3. **Years of Experience Scope Match:**
+   - If candidate has "X years managing Y use cases" and JD requires "managing Z use cases," score should not drop below 80%
+   - Example: Candidate managed 50 AI models, JD requires managing AI models → 80%+ even if exact count differs
+
+4. **Exact Title Match (Different Institution Type) = Minimum 75%**
+   - VP AI Governance (tier-1 bank) → VP AI Governance (fintech) = 75-85%
+   - VP AI Governance (tier-1 bank) → VP AI Governance (tech company) = 70-82%
+
+5. **Role Pivot Within Same Institution Type:**
+   - Governance → Product (same industry) = 65-78%
+   - Governance → Risk (same industry) = 75-85%
+   - Risk → Program Management (same industry) = 68-76%
+
+6. **People Management Cap:**
+   - If role requires people management and candidate has NO direct reports mentioned → cap at 70%
+   - If candidate has people management and role doesn't require it → no penalty
+
+7. **P&L Ownership Cap:**
+   - If role requires P&L ownership and candidate has none → cap at 68%
+
+8. **Institution Type Penalties:**
+   - Tier-1 IB → Tier-2/regional bank = -8 to -12 points
+   - Bank → Fintech = -5 to -10 points
+   - Bank → Big Tech = -10 to -18 points
+   - Bank → Startup = -20 to -30 points
+
+9. **Seniority Mismatch Penalties:**
+   - VP → SVP (promotion needed) = -5 to -8 points
+   - SVP → VP (step down) = -8 to -12 points
+   - Director → VP (promotion needed) = -10 to -15 points
+
+10. **AI Specialization Rule:**
+    - If candidate is "AI Governance" specialist and role is generic "Risk Management" (no AI) → cap at 70%
+    - If candidate is generic risk and role requires AI specialization → cap at 60%
+
+11. **Regulatory Expertise Match:**
+    - If role requires specific regulatory knowledge (Fed, OCC, GDPR) and candidate has it → +5 to +8 points
+    - If role requires regulatory expertise and candidate has none → -15 to -20 points
+
+12. **Cross-Functional Leadership:**
+    - If candidate has "led cross-functional initiatives" and JD requires it → automatic inclusion in strengths
+    - If JD emphasizes stakeholder management and candidate has evidence → +5 points
+
+13. **Consistency Check:**
+    - If two job descriptions are 90% similar in requirements, the same candidate's scores should differ by no more than 5 points
+    - Review your scoring: Does this match the calibration examples above?
+
+**EVIDENCE REQUIREMENTS:**
+
+When assessing skills:
+- "Strong" evidence = explicitly mentioned in CV with concrete examples/metrics
+- "Moderate" evidence = clearly implied by role/responsibilities but not explicitly stated
+- "Basic" evidence = tangentially related experience that could transfer
+- NO evidence = do not list as a matched skill
+
+**OUTPUT FORMAT (JSON only, no markdown):**
+
+{
+  "match_score": <integer 0-100>,
+  "scoring_breakdown": {
+    "direct_experience": <0-40 points>,
+    "transferable_skills": <0-25 points>,
+    "industry_fit": <0-20 points>,
+    "seniority_match": <0-15 points>
+  },
+  "skills_match": [
+    {
+      "skill": "AI/ML Governance",
+      "evidence": "Led AI governance framework at JP Morgan for 3+ years",
+      "strength": "strong"
+    }
+  ],
+  "skills_missing": [
+    {
+      "skill": "P&L Ownership",
+      "importance": "high",
+      "impact": "May need to demonstrate budget management experience in interviews"
+    }
+  ],
+  "recommendations": [
+    "Emphasize your experience managing [specific area] in your application",
+    "Be prepared to discuss how your governance experience translates to [required skill]"
+  ],
+  "match_rationale": "Brief 2-3 sentence explanation of the score, referencing which calibration example this most resembles"
+}
+
+**REMEMBER:** You are evaluating Grace, a VP at JP Morgan with 15+ years in tier-1 financial services and deep AI governance expertise. Score accordingly using the calibration examples above."""
+
+        # Insert Template #1
+        conn.execute(text("""
+            INSERT INTO prompt_templates (name, description, prompt_text, target_profile, is_default, version)
+            VALUES (:name, :description, :prompt_text, :target_profile, :is_default, :version)
+        """), {
+            "name": "Default - General Professional",
+            "description": "A balanced, professional evaluation suitable for most career backgrounds and industries.",
+            "prompt_text": default_prompt,
+            "target_profile": "General",
+            "is_default": True,
+            "version": "v1"
+        })
+
+        # Insert Template #2
+        conn.execute(text("""
+            INSERT INTO prompt_templates (name, description, prompt_text, target_profile, is_default, version)
+            VALUES (:name, :description, :prompt_text, :target_profile, :is_default, :version)
+        """), {
+            "name": "Finance VP (Tier-1 IB)",
+            "description": "Specialized evaluation for VP/SVP-level financial services professionals with AI/ML governance, risk, or product experience at tier-1 investment banks. Includes detailed calibration for banking roles.",
+            "prompt_text": finance_vp_prompt,
+            "target_profile": "VP Banking - AI/Governance",
+            "is_default": False,
+            "version": "v1"
+        })
+
+        conn.commit()
+        print("✓ Seeded 2 initial prompt templates")
+
+seed_initial_prompt_templates()
+
+
+def assign_user_to_finance_vp_template():
+    """Assign user_id=1 (Grace) to the Finance VP template"""
+    engine = get_db_connection()
+    if not engine:
+        return
+
+    with engine.connect() as conn:
+        # Check if user_id=1 already has a preference assigned
+        result = conn.execute(text("""
+            SELECT COUNT(*) FROM user_prompt_preferences WHERE user_id = 1
+        """))
+        count = result.fetchone()[0]
+
+        if count > 0:
+            return  # User already has a template assigned
+
+        # Get the Finance VP template ID
+        template = conn.execute(text("""
+            SELECT id FROM prompt_templates WHERE name = 'Finance VP (Tier-1 IB)'
+        """))
+        template_row = template.fetchone()
+
+        if not template_row:
+            print("⚠ Finance VP template not found, skipping user assignment")
+            return
+
+        template_id = template_row[0]
+
+        # Assign user_id=1 to this template
+        conn.execute(text("""
+            INSERT INTO user_prompt_preferences (user_id, template_id, is_active)
+            VALUES (:user_id, :template_id, TRUE)
+        """), {"user_id": 1, "template_id": template_id})
+
+        conn.commit()
+        print(f"✓ Assigned user_id=1 to Finance VP (Tier-1 IB) template (template_id={template_id})")
+
+assign_user_to_finance_vp_template()
+
+
 def generate_reset_token():
     import secrets
     return secrets.token_urlsafe(32)
@@ -470,6 +805,62 @@ def get_anthropic_client():
         raise
 
 
+def get_user_system_prompt(user_id):
+    """
+    Get the active system prompt for a user.
+    Returns the custom prompt if set, otherwise the selected template prompt,
+    or falls back to the default template.
+    """
+    engine = get_db_connection()
+    if not engine:
+        # Fallback to basic prompt if no database connection
+        return """You are an expert career coach and recruiter. Analyze how well this candidate's CV matches the job description.
+Provide a match score (0-100) and detailed feedback on skills match, missing skills, and recommendations."""
+
+    try:
+        with engine.connect() as conn:
+            # First, check if user has an active preference with custom prompt
+            result = conn.execute(text("""
+                SELECT upp.custom_prompt_text, pt.prompt_text
+                FROM user_prompt_preferences upp
+                LEFT JOIN prompt_templates pt ON upp.template_id = pt.id
+                WHERE upp.user_id = :user_id AND upp.is_active = TRUE
+                ORDER BY upp.created_at DESC
+                LIMIT 1
+            """), {"user_id": user_id})
+
+            row = result.fetchone()
+
+            if row:
+                # If user has custom prompt, use it; otherwise use template
+                custom_prompt = row[0]
+                template_prompt = row[1]
+
+                if custom_prompt:
+                    return custom_prompt
+                elif template_prompt:
+                    return template_prompt
+
+            # If no user preference found, get the default template
+            default_result = conn.execute(text("""
+                SELECT prompt_text FROM prompt_templates WHERE is_default = TRUE LIMIT 1
+            """))
+
+            default_row = default_result.fetchone()
+            if default_row:
+                return default_row[0]
+
+            # Ultimate fallback (should never happen if seeding worked)
+            return """You are an expert career coach and recruiter. Analyze how well this candidate's CV matches the job description.
+Provide a match score (0-100) and detailed feedback on skills match, missing skills, and recommendations."""
+
+    except Exception as e:
+        print(f"Error getting user system prompt: {e}")
+        # Return basic fallback prompt
+        return """You are an expert career coach and recruiter. Analyze how well this candidate's CV matches the job description.
+Provide a match score (0-100) and detailed feedback on skills match, missing skills, and recommendations."""
+
+
 def extract_job_info_from_posting(job_posting):
     """Extract job title and company from full job posting using AI"""
     client = get_anthropic_client()
@@ -527,13 +918,17 @@ If you cannot find the company name, use "Not specified". Return ONLY the JSON o
         return job_title, "Not specified"
 
 
-def analyze_job_match_with_ai(cv_text, job_title, job_company, job_description):
-    """Use Claude AI to analyze CV-to-job match"""
+def analyze_job_match_with_ai(cv_text, job_title, job_company, job_description, user_id):
+    """Use Claude AI to analyze CV-to-job match using user's selected prompt template"""
     # This will raise an exception if API key is not set
     client = get_anthropic_client()
 
     try:
-        prompt = f"""You are an expert career coach and recruiter. Analyze how well this candidate's CV matches the job description.
+        # Get user's system prompt from their template selection
+        system_prompt = get_user_system_prompt(user_id)
+
+        # Build full prompt with CV and job details
+        prompt = f"""{system_prompt}
 
 **CANDIDATE'S CV:**
 {cv_text}
@@ -3331,12 +3726,13 @@ def analyze_match():
         # Extract job title and company from posting using AI
         job_title, job_company = extract_job_info_from_posting(job_posting)
 
-        # Analyze with AI (this will raise exception if it fails)
+        # Analyze with AI using user's selected prompt template (this will raise exception if it fails)
         analysis_result = analyze_job_match_with_ai(
             cv_text,
             job_title,
             job_company,
-            job_posting
+            job_posting,
+            user_id
         )
 
         # Save analysis to database
@@ -3460,6 +3856,160 @@ def delete_analysis(analysis_id):
     except Exception as e:
         print(f"Error deleting analysis: {e}")
         return jsonify({'error': 'Failed to delete analysis'}), 500
+
+
+@app.route("/prompt-settings", methods=["GET"])
+def prompt_settings():
+    """Display prompt settings page"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return "Database error", 500
+
+        with engine.connect() as conn:
+            # Get all available templates
+            templates_result = conn.execute(text("""
+                SELECT id, name, description, target_profile, version
+                FROM prompt_templates
+                ORDER BY is_default DESC, name ASC
+            """))
+
+            templates = []
+            for row in templates_result:
+                templates.append({
+                    'id': row[0],
+                    'name': row[1],
+                    'description': row[2],
+                    'target_profile': row[3],
+                    'version': row[4]
+                })
+
+            # Get user's current active template and prompt
+            user_pref_result = conn.execute(text("""
+                SELECT upp.template_id, upp.custom_prompt_text, pt.name, pt.prompt_text
+                FROM user_prompt_preferences upp
+                LEFT JOIN prompt_templates pt ON upp.template_id = pt.id
+                WHERE upp.user_id = :user_id AND upp.is_active = TRUE
+                ORDER BY upp.created_at DESC
+                LIMIT 1
+            """), {"user_id": user_id})
+
+            user_pref_row = user_pref_result.fetchone()
+
+            current_template_id = None
+            current_template_name = "No template selected"
+            current_prompt_text = ""
+
+            if user_pref_row:
+                current_template_id = user_pref_row[0]
+                custom_prompt = user_pref_row[1]
+                template_name = user_pref_row[2]
+                template_prompt = user_pref_row[3]
+
+                current_template_name = template_name or "Custom"
+                current_prompt_text = custom_prompt if custom_prompt else template_prompt
+
+            return render_template('prompt_settings.html',
+                                 templates=templates,
+                                 current_template_id=current_template_id,
+                                 current_template_name=current_template_name,
+                                 current_prompt_text=current_prompt_text)
+
+    except Exception as e:
+        print(f"Error loading prompt settings: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading settings", 500
+
+
+@app.route("/get-template-prompt/<int:template_id>", methods=["GET"])
+def get_template_prompt(template_id):
+    """Get full prompt text for a specific template (for preview)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT prompt_text FROM prompt_templates WHERE id = :template_id
+            """), {"template_id": template_id})
+
+            row = result.fetchone()
+            if not row:
+                return jsonify({'error': 'Template not found'}), 404
+
+            return jsonify({'prompt_text': row[0]})
+
+    except Exception as e:
+        print(f"Error getting template prompt: {e}")
+        return jsonify({'error': 'Failed to get template'}), 500
+
+
+@app.route("/switch-template", methods=["POST"])
+def switch_template():
+    """Switch user's active template"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.get_json()
+        template_id = data.get('template_id')
+
+        if not template_id:
+            return jsonify({'error': 'template_id is required'}), 400
+
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            # Deactivate all current preferences for this user
+            conn.execute(text("""
+                UPDATE user_prompt_preferences
+                SET is_active = FALSE
+                WHERE user_id = :user_id
+            """), {"user_id": user_id})
+
+            # Create new active preference with selected template
+            conn.execute(text("""
+                INSERT INTO user_prompt_preferences (user_id, template_id, is_active)
+                VALUES (:user_id, :template_id, TRUE)
+            """), {"user_id": user_id, "template_id": template_id})
+
+            conn.commit()
+
+            # Get the template name for the response
+            template_result = conn.execute(text("""
+                SELECT name FROM prompt_templates WHERE id = :template_id
+            """), {"template_id": template_id})
+
+            template_row = template_result.fetchone()
+            template_name = template_row[0] if template_row else "Unknown"
+
+            log_user_activity('prompt_template_switch', f'Switched to template: {template_name}')
+
+            return jsonify({
+                'success': True,
+                'message': f'Switched to {template_name} template',
+                'template_name': template_name
+            })
+
+    except Exception as e:
+        print(f"Error switching template: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to switch template'}), 500
 
 
 @app.route("/ai-usage-stats", methods=["GET"])
