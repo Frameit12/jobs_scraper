@@ -722,15 +722,12 @@ We're looking for a Senior VP to lead our AI Risk team...
                 const result = await response.json();
 
                 if (result.success) {
-                    // Display results first
+                    // Display results and keep them visible
                     displayResults(result.analysis);
                     document.getElementById('results-section').classList.add('active');
                     document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
-
-                    // Reload page after 2 seconds to update sidebar/history
-                    setTimeout(() => {
-                        location.reload();
-                    }, 2000);
+                    // Analysis is saved - it will appear in sidebar on next page load
+                    // No reload needed - let user view results without interruption
                 } else {
                     alert('Error: ' + result.error);
                 }
@@ -958,11 +955,9 @@ We're looking for a Senior VP to lead our AI Risk team...
                 const result = await response.json();
 
                 if (result.success) {
-                    // Remove from UI
-                    const card = document.querySelector(`[data-analysis-id="${analysisId}"]`);
-                    if (card) {
-                        card.remove();
-                    }
+                    // Remove ALL cards with this ID (sidebar + recent section)
+                    const cards = document.querySelectorAll(`[data-analysis-id="${analysisId}"]`);
+                    cards.forEach(card => card.remove());
 
                     // Update count
                     const historyList = document.getElementById('history-list');
