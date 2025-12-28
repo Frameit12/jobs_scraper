@@ -290,9 +290,14 @@ def extract_text_from_pdf(file_data):
             text += page.extract_text() + "\n"
 
         return text.strip()
+    except ImportError as e:
+        print(f"PyPDF2 not installed: {e}")
+        raise Exception("PyPDF2 library not installed. Please install it.")
     except Exception as e:
         print(f"Error extracting text from PDF: {e}")
-        return None
+        import traceback
+        traceback.print_exc()
+        raise Exception(f"Failed to parse PDF: {str(e)}")
 
 
 def extract_text_from_docx(file_data):
@@ -309,9 +314,14 @@ def extract_text_from_docx(file_data):
             text += paragraph.text + "\n"
 
         return text.strip()
+    except ImportError as e:
+        print(f"python-docx not installed: {e}")
+        raise Exception("python-docx library not installed. Please install it.")
     except Exception as e:
         print(f"Error extracting text from DOCX: {e}")
-        return None
+        import traceback
+        traceback.print_exc()
+        raise Exception(f"Failed to parse DOCX: {str(e)}")
 
 
 def parse_cv(file_data, file_type):
@@ -321,7 +331,7 @@ def parse_cv(file_data, file_type):
     elif file_type.lower() in ['docx', 'doc']:
         return extract_text_from_docx(file_data)
     else:
-        return None
+        raise Exception(f"Unsupported file type: {file_type}")
 
 
 def save_cv_to_db(user_id, cv_name, file_data, file_type, extracted_text):
@@ -3052,8 +3062,8 @@ def upload_cv():
         # Extract text from CV
         extracted_text = parse_cv(file_data, file_ext)
 
-        if not extracted_text:
-            return jsonify({'error': 'Failed to extract text from CV'}), 400
+        if not extracted_text or not extracted_text.strip():
+            return jsonify({'error': 'CV appears to be empty or text extraction failed'}), 400
 
         # Save to database
         cv_id = save_cv_to_db(user_id, cv_name, file_data, file_ext, extracted_text)
@@ -3072,7 +3082,9 @@ def upload_cv():
 
     except Exception as e:
         print(f"Error uploading CV: {e}")
-        return jsonify({'error': 'An error occurred during upload'}), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Upload error: {str(e)}'}), 500
 
 
 @app.route("/analyze-match", methods=["POST"])
