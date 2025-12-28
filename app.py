@@ -489,7 +489,7 @@ Company: {job_company or 'Not specified'}
 {job_description}
 
 **INSTRUCTIONS:**
-Provide a detailed analysis in the following JSON format:
+Respond ONLY with valid JSON (no markdown, no code blocks, no other text). Use this exact structure:
 
 {{
     "match_score": <integer 0-100>,
@@ -522,7 +522,7 @@ Provide a detailed analysis in the following JSON format:
     "overall_assessment": "2-3 sentence summary of candidacy strength"
 }}
 
-Be honest and objective. Focus on facts from the CV and job description."""
+IMPORTANT: Return ONLY the JSON object above. No explanations, no markdown formatting, just pure JSON. Be honest and objective."""
 
         message = client.messages.create(
             model="claude-sonnet-4-5-20250929",
@@ -544,12 +544,25 @@ Be honest and objective. Focus on facts from the CV and job description."""
 
         # Parse JSON response
         import json
+        import re
+
+        # Extract JSON from response (handle markdown code blocks)
+        json_text = response_text.strip()
+
+        # Check if response is wrapped in markdown code blocks
+        if json_text.startswith('```'):
+            # Extract JSON from markdown code block
+            match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', json_text, re.DOTALL)
+            if match:
+                json_text = match.group(1).strip()
+
         try:
-            analysis = json.loads(response_text)
+            analysis = json.loads(json_text)
         except json.JSONDecodeError as json_err:
             print(f"JSON parsing error: {json_err}")
-            print(f"Raw response: {response_text[:500]}")  # Log first 500 chars
-            raise Exception(f"AI returned invalid JSON. Raw response: {response_text[:200]}")
+            print(f"Raw response (first 1000 chars): {response_text[:1000]}")
+            # Return more helpful error to user
+            raise Exception(f"AI response was not valid JSON. This might be a prompt issue. First 300 chars: {response_text[:300]}")
 
         return analysis
 
