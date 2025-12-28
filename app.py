@@ -666,14 +666,26 @@ def track_ai_usage(feature_type, tokens_input, tokens_output):
 
 def save_job_analysis(user_id, cv_id, job_title, job_company, job_description, analysis_result):
     """Save job matching analysis to database"""
+    print(f"\n{'='*60}")
+    print(f"SAVE_JOB_ANALYSIS CALLED")
+    print(f"{'='*60}")
+    print(f"user_id: {user_id}")
+    print(f"cv_id: {cv_id}")
+    print(f"job_title: {job_title}")
+    print(f"job_company: {job_company}")
+    print(f"job_description length: {len(job_description) if job_description else 0}")
+    print(f"match_score: {analysis_result.get('match_score')}")
+
     engine = get_db_connection()
     if not engine:
+        print("ERROR: No database connection")
         return None
 
     try:
         import json
 
         with engine.connect() as conn:
+            print("\nExecuting INSERT query...")
             result = conn.execute(text("""
                 INSERT INTO job_analyses
                 (user_id, cv_id, job_title, job_company, job_description,
@@ -694,12 +706,35 @@ def save_job_analysis(user_id, cv_id, job_title, job_company, job_description, a
                 "recommendations": json.dumps(analysis_result.get('recommendations', [])),
                 "full_analysis": json.dumps(analysis_result)
             })
-            # Fetch the ID BEFORE committing
-            analysis_id = result.fetchone()[0]
+
+            row = result.fetchone()
+            print(f"Fetched row: {row}")
+
+            if not row:
+                print("ERROR: No row returned from INSERT")
+                return None
+
+            analysis_id = row[0]
+            print(f"Analysis ID from INSERT: {analysis_id} (type: {type(analysis_id)})")
+
+            print("Committing transaction...")
             conn.commit()
+            print(f"Transaction committed successfully")
+
+            # VERIFY the record was actually saved
+            print(f"Verifying record with ID {analysis_id} exists...")
+            verify = conn.execute(text("SELECT id, job_title, match_score FROM job_analyses WHERE id = :id"), {"id": analysis_id})
+            verify_row = verify.fetchone()
+            if verify_row:
+                print(f"✓ Verification successful: ID={verify_row[0]}, Title={verify_row[1]}, Score={verify_row[2]}")
+            else:
+                print(f"✗ WARNING: Record not found after commit!")
+
+            print(f"Returning analysis_id: {analysis_id}")
+            print(f"{'='*60}\n")
             return analysis_id
     except Exception as e:
-        print(f"Error saving job analysis: {e}")
+        print(f"ERROR in save_job_analysis: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -741,12 +776,29 @@ def get_user_analyses(user_id, limit=10):
 
 def get_analysis_by_id(analysis_id, user_id):
     """Get full analysis details by ID"""
+    print(f"\n{'='*60}")
+    print(f"GET_ANALYSIS_BY_ID CALLED")
+    print(f"{'='*60}")
+    print(f"Requested analysis_id: {analysis_id} (type: {type(analysis_id)})")
+    print(f"user_id: {user_id}")
+
     engine = get_db_connection()
     if not engine:
+        print("ERROR: No database connection")
         return None
 
     try:
         with engine.connect() as conn:
+            # First, check if analysis exists at all (without user_id filter)
+            print("\nChecking if analysis exists (without user filter)...")
+            check = conn.execute(text("SELECT id, user_id FROM job_analyses WHERE id = :id"), {"id": analysis_id})
+            check_row = check.fetchone()
+            if check_row:
+                print(f"✓ Found analysis: ID={check_row[0]}, user_id={check_row[1]}")
+            else:
+                print(f"✗ No analysis found with ID={analysis_id} in database")
+
+            print(f"\nExecuting main query with user_id filter...")
             result = conn.execute(text("""
                 SELECT ja.id, ja.job_title, ja.job_company, ja.job_description,
                        ja.match_score, ja.skills_match, ja.skills_missing,
@@ -759,10 +811,22 @@ def get_analysis_by_id(analysis_id, user_id):
 
             row = result.fetchone()
             if not row:
+                print(f"✗ No row returned from query")
+                print(f"  Possible reasons:")
+                print(f"  1. Analysis ID {analysis_id} doesn't exist")
+                print(f"  2. Analysis doesn't belong to user {user_id}")
+                print(f"  3. CV was deleted (JOIN would fail)")
+                print(f"{'='*60}\n")
                 return None
 
+            print(f"✓ Row found:")
+            print(f"  ID: {row[0]}")
+            print(f"  Title: {row[1]}")
+            print(f"  Company: {row[2]}")
+            print(f"  Match Score: {row[4]}")
+
             import json
-            return {
+            analysis_data = {
                 'id': row[0],
                 'job_title': row[1],
                 'job_company': row[2],
@@ -775,8 +839,14 @@ def get_analysis_by_id(analysis_id, user_id):
                 'created_at': row[9],
                 'cv_name': row[10]
             }
+            print(f"✓ Returning analysis data")
+            print(f"{'='*60}\n")
+            return analysis_data
     except Exception as e:
-        print(f"Error getting analysis by ID: {e}")
+        print(f"ERROR in get_analysis_by_id: {e}")
+        import traceback
+        traceback.print_exc()
+        print(f"{'='*60}\n")
         return None
 
 
@@ -3341,24 +3411,31 @@ def delete_cv(cv_id):
 @app.route("/get-analysis/<int:analysis_id>", methods=["GET"])
 def get_analysis(analysis_id):
     """Get full analysis by ID"""
+    print(f"\n>>> ROUTE /get-analysis/{analysis_id} called")
     if 'user_id' not in session:
+        print("  ERROR: User not authenticated")
         return jsonify({'error': 'Not authenticated'}), 401
 
     user_id = session['user_id']
+    print(f"  User ID from session: {user_id}")
 
     try:
         analysis = get_analysis_by_id(analysis_id, user_id)
 
         if not analysis:
+            print(f"  RETURNING 404: Analysis not found")
             return jsonify({'error': 'Analysis not found'}), 404
 
+        print(f"  SUCCESS: Returning analysis data")
         return jsonify({
             'success': True,
             'analysis': analysis
         })
 
     except Exception as e:
-        print(f"Error getting analysis: {e}")
+        print(f"  ERROR in route: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Failed to get analysis'}), 500
 
 
