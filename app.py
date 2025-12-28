@@ -162,6 +162,79 @@ def init_search_limits_table():
 init_search_limits_table()
 
 
+def init_cv_table():
+    """Initialize table for storing user CVs"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_cvs (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    cv_name VARCHAR(255) NOT NULL,
+                    file_data BYTEA NOT NULL,
+                    file_type VARCHAR(10) NOT NULL,
+                    file_size INTEGER NOT NULL,
+                    extracted_text TEXT,
+                    skills_detected TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, cv_name)
+                )
+            """))
+            conn.commit()
+
+init_cv_table()
+
+
+def init_job_analyses_table():
+    """Initialize table for storing job matching analyses"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS job_analyses (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    cv_id INTEGER REFERENCES user_cvs(id) ON DELETE CASCADE,
+                    job_title VARCHAR(500) NOT NULL,
+                    job_company VARCHAR(500),
+                    job_description TEXT NOT NULL,
+                    match_score INTEGER,
+                    skills_match JSONB,
+                    skills_missing JSONB,
+                    recommendations TEXT,
+                    full_analysis TEXT,
+                    decision VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+
+init_job_analyses_table()
+
+
+def init_ai_usage_tracking_table():
+    """Initialize table for tracking AI API usage and costs"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS ai_usage_tracking (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    feature_type VARCHAR(50) NOT NULL,
+                    tokens_input INTEGER,
+                    tokens_output INTEGER,
+                    estimated_cost DECIMAL(10, 6),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+
+init_ai_usage_tracking_table()
+
+
 def generate_reset_token():
     import secrets
     return secrets.token_urlsafe(32)
@@ -199,6 +272,380 @@ def create_password_reset_token(user_id):
     except Exception as e:
         print(f"Error creating reset token: {e}")
         return None
+
+
+# ==================== AI MATCH TOOL: CV PARSING FUNCTIONS ====================
+
+def extract_text_from_pdf(file_data):
+    """Extract text from PDF file"""
+    try:
+        from PyPDF2 import PdfReader
+        import io
+
+        pdf_file = io.BytesIO(file_data)
+        reader = PdfReader(pdf_file)
+
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+
+        return text.strip()
+    except Exception as e:
+        print(f"Error extracting text from PDF: {e}")
+        return None
+
+
+def extract_text_from_docx(file_data):
+    """Extract text from DOCX file"""
+    try:
+        from docx import Document
+        import io
+
+        docx_file = io.BytesIO(file_data)
+        doc = Document(docx_file)
+
+        text = ""
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+
+        return text.strip()
+    except Exception as e:
+        print(f"Error extracting text from DOCX: {e}")
+        return None
+
+
+def parse_cv(file_data, file_type):
+    """Parse CV and extract text based on file type"""
+    if file_type.lower() == 'pdf':
+        return extract_text_from_pdf(file_data)
+    elif file_type.lower() in ['docx', 'doc']:
+        return extract_text_from_docx(file_data)
+    else:
+        return None
+
+
+def save_cv_to_db(user_id, cv_name, file_data, file_type, extracted_text):
+    """Save CV to database"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        file_size = len(file_data)
+
+        with engine.connect() as conn:
+            # Check if CV with same name exists, update if yes
+            result = conn.execute(text("""
+                SELECT id FROM user_cvs
+                WHERE user_id = :user_id AND cv_name = :cv_name
+            """), {"user_id": user_id, "cv_name": cv_name})
+
+            existing_cv = result.fetchone()
+
+            if existing_cv:
+                # Update existing CV
+                conn.execute(text("""
+                    UPDATE user_cvs
+                    SET file_data = :file_data, file_type = :file_type,
+                        file_size = :file_size, extracted_text = :extracted_text,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :cv_id
+                """), {
+                    "file_data": file_data,
+                    "file_type": file_type,
+                    "file_size": file_size,
+                    "extracted_text": extracted_text,
+                    "cv_id": existing_cv[0]
+                })
+                conn.commit()
+                return existing_cv[0]
+            else:
+                # Insert new CV
+                result = conn.execute(text("""
+                    INSERT INTO user_cvs (user_id, cv_name, file_data, file_type, file_size, extracted_text)
+                    VALUES (:user_id, :cv_name, :file_data, :file_type, :file_size, :extracted_text)
+                    RETURNING id
+                """), {
+                    "user_id": user_id,
+                    "cv_name": cv_name,
+                    "file_data": file_data,
+                    "file_type": file_type,
+                    "file_size": file_size,
+                    "extracted_text": extracted_text
+                })
+                conn.commit()
+                cv_id = result.fetchone()[0]
+                return cv_id
+    except Exception as e:
+        print(f"Error saving CV to database: {e}")
+        return None
+
+
+def get_user_cvs(user_id):
+    """Get all CVs for a user"""
+    engine = get_db_connection()
+    if not engine:
+        return []
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, cv_name, file_type, file_size, created_at, updated_at
+                FROM user_cvs
+                WHERE user_id = :user_id
+                ORDER BY updated_at DESC
+            """), {"user_id": user_id})
+
+            cvs = []
+            for row in result:
+                cvs.append({
+                    'id': row[0],
+                    'cv_name': row[1],
+                    'file_type': row[2],
+                    'file_size': row[3],
+                    'created_at': row[4],
+                    'updated_at': row[5]
+                })
+            return cvs
+    except Exception as e:
+        print(f"Error getting user CVs: {e}")
+        return []
+
+
+def get_cv_by_id(cv_id, user_id):
+    """Get specific CV by ID (with user verification)"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, cv_name, file_data, file_type, extracted_text
+                FROM user_cvs
+                WHERE id = :cv_id AND user_id = :user_id
+            """), {"cv_id": cv_id, "user_id": user_id})
+
+            row = result.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'cv_name': row[1],
+                    'file_data': row[2],
+                    'file_type': row[3],
+                    'extracted_text': row[4]
+                }
+            return None
+    except Exception as e:
+        print(f"Error getting CV: {e}")
+        return None
+
+
+# ==================== AI MATCH TOOL: AI INTEGRATION FUNCTIONS ====================
+
+def get_anthropic_client():
+    """Initialize Anthropic client"""
+    try:
+        import anthropic
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
+        if not api_key:
+            print("Warning: ANTHROPIC_API_KEY not found in environment variables")
+            return None
+        return anthropic.Anthropic(api_key=api_key)
+    except Exception as e:
+        print(f"Error initializing Anthropic client: {e}")
+        return None
+
+
+def analyze_job_match_with_ai(cv_text, job_title, job_company, job_description):
+    """Use Claude AI to analyze CV-to-job match"""
+    client = get_anthropic_client()
+    if not client:
+        return None
+
+    try:
+        prompt = f"""You are an expert career coach and recruiter. Analyze how well this candidate's CV matches the job description.
+
+**CANDIDATE'S CV:**
+{cv_text}
+
+**JOB DETAILS:**
+Title: {job_title}
+Company: {job_company or 'Not specified'}
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**INSTRUCTIONS:**
+Provide a detailed analysis in the following JSON format:
+
+{{
+    "match_score": <integer 0-100>,
+    "skills_match": [
+        {{
+            "skill": "Skill name",
+            "evidence": "Where in CV this is demonstrated",
+            "strength": "strong|moderate|basic"
+        }}
+    ],
+    "skills_missing": [
+        {{
+            "skill": "Required skill name",
+            "importance": "required|preferred|nice-to-have",
+            "impact": "Brief explanation of gap impact"
+        }}
+    ],
+    "experience_match": [
+        "Bullet point of matching experience"
+    ],
+    "experience_gaps": [
+        "Bullet point of experience gaps"
+    ],
+    "recommendations": [
+        {{
+            "priority": "high|medium|low",
+            "recommendation": "Specific actionable advice"
+        }}
+    ],
+    "overall_assessment": "2-3 sentence summary of candidacy strength"
+}}
+
+Be honest and objective. Focus on facts from the CV and job description."""
+
+        message = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4000,
+            temperature=0.3,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        response_text = message.content[0].text
+
+        # Track usage
+        track_ai_usage(
+            feature_type='job_match_analysis',
+            tokens_input=message.usage.input_tokens,
+            tokens_output=message.usage.output_tokens
+        )
+
+        # Parse JSON response
+        import json
+        analysis = json.loads(response_text)
+
+        return analysis
+
+    except Exception as e:
+        print(f"Error analyzing job match: {e}")
+        return None
+
+
+def track_ai_usage(feature_type, tokens_input, tokens_output):
+    """Track AI API usage for cost monitoring"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return
+
+    engine = get_db_connection()
+    if not engine:
+        return
+
+    try:
+        # Calculate estimated cost (Claude 3.5 Sonnet pricing)
+        # Input: $3 per million tokens, Output: $15 per million tokens
+        cost_input = (tokens_input / 1_000_000) * 3.0
+        cost_output = (tokens_output / 1_000_000) * 15.0
+        total_cost = cost_input + cost_output
+
+        with engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO ai_usage_tracking
+                (user_id, feature_type, tokens_input, tokens_output, estimated_cost)
+                VALUES (:user_id, :feature_type, :tokens_input, :tokens_output, :estimated_cost)
+            """), {
+                "user_id": user_id,
+                "feature_type": feature_type,
+                "tokens_input": tokens_input,
+                "tokens_output": tokens_output,
+                "estimated_cost": total_cost
+            })
+            conn.commit()
+    except Exception as e:
+        print(f"Error tracking AI usage: {e}")
+
+
+def save_job_analysis(user_id, cv_id, job_title, job_company, job_description, analysis_result):
+    """Save job matching analysis to database"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        import json
+
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                INSERT INTO job_analyses
+                (user_id, cv_id, job_title, job_company, job_description,
+                 match_score, skills_match, skills_missing, recommendations, full_analysis)
+                VALUES
+                (:user_id, :cv_id, :job_title, :job_company, :job_description,
+                 :match_score, :skills_match, :skills_missing, :recommendations, :full_analysis)
+                RETURNING id
+            """), {
+                "user_id": user_id,
+                "cv_id": cv_id,
+                "job_title": job_title,
+                "job_company": job_company or '',
+                "job_description": job_description,
+                "match_score": analysis_result.get('match_score'),
+                "skills_match": json.dumps(analysis_result.get('skills_match', [])),
+                "skills_missing": json.dumps(analysis_result.get('skills_missing', [])),
+                "recommendations": json.dumps(analysis_result.get('recommendations', [])),
+                "full_analysis": json.dumps(analysis_result)
+            })
+            conn.commit()
+            analysis_id = result.fetchone()[0]
+            return analysis_id
+    except Exception as e:
+        print(f"Error saving job analysis: {e}")
+        return None
+
+
+def get_user_analyses(user_id, limit=10):
+    """Get recent job analyses for a user"""
+    engine = get_db_connection()
+    if not engine:
+        return []
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT ja.id, ja.job_title, ja.job_company, ja.match_score,
+                       ja.created_at, cv.cv_name
+                FROM job_analyses ja
+                JOIN user_cvs cv ON ja.cv_id = cv.id
+                WHERE ja.user_id = :user_id
+                ORDER BY ja.created_at DESC
+                LIMIT :limit
+            """), {"user_id": user_id, "limit": limit})
+
+            analyses = []
+            for row in result:
+                analyses.append({
+                    'id': row[0],
+                    'job_title': row[1],
+                    'job_company': row[2],
+                    'match_score': row[3],
+                    'created_at': row[4],
+                    'cv_name': row[5]
+                })
+            return analyses
+    except Exception as e:
+        print(f"Error getting user analyses: {e}")
+        return []
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
@@ -2544,7 +2991,229 @@ def test_gmail_direct():
     except Exception as e:
         logger.error(f"❌ Gmail SMTP test failed: {e}")
         return f"Gmail test failed: {e}"
-        
+
+
+# ==================== AI MATCH TOOL ROUTES ====================
+
+@app.route("/ai-match", methods=["GET", "POST"])
+def ai_match():
+    """AI Match Tool main page"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    username = session.get('username', 'User')
+
+    # Get user's CVs
+    user_cvs = get_user_cvs(user_id)
+
+    # Get recent analyses
+    recent_analyses = get_user_analyses(user_id, limit=5)
+
+    return render_template('ai_match.html',
+                         username=username,
+                         user_cvs=user_cvs,
+                         recent_analyses=recent_analyses)
+
+
+@app.route("/upload-cv", methods=["POST"])
+def upload_cv():
+    """Handle CV upload"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        # Get uploaded file
+        if 'cv_file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['cv_file']
+        cv_name = request.form.get('cv_name', file.filename)
+
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Validate file type
+        allowed_extensions = {'pdf', 'docx', 'doc'}
+        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+
+        if file_ext not in allowed_extensions:
+            return jsonify({'error': 'Invalid file type. Only PDF and DOCX allowed'}), 400
+
+        # Read file data
+        file_data = file.read()
+
+        # Check file size (max 5MB)
+        if len(file_data) > 5 * 1024 * 1024:
+            return jsonify({'error': 'File too large. Maximum size is 5MB'}), 400
+
+        # Extract text from CV
+        extracted_text = parse_cv(file_data, file_ext)
+
+        if not extracted_text:
+            return jsonify({'error': 'Failed to extract text from CV'}), 400
+
+        # Save to database
+        cv_id = save_cv_to_db(user_id, cv_name, file_data, file_ext, extracted_text)
+
+        if not cv_id:
+            return jsonify({'error': 'Failed to save CV'}), 500
+
+        log_user_activity('cv_upload', f'Uploaded CV: {cv_name}')
+
+        return jsonify({
+            'success': True,
+            'cv_id': cv_id,
+            'cv_name': cv_name,
+            'message': 'CV uploaded successfully'
+        })
+
+    except Exception as e:
+        print(f"Error uploading CV: {e}")
+        return jsonify({'error': 'An error occurred during upload'}), 500
+
+
+@app.route("/analyze-match", methods=["POST"])
+def analyze_match():
+    """Analyze job match using AI"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.get_json()
+
+        cv_id = data.get('cv_id')
+        job_title = data.get('job_title')
+        job_company = data.get('job_company', '')
+        job_description = data.get('job_description')
+
+        # Validate inputs
+        if not cv_id or not job_title or not job_description:
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Get CV
+        cv_data = get_cv_by_id(cv_id, user_id)
+        if not cv_data:
+            return jsonify({'error': 'CV not found'}), 404
+
+        cv_text = cv_data['extracted_text']
+
+        # Analyze with AI
+        analysis_result = analyze_job_match_with_ai(
+            cv_text,
+            job_title,
+            job_company,
+            job_description
+        )
+
+        if not analysis_result:
+            return jsonify({'error': 'AI analysis failed'}), 500
+
+        # Save analysis to database
+        analysis_id = save_job_analysis(
+            user_id,
+            cv_id,
+            job_title,
+            job_company,
+            job_description,
+            analysis_result
+        )
+
+        log_user_activity('job_match_analysis', f'Analyzed: {job_title}')
+
+        return jsonify({
+            'success': True,
+            'analysis_id': analysis_id,
+            'analysis': analysis_result
+        })
+
+    except Exception as e:
+        print(f"Error analyzing match: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'An error occurred during analysis'}), 500
+
+
+@app.route("/delete-cv/<int:cv_id>", methods=["POST"])
+def delete_cv(cv_id):
+    """Delete a CV"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            # Verify ownership and delete
+            result = conn.execute(text("""
+                DELETE FROM user_cvs
+                WHERE id = :cv_id AND user_id = :user_id
+                RETURNING cv_name
+            """), {"cv_id": cv_id, "user_id": user_id})
+
+            deleted_cv = result.fetchone()
+            conn.commit()
+
+            if not deleted_cv:
+                return jsonify({'error': 'CV not found'}), 404
+
+            log_user_activity('cv_delete', f'Deleted CV: {deleted_cv[0]}')
+
+            return jsonify({'success': True, 'message': 'CV deleted'})
+
+    except Exception as e:
+        print(f"Error deleting CV: {e}")
+        return jsonify({'error': 'Failed to delete CV'}), 500
+
+
+@app.route("/ai-usage-stats", methods=["GET"])
+def ai_usage_stats():
+    """Get AI usage statistics for the user"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            # Get total usage this month
+            result = conn.execute(text("""
+                SELECT
+                    COUNT(*) as total_analyses,
+                    SUM(tokens_input) as total_input_tokens,
+                    SUM(tokens_output) as total_output_tokens,
+                    SUM(estimated_cost) as total_cost
+                FROM ai_usage_tracking
+                WHERE user_id = :user_id
+                AND created_at >= DATE_TRUNC('month', CURRENT_DATE)
+            """), {"user_id": user_id})
+
+            stats = result.fetchone()
+
+            return jsonify({
+                'total_analyses': stats[0] or 0,
+                'total_input_tokens': stats[1] or 0,
+                'total_output_tokens': stats[2] or 0,
+                'total_cost': float(stats[3] or 0)
+            })
+
+    except Exception as e:
+        print(f"Error getting usage stats: {e}")
+        return jsonify({'error': 'Failed to get stats'}), 500
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
 
