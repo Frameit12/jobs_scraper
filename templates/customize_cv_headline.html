@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customize CV - Select Headline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .headline-card {
+            transition: all 0.3s ease;
+        }
+        .headline-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .headline-card.selected {
+            border-color: #3b82f6;
+            background: linear-gradient(to right, #eff6ff, #dbeafe);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+
+<div x-data="headlineSelector()" class="max-w-6xl mx-auto p-8" x-cloak>
+
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-800">Customize Your CV</h1>
+                <p class="text-slate-600 mt-2">
+                    For: <span class="font-semibold">{{ job_title }}</span>
+                    {% if job_company %}- {{ job_company }}{% endif %}
+                </p>
+            </div>
+            <a href="/ai-match" class="text-slate-600 hover:text-slate-800 flex items-center">
+                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                Cancel
+            </a>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mt-6">
+            <div class="flex items-center text-sm text-slate-600 mb-2">
+                <span class="font-semibold text-blue-600">Step 1 of 3:</span>
+                <span class="ml-2">Select Headline</span>
+            </div>
+            <div class="h-2 bg-gray-200 rounded-full">
+                <div class="h-2 bg-blue-600 rounded-full" style="width: 33%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Recommendation Banner -->
+    <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl shadow-lg p-6 mb-8">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+            </div>
+            <div class="ml-4 flex-1">
+                <h3 class="text-xl font-bold mb-2">🎯 AI Recommendation</h3>
+                {% if recommended_headline %}
+                <div class="bg-white/20 rounded-lg p-4 mb-3">
+                    <p class="font-semibold text-lg">"{{ recommended_headline.text }}"</p>
+                    <div class="flex items-center mt-2">
+                        <span class="bg-green-400 text-green-900 px-3 py-1 rounded-full text-sm font-semibold">
+                            Match: {{ recommended_headline.match_score }}%
+                        </span>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <p class="font-semibold text-sm">💡 Why this headline maximizes your interview chances:</p>
+                    <ul class="space-y-1 text-sm">
+                        {% for reason in recommended_headline.reasons %}
+                        <li class="flex items-start">
+                            <svg class="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span>{{ reason }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Action Buttons -->
+    <div class="flex gap-4 mb-8">
+        <button @click="selectRecommended()"
+                class="flex-1 bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold hover:bg-blue-700 transition shadow-lg flex items-center justify-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            Use Recommended Headline
+        </button>
+        <button @click="showAllHeadlines = !showAllHeadlines"
+                class="flex-1 bg-slate-100 text-slate-700 px-6 py-4 rounded-lg font-semibold hover:bg-slate-200 transition flex items-center justify-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+            <span x-text="showAllHeadlines ? 'Hide Other Options' : 'View All Options (' + {{ headlines|length }} + ')'"></span>
+        </button>
+    </div>
+
+    <!-- All Headlines List (Collapsible) -->
+    <div x-show="showAllHeadlines"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform scale-95"
+         x-transition:enter-end="opacity-100 transform scale-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 transform scale-100"
+         x-transition:leave-end="opacity-0 transform scale-95"
+         class="space-y-4">
+
+        <h3 class="text-xl font-bold text-slate-800 mb-4">All Available Headlines</h3>
+
+        {% for headline in headlines %}
+        <div class="headline-card bg-white rounded-xl shadow-md border-2 p-6 cursor-pointer"
+             :class="{ 'selected': selectedHeadline === '{{ headline.text }}' }"
+             @click="selectHeadline('{{ headline.text }}', {{ headline.match_score }})">
+
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex-1">
+                    <p class="text-lg font-semibold text-slate-800 leading-relaxed">"{{ headline.text }}"</p>
+                </div>
+                <div class="ml-4 flex-shrink-0">
+                    {% if headline.tier == 'top' %}
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold
+                        {% if headline.match_score >= 80 %}bg-green-100 text-green-800
+                        {% elif headline.match_score >= 70 %}bg-blue-100 text-blue-800
+                        {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                        {{ headline.match_score }}% Match
+                    </span>
+                    {% else %}
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-600">
+                        {{ headline.match_score }}% Match
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Reasons (for top headlines) -->
+            {% if headline.tier == 'top' and headline.reasons %}
+            <div class="bg-slate-50 rounded-lg p-4 mb-3">
+                <p class="text-sm font-semibold text-slate-700 mb-2">💡 Why this works:</p>
+                <ul class="space-y-1 text-sm text-slate-600">
+                    {% for reason in headline.reasons %}
+                    <li class="flex items-start">
+                        <svg class="w-4 h-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span>{{ reason }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Suggested Adaptation -->
+            {% if headline.suggested_adaptation %}
+            <div class="bg-amber-50 border-l-4 border-amber-400 p-3">
+                <p class="text-sm text-amber-800">
+                    <span class="font-semibold">⚙️ Suggested Enhancement:</span>
+                    {{ headline.suggested_adaptation }}
+                </p>
+            </div>
+            {% endif %}
+            {% endif %}
+
+            <!-- Weakness (for lower-tier headlines) -->
+            {% if headline.tier == 'other' and headline.weakness %}
+            <div class="bg-slate-50 rounded-lg p-3">
+                <p class="text-sm text-slate-600">
+                    <span class="font-semibold">⚠️ Concern:</span>
+                    {{ headline.weakness }}
+                </p>
+            </div>
+            {% endif %}
+
+            <!-- Selection indicator -->
+            <div x-show="selectedHeadline === '{{ headline.text }}'" class="mt-4 flex items-center text-blue-600">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span class="font-semibold">Selected</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Continue Button (Fixed at Bottom) -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4"
+         x-show="selectedHeadline !== null">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div>
+                <p class="text-sm text-slate-600">Selected headline:</p>
+                <p class="font-semibold text-slate-800 truncate max-w-2xl" x-text="selectedHeadline"></p>
+            </div>
+            <button @click="saveAndContinue()"
+                    :disabled="saving"
+                    class="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400 flex items-center">
+                <span x-show="!saving">Continue to Bullet Selection →</span>
+                <span x-show="saving">
+                    <svg class="animate-spin h-5 w-5 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                </span>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function headlineSelector() {
+    return {
+        selectedHeadline: null,
+        selectedMatchScore: 0,
+        showAllHeadlines: false,
+        saving: false,
+
+        selectRecommended() {
+            {% if recommended_headline %}
+            this.selectHeadline('{{ recommended_headline.text }}', {{ recommended_headline.match_score }});
+            this.saveAndContinue();
+            {% endif %}
+        },
+
+        selectHeadline(headline, matchScore) {
+            this.selectedHeadline = headline;
+            this.selectedMatchScore = matchScore;
+
+            // Scroll to bottom to show continue button
+            setTimeout(() => {
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }, 100);
+        },
+
+        async saveAndContinue() {
+            if (!this.selectedHeadline) {
+                alert('Please select a headline first');
+                return;
+            }
+
+            this.saving = true;
+
+            try {
+                const response = await fetch('/customize-cv/headline', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        headline: this.selectedHeadline,
+                        match_score: this.selectedMatchScore
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Redirect to next step
+                    window.location.href = result.next_step;
+                } else {
+                    alert('Error: ' + result.error);
+                    this.saving = false;
+                }
+            } catch (error) {
+                console.error('Error saving headline:', error);
+                alert('Failed to save headline. Please try again.');
+                this.saving = false;
+            }
+        }
+    }
+}
+</script>
+
+</body>
+</html>

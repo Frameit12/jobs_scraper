@@ -319,6 +319,37 @@ def init_master_templates_table():
 init_master_templates_table()
 
 
+def init_cv_customization_sessions_table():
+    """Initialize table for storing CV customization sessions"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS cv_customization_sessions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    analysis_id INTEGER REFERENCES job_analyses(id) ON DELETE CASCADE,
+                    job_title VARCHAR(500),
+                    job_company VARCHAR(500),
+                    selected_headline TEXT,
+                    approved_bullets JSONB,
+                    new_bullets JSONB,
+                    match_score_progression JSONB,
+                    status VARCHAR(50) DEFAULT 'in_progress',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_cv_sessions_user
+                ON cv_customization_sessions(user_id, status)
+            """))
+            conn.commit()
+
+init_cv_customization_sessions_table()
+
+
 def seed_initial_prompt_templates():
     """Seed initial prompt templates if they don't exist"""
     engine = get_db_connection()
@@ -1148,6 +1179,244 @@ def extract_text_from_docx(file_data):
 
     except Exception as e:
         print(f"Error extracting text from docx: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+# ==================== CV CUSTOMIZATION: HELPER FUNCTIONS ====================
+
+def parse_headlines_from_template(template_text):
+    """Extract all headline variations from master template"""
+    headlines = []
+    lines = template_text.split('\n')
+
+    for i, line in enumerate(lines):
+        line = line.strip()
+        # Look for lines that look like headlines (contain |, multiple sections, professional titles)
+        if '|' in line and len(line) > 20 and not line.startswith('•') and not line.startswith('-'):
+            headlines.append({
+                'id': i,
+                'text': line
+            })
+        # Also look for lines after "Headline" markers
+        elif line.lower().startswith('headline') and i + 1 < len(lines):
+            next_line = lines[i + 1].strip()
+            if next_line:
+                headlines.append({
+                    'id': i + 1,
+                    'text': next_line
+                })
+
+    return headlines
+
+
+def parse_bullets_from_template(template_text):
+    """Extract all bullet points from latest role in master template"""
+    bullets = []
+    lines = template_text.split('\n')
+
+    in_latest_role = False
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+
+        # Detect start of job role (usually contains years like "2021-2025" or job title + company)
+        if any(year in line for year in ['2024', '2023', '2022', '2021', '2020']) and not in_latest_role:
+            in_latest_role = True
+            continue
+
+        # Detect next job role (stop collecting bullets)
+        if in_latest_role and any(year in line for year in ['2019', '2018', '2017', '2016', '2015']):
+            break
+
+        # Collect bullet points
+        if in_latest_role and (line_stripped.startswith('•') or line_stripped.startswith('-') or line_stripped.startswith('*')):
+            bullet_text = line_stripped.lstrip('•-*').strip()
+            if len(bullet_text) > 20:  # Filter out too-short bullets
+                bullets.append({
+                    'id': i,
+                    'text': bullet_text
+                })
+
+    return bullets
+
+
+def create_cv_customization_session(user_id, analysis_id, job_title, job_company):
+    """Create a new CV customization session"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                INSERT INTO cv_customization_sessions
+                (user_id, analysis_id, job_title, job_company, status)
+                VALUES (:user_id, :analysis_id, :job_title, :job_company, 'in_progress')
+                RETURNING id
+            """), {
+                "user_id": user_id,
+                "analysis_id": analysis_id,
+                "job_title": job_title,
+                "job_company": job_company
+            })
+
+            session_id = result.fetchone()[0]
+            conn.commit()
+            return session_id
+
+    except Exception as e:
+        print(f"Error creating CV customization session: {e}")
+        return None
+
+
+def get_cv_session(session_id):
+    """Get CV customization session data"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, user_id, analysis_id, job_title, job_company,
+                       selected_headline, approved_bullets, new_bullets,
+                       match_score_progression, status, created_at
+                FROM cv_customization_sessions
+                WHERE id = :session_id
+            """), {"session_id": session_id})
+
+            row = result.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'user_id': row[1],
+                    'analysis_id': row[2],
+                    'job_title': row[3],
+                    'job_company': row[4],
+                    'selected_headline': row[5],
+                    'approved_bullets': row[6] if row[6] else [],
+                    'new_bullets': row[7] if row[7] else [],
+                    'match_score_progression': row[8] if row[8] else {},
+                    'status': row[9],
+                    'created_at': row[10]
+                }
+            return None
+
+    except Exception as e:
+        print(f"Error getting CV session: {e}")
+        return None
+
+
+def update_cv_session_headline(session_id, headline_text):
+    """Update selected headline in CV session"""
+    engine = get_db_connection()
+    if not engine:
+        return False
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                UPDATE cv_customization_sessions
+                SET selected_headline = :headline, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """), {"session_id": session_id, "headline": headline_text})
+            conn.commit()
+            return True
+
+    except Exception as e:
+        print(f"Error updating headline: {e}")
+        return False
+
+
+def analyze_headlines_with_ai(headlines, job_description, user_id):
+    """Use AI to analyze headlines and recommend best one"""
+    client = get_anthropic_client()
+
+    # Get user's system prompt
+    system_prompt = get_user_system_prompt(user_id)
+
+    # Build headlines list for prompt
+    headlines_text = "\n".join([f"{i+1}. {h['text']}" for i, h in enumerate(headlines)])
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=2000,
+            temperature=0.3,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""You are helping a job seeker select the best resume headline to maximize their interview chances for this role.
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**AVAILABLE HEADLINE OPTIONS:**
+{headlines_text}
+
+**YOUR TASK:**
+Analyze each headline and:
+1. Identify which headline best aligns with the JD requirements
+2. Explain why it's the best match (3-4 specific reasons tied to JD)
+3. Calculate a match score (0-100) for the top 3 headlines
+4. Suggest if the best headline needs any adaptations for this specific role
+
+Return your analysis as JSON:
+{{
+    "recommended_headline_index": 2,
+    "top_3": [
+        {{
+            "index": 2,
+            "match_score": 85,
+            "reasons": [
+                "Emphasizes AI innovation which matches JD requirement for AI-driven initiatives",
+                "Leadership positioning aligns with transformation lead role",
+                "Financial services background directly relevant"
+            ],
+            "suggested_adaptation": null
+        }},
+        {{
+            "index": 4,
+            "match_score": 78,
+            "reasons": ["...", "...", "..."],
+            "suggested_adaptation": "Change 'Program Manager' to 'Transformation Lead' to match job title"
+        }},
+        {{
+            "index": 13,
+            "match_score": 72,
+            "reasons": ["...", "...", "..."],
+            "suggested_adaptation": null
+        }}
+    ],
+    "other_headlines": [
+        {{
+            "index": 1,
+            "match_score": 45,
+            "weakness": "Too focused on risk/compliance, doesn't emphasize transformation"
+        }},
+        ...
+    ]
+}}
+
+Be strategic and honest about which headlines will maximize interview chances."""
+                }
+            ]
+        )
+
+        response_text = message.content[0].text
+
+        # Extract JSON from response
+        import re
+        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if json_match:
+            analysis = json.loads(json_match.group())
+            return analysis
+
+        return None
+
+    except Exception as e:
+        print(f"Error analyzing headlines with AI: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -4519,6 +4788,158 @@ def debug_analyses():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ==================== CV CUSTOMIZATION ROUTES ====================
+
+@app.route("/customize-cv/start/<int:analysis_id>", methods=["GET"])
+def customize_cv_start(analysis_id):
+    """Entry point for CV customization - creates session and starts flow"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        # Get the analysis
+        analysis = get_analysis_by_id(analysis_id, user_id)
+        if not analysis:
+            return "Analysis not found", 404
+
+        # Get user's master template
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return redirect(f'/my-resume-template?error=no_template')
+
+        # Create CV customization session
+        cv_session_id = create_cv_customization_session(
+            user_id,
+            analysis_id,
+            analysis['job_title'],
+            analysis['job_company']
+        )
+
+        if not cv_session_id:
+            return "Failed to create customization session", 500
+
+        # Store session ID in Flask session
+        session['cv_session_id'] = cv_session_id
+
+        # Redirect to headline selection
+        return redirect('/customize-cv/headline')
+
+    except Exception as e:
+        print(f"Error starting CV customization: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error starting CV customization", 500
+
+
+@app.route("/customize-cv/headline", methods=["GET", "POST"])
+def customize_cv_headline():
+    """Step 1: Headline selection with AI recommendations"""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return redirect('/ai-match')
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+
+    if request.method == "POST":
+        # Save selected headline
+        data = request.json
+        selected_headline = data.get('headline')
+
+        if update_cv_session_headline(cv_session_id, selected_headline):
+            return jsonify({'success': True, 'next_step': '/customize-cv/bullets'})
+        else:
+            return jsonify({'error': 'Failed to save headline'}), 500
+
+    # GET request - show headline selection page
+    try:
+        # Get CV session data
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return "Session not found", 404
+
+        # Get analysis for job description
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return "Analysis not found", 404
+
+        # Get master template
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return "Master template not found", 404
+
+        # Parse headlines from template
+        headlines = parse_headlines_from_template(master_template['template_text'])
+
+        if not headlines:
+            return "No headlines found in master template", 400
+
+        # Analyze headlines with AI
+        ai_analysis = analyze_headlines_with_ai(
+            headlines,
+            analysis['job_description'],
+            user_id
+        )
+
+        if not ai_analysis:
+            return "Failed to analyze headlines", 500
+
+        # Combine headlines with AI analysis
+        headlines_with_analysis = []
+        for i, headline in enumerate(headlines):
+            # Find this headline in AI analysis
+            headline_analysis = None
+
+            # Check top 3
+            for top in ai_analysis.get('top_3', []):
+                if top['index'] == i:
+                    headline_analysis = {
+                        'tier': 'top',
+                        'match_score': top['match_score'],
+                        'reasons': top['reasons'],
+                        'suggested_adaptation': top.get('suggested_adaptation')
+                    }
+                    break
+
+            # Check other headlines
+            if not headline_analysis:
+                for other in ai_analysis.get('other_headlines', []):
+                    if other['index'] == i:
+                        headline_analysis = {
+                            'tier': 'other',
+                            'match_score': other['match_score'],
+                            'weakness': other.get('weakness')
+                        }
+                        break
+
+            if headline_analysis:
+                headlines_with_analysis.append({
+                    **headline,
+                    **headline_analysis
+                })
+
+        # Get recommended headline
+        recommended_index = ai_analysis.get('recommended_headline_index', 0)
+        recommended_headline = next(
+            (h for h in headlines_with_analysis if h['id'] == recommended_index),
+            headlines_with_analysis[0] if headlines_with_analysis else None
+        )
+
+        return render_template('customize_cv_headline.html',
+                             job_title=cv_session['job_title'],
+                             job_company=cv_session['job_company'],
+                             headlines=headlines_with_analysis,
+                             recommended_headline=recommended_headline,
+                             analysis_id=cv_session['analysis_id'])
+
+    except Exception as e:
+        print(f"Error in headline selection: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading headline selection", 500
 
 
 @app.route("/get-analysis/<int:analysis_id>", methods=["GET"])
