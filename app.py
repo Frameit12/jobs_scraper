@@ -1207,17 +1207,23 @@ def parse_headlines_from_template(template_text):
             print(f"Found HEADLINES section at line {i}: '{line_stripped[:50]}...'")
             continue
 
-        # Detect end of HEADLINES section (next major section)
-        if in_headlines_section and (
-            line_stripped.startswith('___') or  # Separator line
-            'CORE SKILLS' in line_stripped.upper() or
-            'COMPETENCIES' in line_stripped.upper() or
-            'EXPERIENCE' in line_stripped.upper() or
-            'EDUCATION' in line_stripped.upper() or
-            'TECHNICAL' in line_stripped.upper()
-        ):
-            print(f"End of HEADLINES section at line {i}: '{line_stripped[:50]}...'")
-            break
+        # Detect end of HEADLINES section (only match actual section headers, not words within headlines)
+        if in_headlines_section and line_stripped:
+            # Check if this is a separator line
+            if line_stripped.startswith('___'):
+                print(f"End of HEADLINES section at line {i}: '{line_stripped[:50]}...'")
+                break
+
+            # Check if this is an ALL CAPS section header or starts with known section names
+            upper_line = line_stripped.upper()
+            if (line_stripped.isupper() and len(line_stripped) > 5) or \
+               upper_line.startswith('CORE SKILLS') or \
+               upper_line.startswith('EXPERIENCE:') or \
+               upper_line.startswith('EDUCATION:') or \
+               upper_line.startswith('TECHNICAL ACUMEN:') or \
+               upper_line.startswith('WORK HISTORY'):
+                print(f"End of HEADLINES section at line {i}: '{line_stripped[:50]}...'")
+                break
 
         # Extract numbered headlines (e.g., "1.", "2.", etc.)
         if in_headlines_section and line_stripped:
