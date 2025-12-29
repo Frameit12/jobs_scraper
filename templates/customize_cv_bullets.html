@@ -135,9 +135,12 @@
             <!-- Rewrite Suggestion (if needed) -->
             {% if bullet.rewrite_suggestion %}
             <div class="bg-orange-50 border-l-4 border-orange-400 p-4 mb-4">
-                <p class="text-xs font-semibold text-orange-900 mb-2">AI Suggested Rewrite:</p>
-                <p class="text-sm text-orange-800">{{ bullet.rewrite_suggestion }}</p>
-                <p class="text-xs text-orange-600 mt-2 italic">Use the "Customize with AI" button below to refine this further.</p>
+                <p class="text-xs font-semibold text-orange-900 mb-2">AI Suggested Rewrite (editable):</p>
+                <textarea x-model="editedRewrites[{{ bullet.bullet_number }}]"
+                          x-init="editedRewrites[{{ bullet.bullet_number }}] = `{{ bullet.rewrite_suggestion|replace('`', '\\`')|replace('\n', ' ') }}`"
+                          rows="3"
+                          class="w-full p-3 text-sm text-orange-900 bg-white border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"></textarea>
+                <p class="text-xs text-orange-600 mt-2 italic">Edit this directly and click "Approve Edited Version" below, or click "Customize with AI" for interactive refinement.</p>
             </div>
             {% endif %}
 
@@ -146,7 +149,7 @@
                 <template x-if="!approvedBullets.includes({{ bullet.bullet_number }})">
                     <button @click="approveBullet({{ bullet.bullet_number }}, '{{ bullet.original_text }}')"
                             class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition text-sm">
-                        ✓ Approve This Bullet
+                        ✓ Approve Original
                     </button>
                 </template>
                 <template x-if="approvedBullets.includes({{ bullet.bullet_number }})">
@@ -157,6 +160,15 @@
                 </template>
 
                 {% if bullet.rewrite_suggestion %}
+                <!-- Approve Edited Version -->
+                <template x-if="!approvedBullets.includes({{ bullet.bullet_number }})">
+                    <button @click="approveEditedRewrite({{ bullet.bullet_number }})"
+                            class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition text-sm">
+                        ✓ Approve Edited Version
+                    </button>
+                </template>
+
+                <!-- Customize with AI -->
                 <button @click="customizeBullet({{ bullet.bullet_number }}, '{{ bullet.original_text }}', `{{ bullet.rewrite_suggestion|replace('`', '\\`')|replace('\n', ' ') }}`)"
                         class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-sm">
                     ✎ Customize with AI
@@ -304,6 +316,7 @@ function bulletSelector() {
         approvedBullets: [],  // Array of bullet numbers
         approvedTexts: {},    // Map of bullet_number -> text (final approved text)
         customizedBullets: {}, // Map of bullet_number -> customized text (to show in UI)
+        editedRewrites: {},   // Map of bullet_number -> edited rewrite text
         saving: false,
 
         // Chat modal state
@@ -330,6 +343,22 @@ function bulletSelector() {
                 delete this.approvedTexts[bulletNumber];
                 delete this.customizedBullets[bulletNumber];
             }
+        },
+
+        approveEditedRewrite(bulletNumber) {
+            // Get the edited text from textarea
+            const editedText = this.editedRewrites[bulletNumber];
+
+            if (!editedText || !editedText.trim()) {
+                alert('Please edit the rewrite first before approving.');
+                return;
+            }
+
+            // Store as customized version
+            this.customizedBullets[bulletNumber] = editedText.trim();
+
+            // Approve with edited text
+            this.approveBullet(bulletNumber, editedText.trim());
         },
 
         customizeBullet(bulletNumber, bulletText, aiSuggestion = '') {
