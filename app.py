@@ -298,11 +298,18 @@ def init_master_templates_table():
                     version INTEGER DEFAULT 1,
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(user_id, is_active) WHERE is_active = TRUE
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """))
 
+            # Create partial unique index - only one active template per user
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_user_master_template_active_unique
+                ON user_master_templates(user_id)
+                WHERE is_active = TRUE
+            """))
+
+            # Create regular index for lookups
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_user_master_template_active
                 ON user_master_templates(user_id, is_active)
