@@ -5381,6 +5381,117 @@ def customize_cv_bullets():
         return "Error loading bullet selection", 500
 
 
+@app.route("/api/customize-bullet-chat", methods=["POST"])
+def customize_bullet_chat():
+    """Handle chat messages for bullet customization"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.json
+        bullet_text = data.get('bullet_text')
+        user_message = data.get('user_message')
+        chat_history = data.get('chat_history', [])
+
+        if not bullet_text or not user_message:
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Get CV session to access job description
+        cv_session_id = session.get('cv_session_id')
+        if not cv_session_id:
+            return jsonify({'error': 'No active CV customization session'}), 400
+
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return jsonify({'error': 'Session not found'}), 404
+
+        # Get job description
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return jsonify({'error': 'Analysis not found'}), 404
+
+        job_description = analysis['job_description']
+
+        # Build chat context from history
+        messages = []
+        for msg in chat_history:
+            if msg['role'] in ['user', 'assistant']:
+                messages.append({
+                    "role": msg['role'],
+                    "content": msg['content']
+                })
+
+        # Get AI response
+        client = get_anthropic_client()
+        system_prompt = get_user_system_prompt(user_id)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=1000,
+            temperature=0.3,
+            system=[
+                {
+                    "type": "text",
+                    "text": f"""{system_prompt}
+
+You are helping a job seeker refine their resume bullet point to better match this job description.
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**ORIGINAL BULLET:**
+{bullet_text}
+
+**YOUR ROLE:**
+- Help the user refine this bullet based on their feedback
+- When providing a refined version, return it as plain text (not JSON)
+- Keep the bullet truthful - only suggest changes that enhance existing experience
+- NEVER invent experiences or metrics the user doesn't have
+- Focus on word choice, phrasing, and highlighting relevant aspects
+- Incorporate JD keywords naturally where appropriate
+
+**IMPORTANT:**
+If you provide a refined bullet in your response, put it between [REFINED_BULLET] and [/REFINED_BULLET] tags so it can be extracted.
+
+Example:
+"Here's a stronger version that emphasizes your cross-functional leadership:
+
+[REFINED_BULLET]
+Led cross-functional teams of 15+ stakeholders across Technology, Operations, and Risk to implement AI governance framework, driving 63% portfolio growth while maintaining 100% regulatory compliance
+[/REFINED_BULLET]
+
+This version better highlights the leadership and stakeholder management aspects emphasized in the JD."
+""",
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
+            messages=messages
+        )
+
+        ai_response = response.content[0].text
+
+        # Extract refined bullet if present
+        refined_bullet = None
+        if '[REFINED_BULLET]' in ai_response and '[/REFINED_BULLET]' in ai_response:
+            start = ai_response.find('[REFINED_BULLET]') + len('[REFINED_BULLET]')
+            end = ai_response.find('[/REFINED_BULLET]')
+            refined_bullet = ai_response[start:end].strip()
+
+        return jsonify({
+            'success': True,
+            'response': ai_response,
+            'refined_bullet': refined_bullet
+        })
+
+    except Exception as e:
+        print(f"Error in bullet chat: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to get AI response'}), 500
+
+
 @app.route("/get-analysis/<int:analysis_id>", methods=["GET"])
 def get_analysis(analysis_id):
     """Get full analysis by ID"""

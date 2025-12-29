@@ -159,14 +159,14 @@
         {% endfor %}
     </div>
 
-    <!-- Gap Analysis -->
+    <!-- Gap Analysis (Info Only) -->
     {% if gaps and gaps|length > 0 %}
-    <div class="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 mb-6">
-        <h3 class="text-lg font-bold text-yellow-900 mb-3">⚠ Gaps Detected</h3>
-        <p class="text-sm text-yellow-800 mb-3">The job description emphasizes these areas that could be strengthened:</p>
+    <div class="bg-blue-50 border-l-4 border-blue-400 rounded-lg p-6 mb-6">
+        <h3 class="text-lg font-bold text-blue-900 mb-3">💡 Additional JD Emphasis Areas</h3>
+        <p class="text-sm text-blue-800 mb-3">The job description also emphasizes these areas. Consider refining bullets to highlight relevant experience:</p>
         <ul class="space-y-2">
             {% for gap in gaps %}
-            <li class="flex items-start text-sm text-yellow-900">
+            <li class="flex items-start text-sm text-blue-900">
                 <span class="mr-2">•</span>
                 <span>{{ gap }}</span>
             </li>
@@ -175,30 +175,85 @@
     </div>
     {% endif %}
 
-    <!-- Suggested New Bullets -->
-    {% if suggested_new_bullets and suggested_new_bullets|length > 0 %}
-    <div class="mb-8">
-        <h2 class="text-xl font-bold text-gray-900 mb-4">AI-Suggested New Bullets to Fill Gaps</h2>
+    <!-- Chat Modal -->
+    <div x-show="chatOpen"
+         x-cloak
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+         @click.self="closeChatModal()">
 
-        {% for new_bullet in suggested_new_bullets %}
-        <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-6 mb-4">
-            <div class="flex items-start justify-between mb-3">
-                <div class="flex items-center gap-2">
-                    <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">NEW</span>
-                    <span class="text-sm text-purple-700 font-semibold">AI-Generated Bullet</span>
+        <div class="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col">
+            <!-- Modal Header -->
+            <div class="p-6 border-b">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-2">Customize Bullet with AI</h2>
+                        <p class="text-sm text-gray-600">Refine this bullet to better match the job requirements</p>
+                    </div>
+                    <button @click="closeChatModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
 
-            <p class="text-base text-gray-900 mb-4">{{ new_bullet }}</p>
+            <!-- Chat Messages Area -->
+            <div class="flex-1 overflow-y-auto p-6 space-y-4" x-ref="chatMessages">
+                <!-- Original Bullet -->
+                <div class="bg-gray-50 rounded-lg p-4 border-l-4 border-gray-400">
+                    <p class="text-xs font-semibold text-gray-600 mb-1">Original Bullet:</p>
+                    <p class="text-sm text-gray-900" x-text="currentBulletText"></p>
+                </div>
 
-            <button @click="approveNewBullet({{ loop.index0 }}, '{{ new_bullet }}')"
-                    class="bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition text-sm">
-                ✓ Add This Bullet
-            </button>
+                <!-- Chat Messages -->
+                <template x-for="(msg, index) in chatMessages" :key="index">
+                    <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                        <div :class="msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'"
+                             class="max-w-[80%] rounded-lg p-4">
+                            <p class="text-sm whitespace-pre-wrap" x-text="msg.content"></p>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Loading Indicator -->
+                <div x-show="chatLoading" class="flex justify-start">
+                    <div class="bg-gray-100 rounded-lg p-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input Area -->
+            <div class="p-6 border-t">
+                <div class="flex gap-2">
+                    <input type="text"
+                           x-model="userMessage"
+                           @keyup.enter="sendChatMessage()"
+                           placeholder="Type your message to refine this bullet..."
+                           class="flex-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button @click="sendChatMessage()"
+                            :disabled="!userMessage.trim() || chatLoading"
+                            class="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition">
+                        Send
+                    </button>
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <button @click="approveChatBullet()"
+                            class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition text-sm">
+                        ✓ Approve Latest Version
+                    </button>
+                    <button @click="closeChatModal()"
+                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
         </div>
-        {% endfor %}
     </div>
-    {% endif %}
 
     <!-- Fixed Bottom Bar -->
     <div class="fixed bottom-0 left-0 right-0 bg-white border-t-2 shadow-lg p-4">
@@ -230,6 +285,14 @@ function bulletSelector() {
         approvedTexts: {},    // Map of bullet_number -> text
         saving: false,
 
+        // Chat modal state
+        chatOpen: false,
+        currentBulletNumber: null,
+        currentBulletText: '',
+        chatMessages: [],
+        userMessage: '',
+        chatLoading: false,
+
         approveBullet(bulletNumber, bulletText) {
             if (!this.approvedBullets.includes(bulletNumber)) {
                 this.approvedBullets.push(bulletNumber);
@@ -245,15 +308,102 @@ function bulletSelector() {
             }
         },
 
-        approveNewBullet(index, bulletText) {
-            // Use negative numbers for new bullets to distinguish from original bullets
-            const bulletNumber = -(index + 1);
-            this.approveBullet(bulletNumber, bulletText);
+        customizeBullet(bulletNumber, bulletText) {
+            // Open chat modal
+            this.currentBulletNumber = bulletNumber;
+            this.currentBulletText = bulletText;
+            this.chatMessages = [];
+            this.userMessage = '';
+            this.chatOpen = true;
+
+            // Add initial AI greeting
+            this.chatMessages.push({
+                role: 'assistant',
+                content: "I'll help you refine this bullet to better match the job requirements. Tell me what you'd like to change or improve about it."
+            });
+
+            this.$nextTick(() => {
+                this.scrollChatToBottom();
+            });
         },
 
-        customizeBullet(bulletNumber, bulletText) {
-            // TODO: Open chat modal for customization
-            alert('Bullet customization chat coming soon! For now, approve the bullet or use a different one.');
+        closeChatModal() {
+            this.chatOpen = false;
+            this.currentBulletNumber = null;
+            this.currentBulletText = '';
+            this.chatMessages = [];
+            this.userMessage = '';
+        },
+
+        async sendChatMessage() {
+            if (!this.userMessage.trim() || this.chatLoading) return;
+
+            const message = this.userMessage.trim();
+            this.userMessage = '';
+
+            // Add user message to chat
+            this.chatMessages.push({
+                role: 'user',
+                content: message
+            });
+
+            this.$nextTick(() => {
+                this.scrollChatToBottom();
+            });
+
+            // Show loading
+            this.chatLoading = true;
+
+            try {
+                const response = await fetch('/api/customize-bullet-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bullet_text: this.currentBulletText,
+                        user_message: message,
+                        chat_history: this.chatMessages
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Add AI response to chat
+                    this.chatMessages.push({
+                        role: 'assistant',
+                        content: result.response
+                    });
+
+                    // If AI provided a refined bullet, update current bullet text
+                    if (result.refined_bullet) {
+                        this.currentBulletText = result.refined_bullet;
+                    }
+
+                    this.$nextTick(() => {
+                        this.scrollChatToBottom();
+                    });
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error in chat:', error);
+                alert('Failed to get AI response. Please try again.');
+            } finally {
+                this.chatLoading = false;
+            }
+        },
+
+        approveChatBullet() {
+            // Approve the refined bullet
+            this.approveBullet(this.currentBulletNumber, this.currentBulletText);
+            this.closeChatModal();
+        },
+
+        scrollChatToBottom() {
+            const chatContainer = this.$refs.chatMessages;
+            if (chatContainer) {
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
         },
 
         async saveAndContinue() {
