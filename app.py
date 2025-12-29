@@ -335,6 +335,7 @@ def init_cv_customization_sessions_table():
                     job_title VARCHAR(500),
                     job_company VARCHAR(500),
                     selected_headline TEXT,
+                    bullet_analysis JSONB,
                     approved_bullets JSONB,
                     new_bullets JSONB,
                     match_score_progression JSONB,
@@ -342,6 +343,12 @@ def init_cv_customization_sessions_table():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
+            """))
+
+            # Add bullet_analysis column if it doesn't exist (for existing tables)
+            conn.execute(text("""
+                ALTER TABLE cv_customization_sessions
+                ADD COLUMN IF NOT EXISTS bullet_analysis JSONB
             """))
 
             conn.execute(text("""
@@ -1397,7 +1404,7 @@ def get_cv_session(session_id):
         with engine.connect() as conn:
             result = conn.execute(text("""
                 SELECT id, user_id, analysis_id, job_title, job_company,
-                       selected_headline, approved_bullets, new_bullets,
+                       selected_headline, bullet_analysis, approved_bullets, new_bullets,
                        match_score_progression, status, created_at
                 FROM cv_customization_sessions
                 WHERE id = :session_id
@@ -1412,11 +1419,12 @@ def get_cv_session(session_id):
                     'job_title': row[3],
                     'job_company': row[4],
                     'selected_headline': row[5],
-                    'approved_bullets': row[6] if row[6] else [],
-                    'new_bullets': row[7] if row[7] else [],
-                    'match_score_progression': row[8] if row[8] else {},
-                    'status': row[9],
-                    'created_at': row[10]
+                    'bullet_analysis': row[6],
+                    'approved_bullets': row[7] if row[7] else [],
+                    'new_bullets': row[8] if row[8] else [],
+                    'match_score_progression': row[9] if row[9] else {},
+                    'status': row[10],
+                    'created_at': row[11]
                 }
             return None
 
@@ -1443,6 +1451,50 @@ def update_cv_session_headline(session_id, headline_text):
 
     except Exception as e:
         print(f"Error updating headline: {e}")
+        return False
+
+
+def update_cv_session_bullet_analysis(session_id, bullet_analysis):
+    """Save bullet analysis to avoid re-running AI"""
+    engine = get_db_connection()
+    if not engine:
+        return False
+
+    try:
+        with engine.connect() as conn:
+            import json
+            conn.execute(text("""
+                UPDATE cv_customization_sessions
+                SET bullet_analysis = :analysis, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """), {"session_id": session_id, "analysis": json.dumps(bullet_analysis)})
+            conn.commit()
+            return True
+
+    except Exception as e:
+        print(f"Error updating bullet analysis: {e}")
+        return False
+
+
+def update_cv_session_approved_bullets(session_id, approved_bullets):
+    """Save approved bullets"""
+    engine = get_db_connection()
+    if not engine:
+        return False
+
+    try:
+        with engine.connect() as conn:
+            import json
+            conn.execute(text("""
+                UPDATE cv_customization_sessions
+                SET approved_bullets = :bullets, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """), {"session_id": session_id, "bullets": json.dumps(approved_bullets)})
+            conn.commit()
+            return True
+
+    except Exception as e:
+        print(f"Error updating approved bullets: {e}")
         return False
 
 
@@ -5354,15 +5406,28 @@ def customize_cv_bullets():
         if not bullets:
             return "No bullets found in master template", 400
 
-        # Analyze bullets with AI
-        ai_analysis = analyze_bullets_with_ai(
-            bullets,
-            analysis['job_description'],
-            user_id
-        )
+        # Check if we already have bullet analysis (to avoid re-running AI)
+        if cv_session.get('bullet_analysis'):
+            print("✓ Using saved bullet analysis (not re-running AI)")
+            ai_analysis = cv_session['bullet_analysis']
+        else:
+            print("⚙ Running AI bullet analysis...")
+            # Analyze bullets with AI
+            ai_analysis = analyze_bullets_with_ai(
+                bullets,
+                analysis['job_description'],
+                user_id
+            )
 
-        if not ai_analysis:
-            return "Failed to analyze bullets", 500
+            if not ai_analysis:
+                return "Failed to analyze bullets", 500
+
+            # Save analysis to avoid re-running
+            update_cv_session_bullet_analysis(cv_session_id, ai_analysis)
+            print("✓ Saved bullet analysis to database")
+
+        # Get previously approved bullets (if any)
+        approved_bullets_data = cv_session.get('approved_bullets', [])
 
         # Render bullet selection template
         return render_template('customize_cv_bullets.html',
@@ -5372,6 +5437,7 @@ def customize_cv_bullets():
                              recommended_bullets=ai_analysis.get('recommended_bullets', []),
                              gaps=ai_analysis.get('gaps', []),
                              suggested_new_bullets=ai_analysis.get('suggested_new_bullets', []),
+                             approved_bullets_data=approved_bullets_data,
                              analysis_id=cv_session['analysis_id'])
 
     except Exception as e:
@@ -5490,6 +5556,45 @@ This version better highlights the leadership and stakeholder management aspects
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Failed to get AI response'}), 500
+
+
+@app.route("/api/save-approved-bullets", methods=["POST"])
+def save_approved_bullets():
+    """Save approved bullets to avoid re-selection"""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    cv_session_id = session['cv_session_id']
+
+    try:
+        data = request.json
+        approved_bullets = data.get('approved_bullets', [])
+        approved_texts = data.get('approved_texts', {})
+        customized_bullets = data.get('customized_bullets', {})
+
+        # Build approved bullets data structure
+        approved_bullets_data = []
+        for bullet_number in approved_bullets:
+            bullet_number_str = str(bullet_number)  # Convert to string for dict lookup
+            approved_bullets_data.append({
+                'bullet_number': bullet_number,
+                'approved_text': approved_texts.get(bullet_number_str, ''),
+                'customized_text': customized_bullets.get(bullet_number_str, None)
+            })
+
+        # Save to database
+        success = update_cv_session_approved_bullets(cv_session_id, approved_bullets_data)
+
+        if success:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Failed to save to database'}), 500
+
+    except Exception as e:
+        print(f"Error saving approved bullets: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to save approved bullets'}), 500
 
 
 @app.route("/get-analysis/<int:analysis_id>", methods=["GET"])

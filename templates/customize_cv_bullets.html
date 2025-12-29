@@ -329,10 +329,53 @@ function bulletSelector() {
         userMessage: '',
         chatLoading: false,
 
+        init() {
+            // Load saved progress from backend
+            const savedBullets = {{ approved_bullets_data | tojson }};
+
+            if (savedBullets && savedBullets.length > 0) {
+                console.log('Loading saved progress:', savedBullets);
+
+                for (const bullet of savedBullets) {
+                    this.approvedBullets.push(bullet.bullet_number);
+                    this.approvedTexts[bullet.bullet_number] = bullet.approved_text;
+
+                    if (bullet.customized_text) {
+                        this.customizedBullets[bullet.bullet_number] = bullet.customized_text;
+                    }
+                }
+
+                console.log(`Loaded ${this.approvedBullets.length} previously approved bullets`);
+            }
+        },
+
+        async saveToBackend() {
+            // Auto-save approved bullets to backend
+            try {
+                const response = await fetch('/api/save-approved-bullets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        approved_bullets: this.approvedBullets,
+                        approved_texts: this.approvedTexts,
+                        customized_bullets: this.customizedBullets
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    console.error('Failed to save to backend:', result.error);
+                }
+            } catch (error) {
+                console.error('Error saving to backend:', error);
+            }
+        },
+
         approveBullet(bulletNumber, bulletText) {
             if (!this.approvedBullets.includes(bulletNumber)) {
                 this.approvedBullets.push(bulletNumber);
                 this.approvedTexts[bulletNumber] = bulletText;
+                this.saveToBackend();  // Auto-save
             }
         },
 
@@ -342,6 +385,7 @@ function bulletSelector() {
                 this.approvedBullets.splice(index, 1);
                 delete this.approvedTexts[bulletNumber];
                 delete this.customizedBullets[bulletNumber];
+                this.saveToBackend();  // Auto-save
             }
         },
 
@@ -359,6 +403,7 @@ function bulletSelector() {
 
             // Approve with edited text
             this.approveBullet(bulletNumber, editedText.trim());
+            // Note: saveToBackend() called inside approveBullet()
         },
 
         customizeBullet(bulletNumber, bulletText, aiSuggestion = '') {
@@ -459,6 +504,7 @@ function bulletSelector() {
 
             // Approve with the final refined text
             this.approveBullet(this.currentBulletNumber, this.currentBulletText);
+            // Note: saveToBackend() called inside approveBullet()
 
             this.closeChatModal();
         },
