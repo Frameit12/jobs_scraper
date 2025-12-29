@@ -1267,31 +1267,82 @@ def parse_headlines_from_template(template_text):
 
 
 def parse_bullets_from_template(template_text):
-    """Extract all bullet points from latest role in master template"""
+    """Extract all bullet points from JP Morgan section in master template
+
+    Template structure:
+    - Section header: "JP MORGAN CHASE BULLETS (66 Unique Variations)"
+    - Category markers: "CATEGORY: [Name]"
+    - Bullets: Plain text paragraphs (no prefix markers)
+    """
+    import re
+
     bullets = []
     lines = template_text.split('\n')
 
-    in_latest_role = False
+    in_bullets_section = False
+    current_category = "Uncategorized"
+
+    print(f"\n=== PARSING JP MORGAN BULLETS ===")
+    print(f"Total lines in template: {len(lines)}")
+
     for i, line in enumerate(lines):
         line_stripped = line.strip()
 
-        # Detect start of job role (usually contains years like "2021-2025" or job title + company)
-        if any(year in line for year in ['2024', '2023', '2022', '2021', '2020']) and not in_latest_role:
-            in_latest_role = True
+        # Detect start of JP Morgan bullets section
+        if 'JP MORGAN' in line_stripped.upper() and 'BULLET' in line_stripped.upper():
+            in_bullets_section = True
+            print(f"Found JP MORGAN BULLETS section at line {i}: '{line_stripped[:60]}...'")
             continue
 
-        # Detect next job role (stop collecting bullets)
-        if in_latest_role and any(year in line for year in ['2019', '2018', '2017', '2016', '2015']):
-            break
+        # Detect end of bullets section (next major section or end)
+        if in_bullets_section and line_stripped:
+            # Check for section headers that indicate end of bullets
+            upper_line = line_stripped.upper()
 
-        # Collect bullet points
-        if in_latest_role and (line_stripped.startswith('•') or line_stripped.startswith('-') or line_stripped.startswith('*')):
-            bullet_text = line_stripped.lstrip('•-*').strip()
-            if len(bullet_text) > 20:  # Filter out too-short bullets
+            # Stop at next major ALL CAPS section (but not CATEGORY markers)
+            if line_stripped.isupper() and len(line_stripped) > 15 and not line_stripped.startswith('CATEGORY:'):
+                # Could be next section like "EDUCATION" or "PREVIOUS EXPERIENCE"
+                if not any(keyword in upper_line for keyword in ['JP MORGAN', 'JPMORGAN', 'CHASE']):
+                    print(f"End of BULLETS section at line {i}: '{line_stripped[:60]}...'")
+                    break
+
+            # Stop at separator lines
+            if line_stripped.startswith('___') or line_stripped.startswith('==='):
+                print(f"End of BULLETS section at line {i}: separator line")
+                break
+
+        # Extract category markers
+        if in_bullets_section and line_stripped.startswith('CATEGORY:'):
+            current_category = line_stripped.replace('CATEGORY:', '').strip()
+            print(f"  Line {i}: Found category '{current_category}'")
+            continue
+
+        # Extract bullets (plain text paragraphs)
+        if in_bullets_section and line_stripped and not line_stripped.startswith('CATEGORY:'):
+            # Validate this is a bullet (substantial text, not a header)
+            if len(line_stripped) > 40:  # Bullets are long, detailed paragraphs
                 bullets.append({
-                    'id': i,
-                    'text': bullet_text
+                    'id': len(bullets),  # 0-indexed
+                    'number': len(bullets) + 1,  # 1-indexed for display
+                    'text': line_stripped,
+                    'category': current_category
                 })
+                print(f"  Line {i}: Added bullet #{len(bullets)} in category '{current_category}'")
+                print(f"    Text preview: '{line_stripped[:80]}...'")
+
+    print(f"=== TOTAL BULLETS FOUND: {len(bullets)} ===")
+    print(f"Expected: 66 bullets")
+
+    # Show category breakdown
+    category_counts = {}
+    for bullet in bullets:
+        cat = bullet['category']
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+
+    print("\n=== CATEGORY BREAKDOWN ===")
+    for cat, count in category_counts.items():
+        print(f"  {cat}: {count} bullets")
+    print()
 
     return bullets
 
@@ -4875,6 +4926,84 @@ def debug_template():
             line_display = f'<span style="color:blue;">{line}</span>'
 
         html += f'<div class="line"><span class="linenum">{i}:</span><span class="content">{line_display}</span></div>'
+
+    html += "</body></html>"
+    return html
+
+
+@app.route("/debug-bullets", methods=["GET"])
+def debug_bullets():
+    """Debug endpoint to test bullet parsing"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+    master_template = get_user_master_template(user_id)
+
+    if not master_template:
+        return "No master template found", 404
+
+    # Parse bullets
+    bullets = parse_bullets_from_template(master_template['template_text'])
+
+    # Build HTML output
+    html = """
+    <html>
+    <head>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .summary { background: #f0f0f0; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+            .category { margin-top: 30px; padding: 10px; background: #e8f4f8; border-left: 4px solid #0066cc; }
+            .bullet { margin: 10px 0; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 3px; }
+            .bullet-number { font-weight: bold; color: #0066cc; }
+            .error { color: red; font-weight: bold; }
+            .success { color: green; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <h1>Bullet Parser Debug</h1>
+    """
+
+    # Summary
+    expected = 66
+    actual = len(bullets)
+    status_class = "success" if actual == expected else "error"
+
+    html += f"""
+    <div class="summary">
+        <h2>Summary</h2>
+        <p class="{status_class}">Total bullets found: {actual} (Expected: {expected})</p>
+    """
+
+    # Category breakdown
+    category_counts = {}
+    for bullet in bullets:
+        cat = bullet['category']
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+
+    html += "<h3>Category Breakdown:</h3><ul>"
+    for cat, count in category_counts.items():
+        html += f"<li><strong>{cat}</strong>: {count} bullets</li>"
+    html += "</ul></div>"
+
+    # Show all bullets grouped by category
+    current_cat = None
+    for bullet in bullets:
+        if bullet['category'] != current_cat:
+            if current_cat is not None:
+                html += "</div>"  # Close previous category
+            current_cat = bullet['category']
+            html += f'<div class="category"><h3>Category: {current_cat}</h3>'
+
+        html += f"""
+        <div class="bullet">
+            <span class="bullet-number">Bullet #{bullet['number']}</span><br>
+            {bullet['text']}
+        </div>
+        """
+
+    if current_cat is not None:
+        html += "</div>"  # Close last category
 
     html += "</body></html>"
     return html
