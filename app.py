@@ -4451,6 +4451,67 @@ def delete_cv(cv_id):
         return jsonify({'error': 'Failed to delete CV'}), 500
 
 
+@app.route("/debug-analyses", methods=["GET"])
+def debug_analyses():
+    """Debug endpoint to see raw database state"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+    engine = get_db_connection()
+    if not engine:
+        return jsonify({'error': 'Database error'}), 500
+
+    try:
+        with engine.connect() as conn:
+            # Get all analyses for this user
+            analyses_result = conn.execute(text("""
+                SELECT id, cv_id, job_title, job_company, match_score, created_at
+                FROM job_analyses
+                WHERE user_id = :user_id
+                ORDER BY created_at DESC
+                LIMIT 10
+            """), {"user_id": user_id})
+
+            analyses = []
+            for row in analyses_result:
+                analyses.append({
+                    'id': row[0],
+                    'cv_id': row[1],
+                    'job_title': row[2],
+                    'job_company': row[3],
+                    'match_score': row[4],
+                    'created_at': str(row[5])
+                })
+
+            # Get all CVs for this user
+            cvs_result = conn.execute(text("""
+                SELECT id, cv_name, created_at
+                FROM user_cvs
+                WHERE user_id = :user_id
+                ORDER BY created_at DESC
+            """), {"user_id": user_id})
+
+            cvs = []
+            for row in cvs_result:
+                cvs.append({
+                    'id': row[0],
+                    'cv_name': row[1],
+                    'created_at': str(row[2])
+                })
+
+            return jsonify({
+                'user_id': user_id,
+                'analyses': analyses,
+                'cvs': cvs,
+                'analysis_count': len(analyses),
+                'cv_count': len(cvs)
+            })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route("/get-analysis/<int:analysis_id>", methods=["GET"])
 def get_analysis(analysis_id):
     """Get full analysis by ID"""
