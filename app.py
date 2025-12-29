@@ -1648,7 +1648,7 @@ def get_user_analyses(user_id, limit=10):
                 SELECT ja.id, ja.job_title, ja.job_company, ja.match_score,
                        ja.created_at, cv.cv_name
                 FROM job_analyses ja
-                JOIN user_cvs cv ON ja.cv_id = cv.id
+                LEFT JOIN user_cvs cv ON ja.cv_id = cv.id
                 WHERE ja.user_id = :user_id
                 ORDER BY ja.created_at DESC
                 LIMIT :limit
@@ -1662,7 +1662,7 @@ def get_user_analyses(user_id, limit=10):
                     'job_company': row[2],
                     'match_score': row[3],
                     'created_at': row[4],
-                    'cv_name': row[5]
+                    'cv_name': row[5] if row[5] else 'Master Template'
                 })
             return analyses
     except Exception as e:
@@ -1701,7 +1701,7 @@ def get_analysis_by_id(analysis_id, user_id):
                        ja.recommendations, ja.full_analysis, ja.created_at,
                        cv.cv_name
                 FROM job_analyses ja
-                JOIN user_cvs cv ON ja.cv_id = cv.id
+                LEFT JOIN user_cvs cv ON ja.cv_id = cv.id
                 WHERE ja.id = :analysis_id AND ja.user_id = :user_id
             """), {"analysis_id": analysis_id, "user_id": user_id})
 
@@ -1711,7 +1711,6 @@ def get_analysis_by_id(analysis_id, user_id):
                 print(f"  Possible reasons:")
                 print(f"  1. Analysis ID {analysis_id} doesn't exist")
                 print(f"  2. Analysis doesn't belong to user {user_id}")
-                print(f"  3. CV was deleted (JOIN would fail)")
                 print(f"{'='*60}\n")
                 return None
 
@@ -1720,6 +1719,7 @@ def get_analysis_by_id(analysis_id, user_id):
             print(f"  Title: {row[1]}")
             print(f"  Company: {row[2]}")
             print(f"  Match Score: {row[4]}")
+            print(f"  CV Name: {row[10] if row[10] else 'Master Template'}")
 
             import json
             analysis_data = {
@@ -1733,7 +1733,7 @@ def get_analysis_by_id(analysis_id, user_id):
                 'recommendations': row[7] if row[7] else [],  # Already deserialized from JSONB
                 'full_analysis': row[8],
                 'created_at': row[9],
-                'cv_name': row[10]
+                'cv_name': row[10] if row[10] else 'Master Template'
             }
             print(f"✓ Returning analysis data")
             print(f"{'='*60}\n")
