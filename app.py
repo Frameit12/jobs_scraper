@@ -1191,22 +1191,41 @@ def parse_headlines_from_template(template_text):
     headlines = []
     lines = template_text.split('\n')
 
+    in_headlines_section = False
+
     for i, line in enumerate(lines):
-        line = line.strip()
-        # Look for lines that look like headlines (contain |, multiple sections, professional titles)
-        if '|' in line and len(line) > 20 and not line.startswith('•') and not line.startswith('-'):
-            headlines.append({
-                'id': i,
-                'text': line
-            })
-        # Also look for lines after "Headline" markers
-        elif line.lower().startswith('headline') and i + 1 < len(lines):
-            next_line = lines[i + 1].strip()
-            if next_line:
-                headlines.append({
-                    'id': i + 1,
-                    'text': next_line
-                })
+        line_stripped = line.strip()
+
+        # Detect start of HEADLINES section
+        if 'HEADLINE' in line_stripped.upper() and ('VARIATION' in line_stripped.upper() or '(' in line_stripped):
+            in_headlines_section = True
+            continue
+
+        # Detect end of HEADLINES section (next major section)
+        if in_headlines_section and (
+            line_stripped.startswith('___') or  # Separator line
+            'CORE SKILLS' in line_stripped.upper() or
+            'COMPETENCIES' in line_stripped.upper() or
+            'EXPERIENCE' in line_stripped.upper() or
+            'EDUCATION' in line_stripped.upper() or
+            'TECHNICAL' in line_stripped.upper()
+        ):
+            break
+
+        # Extract numbered headlines (e.g., "1.", "2.", etc.)
+        if in_headlines_section and line_stripped:
+            # Check if line starts with a number followed by period or tab
+            import re
+            match = re.match(r'^(\d+)[.\t]\s*(.+)', line_stripped)
+            if match:
+                headline_number = int(match.group(1))
+                headline_text = match.group(2).strip()
+                if len(headline_text) > 20:  # Valid headline
+                    headlines.append({
+                        'id': headline_number - 1,  # 0-indexed
+                        'number': headline_number,
+                        'text': headline_text
+                    })
 
     return headlines
 
