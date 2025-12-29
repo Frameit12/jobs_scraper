@@ -5022,6 +5022,69 @@ def customize_cv_headline():
         return "Error loading headline selection", 500
 
 
+@app.route("/customize-cv/bullets", methods=["GET"])
+def customize_cv_bullets():
+    """Step 2: Bullet point selection (Coming Soon)"""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return redirect('/ai-match')
+
+    cv_session_id = session['cv_session_id']
+
+    # Get CV session to show what was selected
+    cv_session = get_cv_session(cv_session_id)
+    if not cv_session:
+        return "Session not found", 404
+
+    # For now, show a success page with the selected headline
+    return f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Headline Saved</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-50 min-h-screen flex items-center justify-center">
+        <div class="max-w-2xl mx-auto p-8">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                    </div>
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">Headline Saved!</h1>
+                    <p class="text-gray-600">Your selected headline has been saved successfully.</p>
+                </div>
+
+                <div class="bg-gray-50 rounded-lg p-6 mb-6">
+                    <p class="text-sm text-gray-600 mb-2">Selected headline:</p>
+                    <p class="text-lg text-gray-900 leading-relaxed">"{cv_session.get('selected_headline', 'N/A')}"</p>
+                </div>
+
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                    <p class="text-sm text-blue-900">
+                        <span class="font-semibold">Next Steps:</span> The bullet point selection and CV generation features are coming soon!
+                        For now, you can use this headline in your CV.
+                    </p>
+                </div>
+
+                <div class="flex gap-3">
+                    <a href="/ai-match" class="flex-1 text-center bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+                        Return to AI Match
+                    </a>
+                    <a href="/customize-cv/start/{cv_session.get('analysis_id')}" class="flex-1 text-center bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
+                        Choose Different Headline
+                    </a>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+
 @app.route("/get-analysis/<int:analysis_id>", methods=["GET"])
 def get_analysis(analysis_id):
     """Get full analysis by ID"""
