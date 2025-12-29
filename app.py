@@ -1190,7 +1190,10 @@ def extract_text_from_docx(file_data):
 # ==================== CV CUSTOMIZATION: HELPER FUNCTIONS ====================
 
 def parse_headlines_from_template(template_text):
-    """Extract all headline variations from master template"""
+    """Extract all headline variations from master template
+
+    Handles both numbered (1. Headline) and unnumbered (plain text) formats.
+    """
     import re
 
     headlines = []
@@ -1210,41 +1213,54 @@ def parse_headlines_from_template(template_text):
             print(f"Found HEADLINES section at line {i}: '{line_stripped[:50]}...'")
             continue
 
-        # Detect end of HEADLINES section (only match actual section headers, not words within headlines)
+        # Detect end of HEADLINES section
         if in_headlines_section and line_stripped:
             # Check if this is a separator line
             if line_stripped.startswith('___'):
-                print(f"End of HEADLINES section at line {i}: '{line_stripped[:50]}...'")
+                print(f"End of HEADLINES section at line {i}: separator line")
                 break
 
-            # Check if this is an ALL CAPS section header or starts with known section names
+            # Check if this is an ALL CAPS section header (e.g., "CORE SKILLS & COMPETENCIES")
+            # Must be all uppercase AND contain multiple words OR common section keywords
             upper_line = line_stripped.upper()
-            if (line_stripped.isupper() and len(line_stripped) > 5) or \
-               upper_line.startswith('CORE SKILLS') or \
+            if line_stripped.isupper() and len(line_stripped) > 10:
+                print(f"End of HEADLINES section at line {i}: section header '{line_stripped[:50]}...'")
+                break
+
+            # Check if starts with known section keywords
+            if upper_line.startswith('CORE SKILLS') or \
                upper_line.startswith('EXPERIENCE:') or \
                upper_line.startswith('EDUCATION:') or \
                upper_line.startswith('TECHNICAL ACUMEN:') or \
-               upper_line.startswith('WORK HISTORY'):
-                print(f"End of HEADLINES section at line {i}: '{line_stripped[:50]}...'")
+               upper_line.startswith('WORK HISTORY') or \
+               upper_line.startswith('JP MORGAN'):
+                print(f"End of HEADLINES section at line {i}: section keyword '{line_stripped[:50]}...'")
                 break
 
-        # Extract numbered headlines (e.g., "1.", "2.", etc.)
+        # Extract headlines (both numbered and unnumbered formats)
         if in_headlines_section and line_stripped:
-            # Check if line starts with a number followed by period or tab
+            # Try numbered format first (e.g., "1. Headline text")
             match = re.match(r'^(\d+)[.\t]\s*(.+)', line_stripped)
             if match:
                 headline_number = int(match.group(1))
                 headline_text = match.group(2).strip()
-                print(f"  Line {i}: Found headline #{headline_number}, length={len(headline_text)}")
-                if len(headline_text) > 20:  # Valid headline
-                    headlines.append({
-                        'id': headline_number - 1,  # 0-indexed
-                        'number': headline_number,
-                        'text': headline_text
-                    })
-                    print(f"    ✓ Added: '{headline_text[:50]}...'")
-                else:
-                    print(f"    ✗ Too short (< 20 chars)")
+                print(f"  Line {i}: Found numbered headline #{headline_number}")
+            else:
+                # Unnumbered format - treat entire line as headline
+                headline_text = line_stripped
+                headline_number = len(headlines) + 1
+                print(f"  Line {i}: Found unnumbered headline (will be #{headline_number})")
+
+            # Validate headline length (must be substantial text, not a section marker)
+            if len(headline_text) > 30:
+                headlines.append({
+                    'id': len(headlines),  # 0-indexed
+                    'number': headline_number,
+                    'text': headline_text
+                })
+                print(f"    ✓ Added: '{headline_text[:60]}...'")
+            else:
+                print(f"    ✗ Too short (< 30 chars): '{headline_text}'")
 
     print(f"=== TOTAL HEADLINES FOUND: {len(headlines)} ===\n")
     return headlines
