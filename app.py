@@ -4862,11 +4862,19 @@ def debug_template():
     lines = master_template['template_text'].split('\n')
 
     # Build HTML output with line numbers
-    html = "<html><head><style>body{font-family:monospace;} .line{padding:2px 0;} .linenum{color:#888;width:50px;display:inline-block;} .content{white-space:pre-wrap;}</style></head><body>"
+    html = "<html><head><style>body{font-family:monospace;font-size:12px;} .line{padding:2px 0;} .linenum{color:#888;width:60px;display:inline-block;} .content{white-space:pre-wrap;}</style></head><body>"
     html += f"<h2>Master Template Debug (Total lines: {len(lines)})</h2>"
+    html += "<p>Showing all lines</p>"
 
-    for i, line in enumerate(lines[:100]):  # Show first 100 lines
-        html += f'<div class="line"><span class="linenum">{i}:</span><span class="content">{line}</span></div>'
+    for i, line in enumerate(lines):  # Show ALL lines
+        # Highlight certain keywords
+        line_display = line
+        if 'JP MORGAN' in line.upper() or 'CATEGORY:' in line:
+            line_display = f'<strong style="background:yellow;">{line}</strong>'
+        elif line.strip().startswith('•'):
+            line_display = f'<span style="color:blue;">{line}</span>'
+
+        html += f'<div class="line"><span class="linenum">{i}:</span><span class="content">{line_display}</span></div>'
 
     html += "</body></html>"
     return html
