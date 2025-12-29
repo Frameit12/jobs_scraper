@@ -1722,6 +1722,15 @@ def get_analysis_by_id(analysis_id, user_id):
             print(f"  CV Name: {row[10] if row[10] else 'Master Template'}")
 
             import json
+
+            # Parse recommendations if it's a JSON string (TEXT column)
+            recommendations_data = row[7] if row[7] else []
+            if isinstance(recommendations_data, str):
+                try:
+                    recommendations_data = json.loads(recommendations_data)
+                except (json.JSONDecodeError, TypeError):
+                    recommendations_data = []
+
             analysis_data = {
                 'id': row[0],
                 'job_title': row[1],
@@ -1730,7 +1739,7 @@ def get_analysis_by_id(analysis_id, user_id):
                 'match_score': row[4],
                 'skills_match': row[5] if row[5] else [],  # Already deserialized from JSONB
                 'skills_missing': row[6] if row[6] else [],  # Already deserialized from JSONB
-                'recommendations': row[7] if row[7] else [],  # Already deserialized from JSONB
+                'recommendations': recommendations_data,  # Manually parsed from TEXT column
                 'full_analysis': row[8],
                 'created_at': row[9],
                 'cv_name': row[10] if row[10] else 'Master Template'
