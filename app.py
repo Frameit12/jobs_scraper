@@ -5317,67 +5317,68 @@ def customize_cv_headline():
         return "Error loading headline selection", 500
 
 
-@app.route("/customize-cv/bullets", methods=["GET"])
+@app.route("/customize-cv/bullets", methods=["GET", "POST"])
 def customize_cv_bullets():
-    """Step 2: Bullet point selection (Coming Soon)"""
+    """Step 2: Bullet point selection with AI recommendations"""
     if 'user_id' not in session or 'cv_session_id' not in session:
         return redirect('/ai-match')
 
+    user_id = session['user_id']
     cv_session_id = session['cv_session_id']
 
-    # Get CV session to show what was selected
-    cv_session = get_cv_session(cv_session_id)
-    if not cv_session:
-        return "Session not found", 404
+    if request.method == "POST":
+        # Save approved bullets and proceed
+        # TODO: Implement bullet saving
+        return jsonify({'success': True, 'next_step': '/customize-cv/preview'})
 
-    # For now, show a success page with the selected headline
-    return f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Headline Saved</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-    </head>
-    <body class="bg-gray-50 min-h-screen flex items-center justify-center">
-        <div class="max-w-2xl mx-auto p-8">
-            <div class="bg-white rounded-lg shadow-lg p-8">
-                <div class="text-center mb-6">
-                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                        </svg>
-                    </div>
-                    <h1 class="text-3xl font-bold text-gray-900 mb-2">Headline Saved!</h1>
-                    <p class="text-gray-600">Your selected headline has been saved successfully.</p>
-                </div>
+    # GET request - show bullet selection page
+    try:
+        # Get CV session data
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return "Session not found", 404
 
-                <div class="bg-gray-50 rounded-lg p-6 mb-6">
-                    <p class="text-sm text-gray-600 mb-2">Selected headline:</p>
-                    <p class="text-lg text-gray-900 leading-relaxed">"{cv_session.get('selected_headline', 'N/A')}"</p>
-                </div>
+        # Get analysis for job description
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return "Analysis not found", 404
 
-                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-                    <p class="text-sm text-blue-900">
-                        <span class="font-semibold">Next Steps:</span> The bullet point selection and CV generation features are coming soon!
-                        For now, you can use this headline in your CV.
-                    </p>
-                </div>
+        # Get master template
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return "Master template not found", 404
 
-                <div class="flex gap-3">
-                    <a href="/ai-match" class="flex-1 text-center bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
-                        Return to AI Match
-                    </a>
-                    <a href="/customize-cv/start/{cv_session.get('analysis_id')}" class="flex-1 text-center bg-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition">
-                        Choose Different Headline
-                    </a>
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
+        # Parse bullets from template
+        bullets = parse_bullets_from_template(master_template['template_text'])
+
+        if not bullets:
+            return "No bullets found in master template", 400
+
+        # Analyze bullets with AI
+        ai_analysis = analyze_bullets_with_ai(
+            bullets,
+            analysis['job_description'],
+            user_id
+        )
+
+        if not ai_analysis:
+            return "Failed to analyze bullets", 500
+
+        # Render bullet selection template
+        return render_template('customize_cv_bullets.html',
+                             job_title=cv_session['job_title'],
+                             job_company=cv_session['job_company'],
+                             selected_headline=cv_session['selected_headline'],
+                             recommended_bullets=ai_analysis.get('recommended_bullets', []),
+                             gaps=ai_analysis.get('gaps', []),
+                             suggested_new_bullets=ai_analysis.get('suggested_new_bullets', []),
+                             analysis_id=cv_session['analysis_id'])
+
+    except Exception as e:
+        print(f"Error in bullet selection: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading bullet selection", 500
 
 
 @app.route("/get-analysis/<int:analysis_id>", methods=["GET"])

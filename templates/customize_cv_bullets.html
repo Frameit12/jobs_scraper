@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customize CV - Select Bullets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .bullet-card {
+            transition: all 0.2s ease;
+        }
+        .bullet-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .bullet-card.approved {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<div x-data="bulletSelector()" class="max-w-6xl mx-auto p-8" x-cloak>
+
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Customize Your CV</h1>
+                <p class="text-gray-600 mt-2">
+                    For: <span class="font-semibold text-gray-900">{{ job_title }}</span>
+                    {% if job_company %} at {{ job_company }}{% endif %}
+                </p>
+            </div>
+            <a href="/ai-match" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</a>
+        </div>
+
+        <!-- Progress -->
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+            <span class="font-semibold text-blue-600">Step 2 of 3</span>
+            <span class="text-gray-400">·</span>
+            <span>Select Bullets</span>
+        </div>
+        <div class="h-1 bg-gray-200 rounded-full mt-2">
+            <div class="h-1 bg-blue-600 rounded-full" style="width: 66%"></div>
+        </div>
+    </div>
+
+    <!-- Selected Headline Summary -->
+    <div class="bg-white rounded-lg border shadow-sm p-6 mb-6">
+        <h3 class="text-sm font-semibold text-gray-700 mb-2">✓ Your Selected Headline:</h3>
+        <p class="text-base text-gray-900">"{{ selected_headline }}"</p>
+    </div>
+
+    <!-- AI Recommendations Header -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+        <p class="text-sm text-blue-900">
+            <span class="font-semibold">AI has analyzed all 66 bullets</span> and selected the top {{ recommended_bullets|length }} that best match this role.
+            Review each bullet below and approve those you want to use.
+        </p>
+    </div>
+
+    <!-- Recommended Bullets -->
+    <div class="space-y-4 mb-8">
+        <h2 class="text-xl font-bold text-gray-900">Recommended Bullets ({{recommended_bullets|length}})</h2>
+
+        {% for bullet in recommended_bullets %}
+        <div class="bullet-card bg-white rounded-lg border-2 p-6"
+             :class="{ 'approved': approvedBullets.includes({{ bullet.bullet_number }}) }">
+
+            <!-- Header Row -->
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-2">
+                        <!-- Bullet Number -->
+                        <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-bold">
+                            #{{ bullet.bullet_number }}
+                        </span>
+
+                        <!-- Category Badge -->
+                        <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
+                            {{ bullet.category }}
+                        </span>
+
+                        <!-- Match Score -->
+                        <span class="px-3 py-1 rounded-full text-sm font-semibold
+                            {% if bullet.match_score >= 90 %}bg-green-100 text-green-700
+                            {% elif bullet.match_score >= 80 %}bg-blue-100 text-blue-700
+                            {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                            {{ bullet.match_score }}% Match
+                        </span>
+
+                        <!-- Status Badge -->
+                        {% if bullet.status == 'ready_to_use' %}
+                        <span class="px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-semibold">
+                            ✓ Ready to use
+                        </span>
+                        {% else %}
+                        <span class="px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-semibold">
+                            ⚠ Needs rewriting
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Original Bullet Text -->
+            <div class="mb-4">
+                <p class="text-base text-gray-900 leading-relaxed">{{ bullet.original_text }}</p>
+            </div>
+
+            <!-- Why This Works -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <p class="text-xs font-semibold text-gray-700 mb-2">Why this maximizes interview chances:</p>
+                <ul class="space-y-1">
+                    {% for reason in bullet.reasons %}
+                    <li class="flex items-start text-sm text-gray-700">
+                        <span class="text-green-600 mr-2 flex-shrink-0">✓</span>
+                        <span>{{ reason }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <!-- Rewrite Suggestion (if needed) -->
+            {% if bullet.rewrite_suggestion %}
+            <div class="bg-orange-50 border-l-4 border-orange-400 p-4 mb-4">
+                <p class="text-xs font-semibold text-orange-900 mb-2">AI Suggested Rewrite:</p>
+                <p class="text-sm text-orange-800">{{ bullet.rewrite_suggestion }}</p>
+                <p class="text-xs text-orange-600 mt-2 italic">Use the "Customize with AI" button below to refine this further.</p>
+            </div>
+            {% endif %}
+
+            <!-- Action Buttons -->
+            <div class="flex gap-2">
+                <template x-if="!approvedBullets.includes({{ bullet.bullet_number }})">
+                    <button @click="approveBullet({{ bullet.bullet_number }}, '{{ bullet.original_text }}')"
+                            class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition text-sm">
+                        ✓ Approve This Bullet
+                    </button>
+                </template>
+                <template x-if="approvedBullets.includes({{ bullet.bullet_number }})">
+                    <button @click="removeBullet({{ bullet.bullet_number }})"
+                            class="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-700 transition text-sm">
+                        ✗ Remove from Selection
+                    </button>
+                </template>
+
+                {% if bullet.rewrite_suggestion %}
+                <button @click="customizeBullet({{ bullet.bullet_number }}, '{{ bullet.original_text }}')"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-sm">
+                    ✎ Customize with AI
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Gap Analysis -->
+    {% if gaps and gaps|length > 0 %}
+    <div class="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-6 mb-6">
+        <h3 class="text-lg font-bold text-yellow-900 mb-3">⚠ Gaps Detected</h3>
+        <p class="text-sm text-yellow-800 mb-3">The job description emphasizes these areas that could be strengthened:</p>
+        <ul class="space-y-2">
+            {% for gap in gaps %}
+            <li class="flex items-start text-sm text-yellow-900">
+                <span class="mr-2">•</span>
+                <span>{{ gap }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Suggested New Bullets -->
+    {% if suggested_new_bullets and suggested_new_bullets|length > 0 %}
+    <div class="mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">AI-Suggested New Bullets to Fill Gaps</h2>
+
+        {% for new_bullet in suggested_new_bullets %}
+        <div class="bg-purple-50 border-2 border-purple-200 rounded-lg p-6 mb-4">
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-bold">NEW</span>
+                    <span class="text-sm text-purple-700 font-semibold">AI-Generated Bullet</span>
+                </div>
+            </div>
+
+            <p class="text-base text-gray-900 mb-4">{{ new_bullet }}</p>
+
+            <button @click="approveNewBullet({{ loop.index0 }}, '{{ new_bullet }}')"
+                    class="bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition text-sm">
+                ✓ Add This Bullet
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Fixed Bottom Bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t-2 shadow-lg p-4">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div class="flex-1">
+                <p class="text-sm text-gray-600">
+                    <span x-text="approvedBullets.length"></span> bullets approved
+                    <template x-if="approvedBullets.length < 8">
+                        <span class="text-orange-600 font-semibold">(recommend at least 8)</span>
+                    </template>
+                </p>
+            </div>
+            <button @click="saveAndContinue()"
+                    :disabled="saving || approvedBullets.length < 6"
+                    :class="approvedBullets.length >= 6 ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'"
+                    class="text-white px-8 py-3 rounded-lg font-semibold transition whitespace-nowrap">
+                <span x-show="!saving">Continue to Preview →</span>
+                <span x-show="saving">Saving...</span>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function bulletSelector() {
+    return {
+        approvedBullets: [],  // Array of bullet numbers
+        approvedTexts: {},    // Map of bullet_number -> text
+        saving: false,
+
+        approveBullet(bulletNumber, bulletText) {
+            if (!this.approvedBullets.includes(bulletNumber)) {
+                this.approvedBullets.push(bulletNumber);
+                this.approvedTexts[bulletNumber] = bulletText;
+            }
+        },
+
+        removeBullet(bulletNumber) {
+            const index = this.approvedBullets.indexOf(bulletNumber);
+            if (index > -1) {
+                this.approvedBullets.splice(index, 1);
+                delete this.approvedTexts[bulletNumber];
+            }
+        },
+
+        approveNewBullet(index, bulletText) {
+            // Use negative numbers for new bullets to distinguish from original bullets
+            const bulletNumber = -(index + 1);
+            this.approveBullet(bulletNumber, bulletText);
+        },
+
+        customizeBullet(bulletNumber, bulletText) {
+            // TODO: Open chat modal for customization
+            alert('Bullet customization chat coming soon! For now, approve the bullet or use a different one.');
+        },
+
+        async saveAndContinue() {
+            if (this.approvedBullets.length < 6) {
+                alert('Please approve at least 6 bullets before continuing.');
+                return;
+            }
+
+            this.saving = true;
+
+            try {
+                const response = await fetch('/customize-cv/bullets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        approved_bullets: this.approvedBullets,
+                        approved_texts: this.approvedTexts
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    window.location.href = result.next_step;
+                } else {
+                    alert('Error: ' + result.error);
+                    this.saving = false;
+                }
+            } catch (error) {
+                console.error('Error saving bullets:', error);
+                alert('Failed to save bullets. Please try again.');
+                this.saving = false;
+            }
+        }
+    };
+}
+</script>
+
+</body>
+</html>
