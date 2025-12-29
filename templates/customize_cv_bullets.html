@@ -22,7 +22,7 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-<div x-data="bulletSelector()" class="max-w-6xl mx-auto p-8" x-cloak>
+<div x-data="bulletSelector()" x-init="init()" class="max-w-6xl mx-auto p-8" x-cloak>
 
     <!-- Header -->
     <div class="mb-8">
@@ -351,6 +351,12 @@ function bulletSelector() {
 
         async saveToBackend() {
             // Auto-save approved bullets to backend
+            console.log('💾 Saving to backend:', {
+                bullets: this.approvedBullets,
+                texts: this.approvedTexts,
+                customized: this.customizedBullets
+            });
+
             try {
                 const response = await fetch('/api/save-approved-bullets', {
                     method: 'POST',
@@ -363,11 +369,13 @@ function bulletSelector() {
                 });
 
                 const result = await response.json();
-                if (!result.success) {
-                    console.error('Failed to save to backend:', result.error);
+                if (result.success) {
+                    console.log('✅ Saved successfully');
+                } else {
+                    console.error('❌ Failed to save:', result.error);
                 }
             } catch (error) {
-                console.error('Error saving to backend:', error);
+                console.error('❌ Error saving to backend:', error);
             }
         },
 

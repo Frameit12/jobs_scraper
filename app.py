@@ -5494,6 +5494,43 @@ def customize_cv_bullets():
         return "Error loading bullet selection", 500
 
 
+@app.route("/customize-cv/preview", methods=["GET"])
+def customize_cv_preview():
+    """Step 3: Preview and download customized CV"""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return redirect('/ai-match')
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+
+    try:
+        # Get CV session data
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return "Session not found", 404
+
+        # Get approved bullets
+        approved_bullets_data = cv_session.get('approved_bullets', [])
+
+        if not approved_bullets_data or len(approved_bullets_data) < 6:
+            flash('Please select at least 6 bullets before previewing.', 'warning')
+            return redirect('/customize-cv/bullets')
+
+        # Render preview template
+        return render_template('customize_cv_preview.html',
+                             job_title=cv_session['job_title'],
+                             job_company=cv_session['job_company'],
+                             selected_headline=cv_session['selected_headline'],
+                             approved_bullets=approved_bullets_data,
+                             analysis_id=cv_session['analysis_id'])
+
+    except Exception as e:
+        print(f"Error in CV preview: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading preview", 500
+
+
 @app.route("/api/customize-bullet-chat", methods=["POST"])
 def customize_bullet_chat():
     """Handle chat messages for bullet customization"""
@@ -5609,9 +5646,11 @@ This version better highlights the leadership and stakeholder management aspects
 def save_approved_bullets():
     """Save approved bullets to avoid re-selection"""
     if 'user_id' not in session or 'cv_session_id' not in session:
+        print("❌ Save bullets: Not authenticated or no CV session")
         return jsonify({'error': 'Not authenticated'}), 401
 
     cv_session_id = session['cv_session_id']
+    print(f"💾 Saving bullets for session {cv_session_id}")
 
     try:
         data = request.json
@@ -5619,26 +5658,36 @@ def save_approved_bullets():
         approved_texts = data.get('approved_texts', {})
         customized_bullets = data.get('customized_bullets', {})
 
+        print(f"  Received: {len(approved_bullets)} bullets")
+        print(f"  Bullet numbers: {approved_bullets}")
+
         # Build approved bullets data structure
         approved_bullets_data = []
         for bullet_number in approved_bullets:
             bullet_number_str = str(bullet_number)  # Convert to string for dict lookup
+            approved_text = approved_texts.get(bullet_number_str, '')
+            customized_text = customized_bullets.get(bullet_number_str, None)
+
+            print(f"  Bullet #{bullet_number}: approved_text={approved_text[:50] if approved_text else 'EMPTY'}...")
+
             approved_bullets_data.append({
                 'bullet_number': bullet_number,
-                'approved_text': approved_texts.get(bullet_number_str, ''),
-                'customized_text': customized_bullets.get(bullet_number_str, None)
+                'approved_text': approved_text,
+                'customized_text': customized_text
             })
 
         # Save to database
         success = update_cv_session_approved_bullets(cv_session_id, approved_bullets_data)
 
         if success:
+            print(f"✅ Successfully saved {len(approved_bullets_data)} bullets to database")
             return jsonify({'success': True})
         else:
+            print("❌ Failed to save to database")
             return jsonify({'error': 'Failed to save to database'}), 500
 
     except Exception as e:
-        print(f"Error saving approved bullets: {e}")
+        print(f"❌ Error saving approved bullets: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Failed to save approved bullets'}), 500
