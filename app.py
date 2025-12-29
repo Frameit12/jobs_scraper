@@ -4828,6 +4828,31 @@ def debug_analyses():
 
 # ==================== CV CUSTOMIZATION ROUTES ====================
 
+@app.route("/debug-template", methods=["GET"])
+def debug_template():
+    """Debug endpoint to view master template structure"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+    master_template = get_user_master_template(user_id)
+
+    if not master_template:
+        return "No master template found", 404
+
+    lines = master_template['template_text'].split('\n')
+
+    # Build HTML output with line numbers
+    html = "<html><head><style>body{font-family:monospace;} .line{padding:2px 0;} .linenum{color:#888;width:50px;display:inline-block;} .content{white-space:pre-wrap;}</style></head><body>"
+    html += f"<h2>Master Template Debug (Total lines: {len(lines)})</h2>"
+
+    for i, line in enumerate(lines[:100]):  # Show first 100 lines
+        html += f'<div class="line"><span class="linenum">{i}:</span><span class="content">{line}</span></div>'
+
+    html += "</body></html>"
+    return html
+
+
 @app.route("/customize-cv/start/<int:analysis_id>", methods=["GET"])
 def customize_cv_start(analysis_id):
     """Entry point for CV customization - creates session and starts flow"""
