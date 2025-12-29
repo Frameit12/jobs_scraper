@@ -1289,7 +1289,11 @@ def parse_bullets_from_template(template_text):
         line_stripped = line.strip()
 
         # Detect start of JP Morgan bullets section
-        if 'JP MORGAN' in line_stripped.upper() and 'BULLET' in line_stripped.upper():
+        # Must match the exact pattern: "JP MORGAN CHASE BULLETS (XX Unique Variations)"
+        # NOT just any line mentioning "JP Morgan" and "bullets"
+        if ('JP MORGAN' in line_stripped.upper() and
+            'BULLETS' in line_stripped.upper() and  # Note: BULLETS plural
+            'VARIATION' in line_stripped.upper()):  # And contains "Variation"
             in_bullets_section = True
             print(f"✓ Found JP MORGAN BULLETS section at line {i}: '{line_stripped}'")
             continue
