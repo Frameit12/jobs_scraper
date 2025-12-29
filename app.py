@@ -1539,6 +1539,153 @@ Be strategic and honest about which headlines will maximize interview chances.""
         return None
 
 
+def analyze_bullets_with_ai(bullets, job_description, user_id):
+    """Use AI to analyze bullets and recommend top 8-10 for this role
+
+    Returns analysis with:
+    - Top 8-10 recommended bullets with match scores
+    - For each: status (ready_to_use or needs_rewriting) + suggestions
+    - Gap analysis: what's missing from bullets vs JD requirements
+    - 2-3 suggested new bullets to fill gaps
+    """
+    client = get_anthropic_client()
+    system_prompt = get_user_system_prompt(user_id)
+
+    # Group bullets by category for better context
+    bullets_by_category = {}
+    for bullet in bullets:
+        cat = bullet['category']
+        if cat not in bullets_by_category:
+            bullets_by_category[cat] = []
+        bullets_by_category[cat].append(bullet)
+
+    # Build bullets text organized by category
+    bullets_text = ""
+    for category, cat_bullets in bullets_by_category.items():
+        bullets_text += f"\n**{category}:**\n"
+        for bullet in cat_bullets:
+            bullets_text += f"{bullet['number']}. {bullet['text']}\n"
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4000,
+            temperature=0.3,
+            system=[
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""You are helping a job seeker select the most impactful resume bullets to maximize interview chances for this role.
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**AVAILABLE BULLETS (66 total, organized by category):**
+{bullets_text}
+
+**YOUR TASK:**
+1. **Score all bullets (0-100)** based on relevance to JD requirements
+2. **Select top 8-10 bullets** that:
+   - Best demonstrate required skills/experience
+   - Show quantifiable impact matching JD priorities
+   - Cover diverse aspects of the role (not all from one category)
+   - Tell a compelling story about candidate's fit
+
+3. **For each top bullet**, determine:
+   - **ready_to_use**: bullet is perfect as-is, use directly
+   - **needs_rewriting**: bullet is relevant but needs adaptation
+     - If needs rewriting, provide specific rewrite suggestion
+
+4. **Gap Analysis**: Identify 2-3 JD requirements NOT well-covered by existing bullets
+
+5. **Suggest 2-3 new bullets** to fill those gaps (write complete bullet text)
+
+**Return JSON in this exact format:**
+{{
+    "recommended_bullets": [
+        {{
+            "bullet_number": 46,
+            "category": "Portfolio Scale & Governance Oversight",
+            "original_text": "Scaled AI Governance Oversight by 63%...",
+            "match_score": 95,
+            "status": "ready_to_use",
+            "reasons": [
+                "Directly demonstrates portfolio management scale required in JD",
+                "Shows 63% growth metric that proves impact",
+                "Governance oversight aligns with compliance focus"
+            ],
+            "rewrite_suggestion": null
+        }},
+        {{
+            "bullet_number": 60,
+            "category": "LLM Innovation",
+            "original_text": "Pioneered LLM-powered solution...",
+            "match_score": 88,
+            "status": "needs_rewriting",
+            "reasons": [
+                "LLM innovation matches AI transformation focus in JD",
+                "Shows hands-on technical implementation experience"
+            ],
+            "rewrite_suggestion": "Pioneered LLM-powered automation solution using ChatGPT to transform manual workflows into comprehensive documentation, reducing manual effort by 5-10 hours per procedure—demonstrating AI transformation impact aligned with [Company]'s AI-first strategy"
+        }},
+        ... (8-10 total)
+    ],
+    "gaps": [
+        "JD emphasizes stakeholder communication at C-suite level - existing bullets show stakeholder mgmt but could strengthen executive influence",
+        "JD requires experience with [specific tool/framework] not explicitly mentioned in bullets",
+        "JD wants change management leadership - only 1 bullet covers this"
+    ],
+    "suggested_new_bullets": [
+        "Led C-suite stakeholder alignment across 5 business units for AI governance framework adoption, securing executive sponsorship and $2M budget approval through compelling ROI presentations that translated technical requirements into business value",
+        "Drove organization-wide change management for new AI compliance standards affecting 200+ team members across Operations and Technology, designing training curriculum and achieving 95% adoption within 3 months"
+    ]
+}}
+
+**Important:**
+- Be strategic: select bullets that show DIVERSE skills, not all from one category
+- Prioritize bullets with metrics/quantifiable impact
+- For "needs_rewriting", give SPECIFIC rewrites that incorporate JD keywords naturally
+- New bullets should fill real gaps, not just restate existing bullets
+- Match scores should reflect true JD alignment (be honest, not inflated)"""
+                }
+            ]
+        )
+
+        # Parse JSON response
+        import json
+        response_text = message.content[0].text
+
+        # Extract JSON from response (handle markdown code blocks)
+        if "```json" in response_text:
+            json_start = response_text.find("```json") + 7
+            json_end = response_text.find("```", json_start)
+            response_text = response_text[json_start:json_end].strip()
+        elif "```" in response_text:
+            json_start = response_text.find("```") + 3
+            json_end = response_text.find("```", json_start)
+            response_text = response_text[json_start:json_end].strip()
+
+        analysis = json.loads(response_text)
+
+        print(f"✓ Bullet analysis complete: {len(analysis.get('recommended_bullets', []))} bullets recommended")
+        print(f"  Gaps identified: {len(analysis.get('gaps', []))}")
+        print(f"  New bullets suggested: {len(analysis.get('suggested_new_bullets', []))}")
+
+        return analysis
+
+    except Exception as e:
+        print(f"Error analyzing bullets with AI: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 # ==================== AI MATCH TOOL: AI INTEGRATION FUNCTIONS ====================
 
 def get_anthropic_client():
