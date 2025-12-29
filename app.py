@@ -1439,6 +1439,47 @@ def get_cv_session(session_id):
         return None
 
 
+def get_cv_session_by_analysis(analysis_id, user_id):
+    """Get CV customization session by analysis_id and user_id"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, user_id, analysis_id, job_title, job_company,
+                       selected_headline, bullet_analysis, approved_bullets, new_bullets,
+                       match_score_progression, status, created_at
+                FROM cv_customization_sessions
+                WHERE analysis_id = :analysis_id AND user_id = :user_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """), {"analysis_id": analysis_id, "user_id": user_id})
+
+            row = result.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'user_id': row[1],
+                    'analysis_id': row[2],
+                    'job_title': row[3],
+                    'job_company': row[4],
+                    'selected_headline': row[5],
+                    'bullet_analysis': row[6],
+                    'approved_bullets': row[7] if row[7] else [],
+                    'new_bullets': row[8] if row[8] else [],
+                    'match_score_progression': row[9] if row[9] else {},
+                    'status': row[10],
+                    'created_at': row[11]
+                }
+            return None
+
+    except Exception as e:
+        print(f"Error getting CV session by analysis: {e}")
+        return None
+
+
 def update_cv_session_headline(session_id, headline_text):
     """Update selected headline in CV session"""
     engine = get_db_connection()
@@ -5621,10 +5662,32 @@ def get_analysis(analysis_id):
             print(f"  RETURNING 404: Analysis not found")
             return jsonify({'error': 'Analysis not found'}), 404
 
+        # Check if CV customization session exists for this analysis
+        cv_session = get_cv_session_by_analysis(analysis_id, user_id)
+        cv_progress = None
+
+        if cv_session:
+            # Determine current step
+            current_step = 'headline'  # Default
+            if cv_session.get('selected_headline'):
+                current_step = 'bullets'
+            if cv_session.get('approved_bullets') and len(cv_session['approved_bullets']) >= 6:
+                current_step = 'preview'
+
+            cv_progress = {
+                'session_id': cv_session['id'],
+                'current_step': current_step,
+                'has_headline': bool(cv_session.get('selected_headline')),
+                'approved_bullets_count': len(cv_session['approved_bullets']) if cv_session.get('approved_bullets') else 0,
+                'status': cv_session.get('status', 'in_progress')
+            }
+            print(f"  CV Session found: {cv_progress}")
+
         print(f"  SUCCESS: Returning analysis data")
         return jsonify({
             'success': True,
-            'analysis': analysis
+            'analysis': analysis,
+            'cv_progress': cv_progress
         })
 
     except Exception as e:

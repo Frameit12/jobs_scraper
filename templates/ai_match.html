@@ -804,7 +804,7 @@ We're looking for a Senior VP to lead our AI Risk team...
 
                 if (result.success) {
                     // Display results and keep them visible
-                    displayResults(result.analysis, result.analysis_id);
+                    displayResults(result.analysis, result.analysis_id, result.cv_progress || null);
                     document.getElementById('results-section').classList.add('active');
                     document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
                     // Analysis is saved - it will appear in sidebar on next page load
@@ -822,7 +822,7 @@ We're looking for a Senior VP to lead our AI Risk team...
         });
 
         // Display Results
-        function displayResults(analysis, analysisId) {
+        function displayResults(analysis, analysisId, cvProgress = null) {
             // Update match score
             document.getElementById('match-score-display').textContent = analysis.match_score + '%';
 
@@ -845,18 +845,55 @@ We're looking for a Senior VP to lead our AI Risk team...
 
             // Add Customize CV button if analysis ID is available
             if (analysisId && {{ 'true' if has_master_template else 'false' }}) {
-                const customizeButton = `
-                    <div class="mt-6 text-center">
-                        <a href="/customize-cv/start/${analysisId}"
-                           class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-700 hover:to-blue-700 transition">
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                            </svg>
-                            📄 Customize CV for This Role
-                        </a>
-                        <p class="text-sm text-slate-500 mt-2">Create a tailored CV using your master template</p>
-                    </div>
-                `;
+                let customizeButton;
+
+                if (cvProgress) {
+                    // User has already started CV customization - show Continue button
+                    const stepLabels = {
+                        'headline': 'Step 1: Select Headline',
+                        'bullets': 'Step 2: Select Bullets',
+                        'preview': 'Step 3: Preview & Download'
+                    };
+
+                    const stepLabel = stepLabels[cvProgress.current_step] || 'In Progress';
+                    const progressText = cvProgress.current_step === 'bullets' && cvProgress.approved_bullets_count > 0
+                        ? `${cvProgress.approved_bullets_count} bullets selected`
+                        : stepLabel;
+
+                    const continueUrl = cvProgress.current_step === 'headline'
+                        ? `/customize-cv/headline`
+                        : cvProgress.current_step === 'bullets'
+                        ? `/customize-cv/bullets`
+                        : `/customize-cv/preview`;
+
+                    customizeButton = `
+                        <div class="mt-6 text-center">
+                            <a href="${continueUrl}"
+                               class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-teal-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-teal-700 transition">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                ✓ Continue Customizing CV
+                            </a>
+                            <p class="text-sm text-slate-500 mt-2">📍 ${progressText}</p>
+                        </div>
+                    `;
+                } else {
+                    // No existing session - show start button
+                    customizeButton = `
+                        <div class="mt-6 text-center">
+                            <a href="/customize-cv/start/${analysisId}"
+                               class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-700 hover:to-blue-700 transition">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                                📄 Customize CV for This Role
+                            </a>
+                            <p class="text-sm text-slate-500 mt-2">Create a tailored CV using your master template</p>
+                        </div>
+                    `;
+                }
+
                 document.getElementById('match-stats').insertAdjacentHTML('afterend', customizeButton);
             }
 
@@ -1027,8 +1064,8 @@ We're looking for a Senior VP to lead our AI Risk team...
                 const result = await response.json();
 
                 if (result.success) {
-                    // Display the loaded analysis with analysis ID
-                    displayResults(result.analysis, analysisId);
+                    // Display the loaded analysis with analysis ID and CV progress
+                    displayResults(result.analysis, analysisId, result.cv_progress || null);
                 } else {
                     alert('Error: ' + result.error);
                 }
