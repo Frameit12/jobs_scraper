@@ -1291,57 +1291,64 @@ def parse_bullets_from_template(template_text):
         # Detect start of JP Morgan bullets section
         if 'JP MORGAN' in line_stripped.upper() and 'BULLET' in line_stripped.upper():
             in_bullets_section = True
-            print(f"Found JP MORGAN BULLETS section at line {i}: '{line_stripped[:60]}...'")
+            print(f"✓ Found JP MORGAN BULLETS section at line {i}: '{line_stripped}'")
             continue
 
-        # Detect end of bullets section (next major section or end)
-        if in_bullets_section and line_stripped:
-            # Check for section headers that indicate end of bullets
-            upper_line = line_stripped.upper()
+        # Only process if we're in the bullets section
+        if not in_bullets_section:
+            continue
 
-            # Stop at next major ALL CAPS section (but not CATEGORY markers)
-            if line_stripped.isupper() and len(line_stripped) > 15 and not line_stripped.startswith('CATEGORY:'):
-                # Could be next section like "EDUCATION" or "PREVIOUS EXPERIENCE"
-                if not any(keyword in upper_line for keyword in ['JP MORGAN', 'JPMORGAN', 'CHASE']):
-                    print(f"End of BULLETS section at line {i}: '{line_stripped[:60]}...'")
-                    break
-
-            # Stop at separator lines
-            if line_stripped.startswith('___') or line_stripped.startswith('==='):
-                print(f"End of BULLETS section at line {i}: separator line")
-                break
+        # Skip empty lines
+        if not line_stripped:
+            continue
 
         # Extract category markers
-        if in_bullets_section and line_stripped.startswith('CATEGORY:'):
+        if line_stripped.startswith('CATEGORY:'):
             current_category = line_stripped.replace('CATEGORY:', '').strip()
-            print(f"  Line {i}: Found category '{current_category}'")
+            print(f"  ✓ Line {i}: Found category '{current_category}'")
             continue
 
-        # Extract bullets (plain text paragraphs)
-        if in_bullets_section and line_stripped and not line_stripped.startswith('CATEGORY:'):
-            # Validate this is a bullet (substantial text, not a header)
-            if len(line_stripped) > 40:  # Bullets are long, detailed paragraphs
-                bullets.append({
-                    'id': len(bullets),  # 0-indexed
-                    'number': len(bullets) + 1,  # 1-indexed for display
-                    'text': line_stripped,
-                    'category': current_category
-                })
-                print(f"  Line {i}: Added bullet #{len(bullets)} in category '{current_category}'")
-                print(f"    Text preview: '{line_stripped[:80]}...'")
+        # Check if we've hit the end of the bullets section
+        # End conditions: next major section header or separator
+        upper_line = line_stripped.upper()
 
-    print(f"=== TOTAL BULLETS FOUND: {len(bullets)} ===")
+        # Separator lines
+        if line_stripped.startswith('___') or line_stripped.startswith('==='):
+            print(f"  ✗ Line {i}: End of BULLETS section (separator line)")
+            break
+
+        # All caps section headers (but not CATEGORY markers or JP MORGAN related)
+        if line_stripped.isupper() and len(line_stripped) > 15:
+            if not any(keyword in upper_line for keyword in ['JP MORGAN', 'JPMORGAN', 'CHASE', 'CATEGORY']):
+                print(f"  ✗ Line {i}: End of BULLETS section (section header): '{line_stripped}'")
+                break
+
+        # If we get here, this should be a bullet
+        # Validate it's substantial text (bullets are detailed paragraphs)
+        if len(line_stripped) > 40:
+            bullets.append({
+                'id': len(bullets),  # 0-indexed
+                'number': len(bullets) + 1,  # 1-indexed for display
+                'text': line_stripped,
+                'category': current_category
+            })
+            print(f"  ✓ Line {i}: Added bullet #{len(bullets)} ({current_category})")
+        else:
+            print(f"  ⚠ Line {i}: Skipped (too short, {len(line_stripped)} chars): '{line_stripped}'")
+
+    print(f"\n=== TOTAL BULLETS FOUND: {len(bullets)} ===")
     print(f"Expected: 66 bullets")
 
-    # Show category breakdown
-    category_counts = {}
-    for bullet in bullets:
-        cat = bullet['category']
-        category_counts[cat] = category_counts.get(cat, 0) + 1
+    if len(bullets) > 0:
+        # Show category breakdown
+        category_counts = {}
+        for bullet in bullets:
+            cat = bullet['category']
+            category_counts[cat] = category_counts.get(cat, 0) + 1
 
-    print("\n=== CATEGORY BREAKDOWN ===")
-    for cat, count in category_counts.items():
-        print(f"  {cat}: {count} bullets")
+        print("\n=== CATEGORY BREAKDOWN ===")
+        for cat, count in category_counts.items():
+            print(f"  {cat}: {count} bullets")
     print()
 
     return bullets
