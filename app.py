@@ -32,6 +32,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Application Configuration
+APP_DOMAIN = "findmeajob.xyz"  # Production domain
+APP_URL = f"https://{APP_DOMAIN}"
 
 # Database setup
 def get_db_connection():
