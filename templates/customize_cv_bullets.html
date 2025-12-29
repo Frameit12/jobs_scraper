@@ -111,6 +111,14 @@
                 <p class="text-base text-gray-900 leading-relaxed">{{ bullet.original_text }}</p>
             </div>
 
+            <!-- Show Customized Version if exists -->
+            <div x-show="customizedBullets[{{ bullet.bullet_number }}]" class="mb-4">
+                <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-4">
+                    <p class="text-xs font-semibold text-green-800 mb-2">✓ Your Customized Version:</p>
+                    <p class="text-base text-green-900 leading-relaxed" x-text="customizedBullets[{{ bullet.bullet_number }}]"></p>
+                </div>
+            </div>
+
             <!-- Why This Works -->
             <div class="bg-gray-50 rounded-lg p-4 mb-4">
                 <p class="text-xs font-semibold text-gray-700 mb-2">Why this maximizes interview chances:</p>
@@ -149,7 +157,7 @@
                 </template>
 
                 {% if bullet.rewrite_suggestion %}
-                <button @click="customizeBullet({{ bullet.bullet_number }}, '{{ bullet.original_text }}')"
+                <button @click="customizeBullet({{ bullet.bullet_number }}, '{{ bullet.original_text }}', `{{ bullet.rewrite_suggestion|replace('`', '\\`')|replace('\n', ' ') }}`)"
                         class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-sm">
                     ✎ Customize with AI
                 </button>
@@ -181,7 +189,7 @@
          class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
          @click.self="closeChatModal()">
 
-        <div class="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[80vh] flex flex-col">
+        <div class="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[85vh] flex flex-col">
             <!-- Modal Header -->
             <div class="p-6 border-b">
                 <div class="flex items-start justify-between">
@@ -201,8 +209,20 @@
             <div class="flex-1 overflow-y-auto p-6 space-y-4" x-ref="chatMessages">
                 <!-- Original Bullet -->
                 <div class="bg-gray-50 rounded-lg p-4 border-l-4 border-gray-400">
-                    <p class="text-xs font-semibold text-gray-600 mb-1">Original Bullet:</p>
-                    <p class="text-sm text-gray-900" x-text="currentBulletText"></p>
+                    <p class="text-xs font-semibold text-gray-600 mb-2">Original Bullet:</p>
+                    <p class="text-base text-gray-900 leading-relaxed" x-text="originalBulletText"></p>
+                </div>
+
+                <!-- AI Suggested Rewrite (if exists) -->
+                <div x-show="aiSuggestedRewrite" class="bg-orange-50 rounded-lg p-4 border-l-4 border-orange-400">
+                    <p class="text-xs font-semibold text-orange-800 mb-2">AI's Initial Suggested Rewrite:</p>
+                    <p class="text-base text-orange-900 leading-relaxed" x-text="aiSuggestedRewrite"></p>
+                </div>
+
+                <!-- Current Working Version -->
+                <div class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
+                    <p class="text-xs font-semibold text-blue-800 mb-2">Current Working Version:</p>
+                    <p class="text-base text-blue-900 leading-relaxed" x-text="currentBulletText"></p>
                 </div>
 
                 <!-- Chat Messages -->
@@ -282,13 +302,16 @@
 function bulletSelector() {
     return {
         approvedBullets: [],  // Array of bullet numbers
-        approvedTexts: {},    // Map of bullet_number -> text
+        approvedTexts: {},    // Map of bullet_number -> text (final approved text)
+        customizedBullets: {}, // Map of bullet_number -> customized text (to show in UI)
         saving: false,
 
         // Chat modal state
         chatOpen: false,
         currentBulletNumber: null,
-        currentBulletText: '',
+        originalBulletText: '',  // The original bullet (never changes)
+        aiSuggestedRewrite: '',  // AI's initial suggestion (never changes)
+        currentBulletText: '',   // Working version (updates as chat progresses)
         chatMessages: [],
         userMessage: '',
         chatLoading: false,
@@ -305,13 +328,19 @@ function bulletSelector() {
             if (index > -1) {
                 this.approvedBullets.splice(index, 1);
                 delete this.approvedTexts[bulletNumber];
+                delete this.customizedBullets[bulletNumber];
             }
         },
 
-        customizeBullet(bulletNumber, bulletText) {
+        customizeBullet(bulletNumber, bulletText, aiSuggestion = '') {
             // Open chat modal
             this.currentBulletNumber = bulletNumber;
-            this.currentBulletText = bulletText;
+            this.originalBulletText = bulletText;  // Store original
+            this.aiSuggestedRewrite = aiSuggestion || '';  // Store AI suggestion
+
+            // Start with AI suggestion if it exists, otherwise use original
+            this.currentBulletText = aiSuggestion || bulletText;
+
             this.chatMessages = [];
             this.userMessage = '';
             this.chatOpen = true;
@@ -330,6 +359,8 @@ function bulletSelector() {
         closeChatModal() {
             this.chatOpen = false;
             this.currentBulletNumber = null;
+            this.originalBulletText = '';
+            this.aiSuggestedRewrite = '';
             this.currentBulletText = '';
             this.chatMessages = [];
             this.userMessage = '';
@@ -394,8 +425,12 @@ function bulletSelector() {
         },
 
         approveChatBullet() {
-            // Approve the refined bullet
+            // Store the customized version to show in UI
+            this.customizedBullets[this.currentBulletNumber] = this.currentBulletText;
+
+            // Approve with the final refined text
             this.approveBullet(this.currentBulletNumber, this.currentBulletText);
+
             this.closeChatModal();
         },
 
