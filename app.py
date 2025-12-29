@@ -351,6 +351,12 @@ def init_cv_customization_sessions_table():
                 ADD COLUMN IF NOT EXISTS bullet_analysis JSONB
             """))
 
+            # Add approved_bullets column if it doesn't exist (for existing tables)
+            conn.execute(text("""
+                ALTER TABLE cv_customization_sessions
+                ADD COLUMN IF NOT EXISTS approved_bullets JSONB
+            """))
+
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_cv_sessions_user
                 ON cv_customization_sessions(user_id, status)
