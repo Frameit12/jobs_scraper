@@ -1188,10 +1188,15 @@ def extract_text_from_docx(file_data):
 
 def parse_headlines_from_template(template_text):
     """Extract all headline variations from master template"""
+    import re
+
     headlines = []
     lines = template_text.split('\n')
 
     in_headlines_section = False
+
+    print(f"\n=== PARSING HEADLINES ===")
+    print(f"Total lines in template: {len(lines)}")
 
     for i, line in enumerate(lines):
         line_stripped = line.strip()
@@ -1199,6 +1204,7 @@ def parse_headlines_from_template(template_text):
         # Detect start of HEADLINES section
         if 'HEADLINE' in line_stripped.upper() and ('VARIATION' in line_stripped.upper() or '(' in line_stripped):
             in_headlines_section = True
+            print(f"Found HEADLINES section at line {i}: '{line_stripped[:50]}...'")
             continue
 
         # Detect end of HEADLINES section (next major section)
@@ -1210,23 +1216,28 @@ def parse_headlines_from_template(template_text):
             'EDUCATION' in line_stripped.upper() or
             'TECHNICAL' in line_stripped.upper()
         ):
+            print(f"End of HEADLINES section at line {i}: '{line_stripped[:50]}...'")
             break
 
         # Extract numbered headlines (e.g., "1.", "2.", etc.)
         if in_headlines_section and line_stripped:
             # Check if line starts with a number followed by period or tab
-            import re
             match = re.match(r'^(\d+)[.\t]\s*(.+)', line_stripped)
             if match:
                 headline_number = int(match.group(1))
                 headline_text = match.group(2).strip()
+                print(f"  Line {i}: Found headline #{headline_number}, length={len(headline_text)}")
                 if len(headline_text) > 20:  # Valid headline
                     headlines.append({
                         'id': headline_number - 1,  # 0-indexed
                         'number': headline_number,
                         'text': headline_text
                     })
+                    print(f"    ✓ Added: '{headline_text[:50]}...'")
+                else:
+                    print(f"    ✗ Too short (< 20 chars)")
 
+    print(f"=== TOTAL HEADLINES FOUND: {len(headlines)} ===\n")
     return headlines
 
 
