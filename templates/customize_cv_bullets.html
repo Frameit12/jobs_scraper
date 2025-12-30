@@ -58,7 +58,9 @@
     <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
         <p class="text-sm text-blue-900">
             <span class="font-semibold">AI has analyzed all 66 bullets</span> and selected the top {{ recommended_bullets|length }} that best match this role.
-            Review each bullet below and approve those you want to use.
+        </p>
+        <p class="text-sm text-blue-800 mt-2">
+            <span class="font-semibold">📊 Prioritized by relevance:</span> The highest-scoring bullets appear first to catch recruiters' eyes.
         </p>
     </div>
 
@@ -74,9 +76,20 @@
             <div class="flex items-start justify-between mb-4">
                 <div class="flex-1">
                     <div class="flex items-center gap-2 mb-2">
+                        <!-- Priority Badge (Top 3 get special highlighting) -->
+                        {% if loop.index <= 3 %}
+                        <span class="px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-xs font-bold shadow-sm">
+                            🎯 Priority #{{ loop.index }}
+                        </span>
+                        {% else %}
+                        <span class="px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs font-semibold">
+                            #{{ loop.index }}
+                        </span>
+                        {% endif %}
+
                         <!-- Bullet Number -->
                         <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-bold">
-                            #{{ bullet.bullet_number }}
+                            Bullet #{{ bullet.bullet_number }}
                         </span>
 
                         <!-- Category Badge -->

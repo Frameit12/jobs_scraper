@@ -1696,7 +1696,11 @@ def analyze_bullets_with_ai(bullets, job_description, user_id):
    - Cover diverse aspects of the role (not all from one category)
    - Tell a compelling story about candidate's fit
 
-3. **For each top bullet**, determine:
+3. **CRITICAL: Order bullets by priority** - Return bullets in descending order by match_score (highest first)
+   - First bullet should be the strongest match (highest score)
+   - This ensures recruiters see most relevant experience first
+
+4. **For each top bullet**, determine:
    - **ready_to_use**: bullet is perfect as-is, use directly
    - **needs_rewriting**: bullet is relevant but needs adaptation
      - If needs rewriting, provide specific rewrite suggestion
@@ -1772,7 +1776,19 @@ def analyze_bullets_with_ai(bullets, job_description, user_id):
 
         analysis = json.loads(response_text)
 
-        print(f"✓ Bullet analysis complete: {len(analysis.get('recommended_bullets', []))} bullets recommended")
+        # IMPORTANT: Sort bullets by match_score (highest first) to ensure priority ordering
+        # This catches recruiter's eye with strongest matches first
+        if 'recommended_bullets' in analysis:
+            analysis['recommended_bullets'] = sorted(
+                analysis['recommended_bullets'],
+                key=lambda x: x.get('match_score', 0),
+                reverse=True
+            )
+            print(f"✓ Bullet analysis complete: {len(analysis.get('recommended_bullets', []))} bullets recommended")
+            print(f"  Sorted by priority - Top match score: {analysis['recommended_bullets'][0].get('match_score', 0)}%")
+        else:
+            print(f"✓ Bullet analysis complete")
+
         print(f"  Gaps identified: {len(analysis.get('gaps', []))}")
         print(f"  New bullets suggested: {len(analysis.get('suggested_new_bullets', []))}")
 
