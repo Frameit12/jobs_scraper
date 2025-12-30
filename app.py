@@ -5982,7 +5982,7 @@ def interview_prep():
                 LEFT JOIN interview_sessions intv ON cvs.id = intv.cv_session_id
                 WHERE cvs.user_id = :user_id
                     AND cvs.approved_bullets IS NOT NULL
-                    AND json_array_length(cvs.approved_bullets) >= 6
+                    AND cvs.approved_bullets::text != '[]'
                 GROUP BY cvs.id
                 ORDER BY cvs.created_at DESC
             """)
@@ -6008,7 +6008,8 @@ def interview_prep():
         print(f"Error in interview prep: {e}")
         import traceback
         traceback.print_exc()
-        return "Error loading interview prep", 500
+        # Return error details for debugging (remove in production)
+        return f"Error loading interview prep: {str(e)}", 500
 
 
 @app.route("/interview-prep/start/<int:cv_session_id>", methods=["POST"])
