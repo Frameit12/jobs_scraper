@@ -1461,6 +1461,25 @@ def get_cv_session(session_id):
 
             row = result.fetchone()
             if row:
+                # Parse JSON fields
+                approved_bullets = row[7]
+                if isinstance(approved_bullets, str):
+                    approved_bullets = json.loads(approved_bullets) if approved_bullets else []
+                elif approved_bullets is None:
+                    approved_bullets = []
+
+                new_bullets = row[8]
+                if isinstance(new_bullets, str):
+                    new_bullets = json.loads(new_bullets) if new_bullets else []
+                elif new_bullets is None:
+                    new_bullets = []
+
+                match_score = row[9]
+                if isinstance(match_score, str):
+                    match_score = json.loads(match_score) if match_score else {}
+                elif match_score is None:
+                    match_score = {}
+
                 return {
                     'id': row[0],
                     'user_id': row[1],
@@ -1469,9 +1488,9 @@ def get_cv_session(session_id):
                     'job_company': row[4],
                     'selected_headline': row[5],
                     'bullet_analysis': row[6],
-                    'approved_bullets': row[7] if row[7] else [],
-                    'new_bullets': row[8] if row[8] else [],
-                    'match_score_progression': row[9] if row[9] else {},
+                    'approved_bullets': approved_bullets,
+                    'new_bullets': new_bullets,
+                    'match_score_progression': match_score,
                     'status': row[10],
                     'created_at': row[11]
                 }
@@ -6075,16 +6094,14 @@ def interview_prep_start(cv_session_id):
         print(f"✓ Created interview session {interview_session_id}")
 
         # Redirect to first question
-        return jsonify({
-            'success': True,
-            'session_id': interview_session_id
-        })
+        return redirect(f'/interview-prep/question/{interview_session_id}/1')
 
     except Exception as e:
         print(f"Error starting interview session: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'Failed to start session'}), 500
+        # Return detailed error for debugging (remove in production)
+        return jsonify({'error': f'Failed to start session: {str(e)}'}), 500
 
 
 @app.route("/interview-prep/question/<int:session_id>/<int:question_num>", methods=["GET"])
