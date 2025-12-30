@@ -6168,9 +6168,23 @@ def interview_prep_question(session_id, question_num):
             if not row:
                 return "Session not found", 404
 
+            # Parse JSON fields
             questions = row[3]
-            answers = row[4] or {}
-            evaluations = row[5] or {}
+            if isinstance(questions, str):
+                questions = json.loads(questions)
+
+            answers = row[4]
+            if isinstance(answers, str):
+                answers = json.loads(answers) if answers else {}
+            elif answers is None:
+                answers = {}
+
+            evaluations = row[5]
+            if isinstance(evaluations, str):
+                evaluations = json.loads(evaluations) if evaluations else {}
+            elif evaluations is None:
+                evaluations = {}
+
             current_question = row[6]
             completed = row[7]
             job_title = row[8]
@@ -6196,9 +6210,17 @@ def interview_prep_question(session_id, question_num):
             return render_template('interview_evaluation.html',
                                  session_id=session_id,
                                  question_num=question_num,
-                                 question_data=question_data,
+                                 question_text=question_data.get('question_text', ''),
                                  user_answer=answers.get(question_key, ''),
-                                 evaluation=evaluation,
+                                 overall_score=evaluation.get('overall_score', 0),
+                                 details_score=evaluation.get('details_score', 0),
+                                 organization_score=evaluation.get('organization_score', 0),
+                                 analysis_score=evaluation.get('analysis_score', 0),
+                                 ownership_score=evaluation.get('ownership_score', 0),
+                                 feedback_summary=evaluation.get('feedback_summary', ''),
+                                 strong_points=evaluation.get('strong_points', []),
+                                 improvement_areas=evaluation.get('improvement_areas', []),
+                                 better_answer_example=evaluation.get('better_answer_example', ''),
                                  job_title=job_title,
                                  job_company=job_company,
                                  total_questions=len(questions))
@@ -6207,7 +6229,8 @@ def interview_prep_question(session_id, question_num):
         return render_template('interview_question.html',
                              session_id=session_id,
                              question_num=question_num,
-                             question_data=question_data,
+                             question_text=question_data.get('question_text', ''),
+                             bullet_reference=question_data.get('bullet_reference', ''),
                              job_title=job_title,
                              job_company=job_company,
                              total_questions=len(questions))
@@ -6251,11 +6274,30 @@ def interview_prep_submit(session_id, question_num):
             if not row:
                 return "Session not found", 404
 
+            # Parse JSON fields
             questions = row[0]
-            answers = row[1] or {}
-            evaluations = row[2] or {}
+            if isinstance(questions, str):
+                questions = json.loads(questions)
+
+            answers = row[1]
+            if isinstance(answers, str):
+                answers = json.loads(answers) if answers else {}
+            elif answers is None:
+                answers = {}
+
+            evaluations = row[2]
+            if isinstance(evaluations, str):
+                evaluations = json.loads(evaluations) if evaluations else {}
+            elif evaluations is None:
+                evaluations = {}
+
             analysis_id = row[4]
+
             approved_bullets = row[5]
+            if isinstance(approved_bullets, str):
+                approved_bullets = json.loads(approved_bullets) if approved_bullets else []
+            elif approved_bullets is None:
+                approved_bullets = []
 
         # Get question
         question_data = questions[question_num - 1]
@@ -6266,9 +6308,16 @@ def interview_prep_submit(session_id, question_num):
         # Extract bullet texts
         bullet_texts = []
         for bullet in approved_bullets:
-            text = bullet.get('customized_text') or bullet.get('approved_text', '')
-            if text:
-                bullet_texts.append(text)
+            # Handle both dict and string formats
+            if isinstance(bullet, dict):
+                bullet_text = bullet.get('customized_text') or bullet.get('approved_text', '')
+            elif isinstance(bullet, str):
+                bullet_text = bullet
+            else:
+                bullet_text = ''
+
+            if bullet_text:
+                bullet_texts.append(bullet_text)
 
         # Evaluate answer
         print(f"Evaluating answer for question {question_num}...")
@@ -6332,7 +6381,7 @@ def interview_prep_summary(session_id):
             # Get session
             query = text("""
                 SELECT
-                    intv.evaluations, intv.completed, intv.overall_score,
+                    intv.questions, intv.evaluations, intv.completed, intv.overall_score,
                     cvs.job_title, cvs.job_company
                 FROM interview_sessions intv
                 JOIN cv_customization_sessions cvs ON intv.cv_session_id = cvs.id
@@ -6345,11 +6394,21 @@ def interview_prep_summary(session_id):
             if not row:
                 return "Session not found", 404
 
-            evaluations = row[0] or {}
-            completed = row[1]
-            overall_score = row[2]
-            job_title = row[3]
-            job_company = row[4]
+            # Parse JSON fields
+            questions = row[0]
+            if isinstance(questions, str):
+                questions = json.loads(questions)
+
+            evaluations = row[1]
+            if isinstance(evaluations, str):
+                evaluations = json.loads(evaluations) if evaluations else {}
+            elif evaluations is None:
+                evaluations = {}
+
+            completed = row[2]
+            overall_score = row[3]
+            job_title = row[4]
+            job_company = row[5]
 
         # If not completed yet, complete it now
         if not completed and evaluations:
@@ -6424,9 +6483,10 @@ def interview_prep_summary(session_id):
                              session_id=session_id,
                              overall_score=overall_score,
                              avg_scores=avg_scores,
+                             questions=questions,
+                             evaluations=evaluations,
                              job_title=job_title,
-                             job_company=job_company,
-                             total_questions=len(evaluations))
+                             job_company=job_company)
 
     except Exception as e:
         print(f"Error loading summary: {e}")
