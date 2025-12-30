@@ -6041,57 +6041,92 @@ def interview_prep_start(cv_session_id):
 
     try:
         # Get CV session data
+        print(f"DEBUG: Getting CV session {cv_session_id}...")
         cv_session = get_cv_session(cv_session_id)
         if not cv_session or cv_session['user_id'] != user_id:
             return jsonify({'error': 'Session not found'}), 404
+        print(f"DEBUG: CV session retrieved successfully")
 
         # Get job analysis
+        print(f"DEBUG: Getting analysis {cv_session['analysis_id']}...")
         analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
         if not analysis:
             return jsonify({'error': 'Analysis not found'}), 404
+        print(f"DEBUG: Analysis retrieved successfully")
 
         # Extract approved bullet texts
         approved_bullets = cv_session.get('approved_bullets', [])
+        print(f"DEBUG: approved_bullets type: {type(approved_bullets)}")
+        print(f"DEBUG: approved_bullets length: {len(approved_bullets) if approved_bullets else 0}")
+
         bullet_texts = []
-        for bullet in approved_bullets:
-            text = bullet.get('customized_text') or bullet.get('approved_text', '')
-            if text:
-                bullet_texts.append(text)
+        try:
+            for i, bullet in enumerate(approved_bullets):
+                # Handle both dict and string formats
+                if isinstance(bullet, dict):
+                    bullet_text = bullet.get('customized_text') or bullet.get('approved_text', '')
+                elif isinstance(bullet, str):
+                    bullet_text = bullet
+                else:
+                    bullet_text = ''
+
+                if bullet_text:
+                    bullet_texts.append(bullet_text)
+                    print(f"DEBUG: Bullet {i+1}: {bullet_text[:50]}...")
+        except Exception as bullet_err:
+            print(f"ERROR extracting bullets: {bullet_err}")
+            raise
+
+        print(f"DEBUG: Extracted {len(bullet_texts)} bullet texts")
+
+        if not bullet_texts:
+            return jsonify({'error': 'No bullets found to generate questions'}), 400
 
         # Generate questions
-        print(f"Generating interview questions for CV session {cv_session_id}...")
-        questions = generate_interview_questions(
-            job_description=analysis['job_description'],
-            cv_bullets=bullet_texts,
-            selected_headline=cv_session['selected_headline'],
-            user_id=user_id
-        )
+        print(f"DEBUG: Calling generate_interview_questions...")
+        try:
+            questions = generate_interview_questions(
+                job_description=analysis['job_description'],
+                cv_bullets=bullet_texts,
+                selected_headline=cv_session['selected_headline'],
+                user_id=user_id
+            )
+            print(f"DEBUG: Questions generated successfully")
+        except Exception as gen_err:
+            print(f"ERROR in generate_interview_questions: {gen_err}")
+            raise
 
         if not questions:
             return jsonify({'error': 'Failed to generate questions'}), 500
 
         # Create interview session
-        engine = get_db_connection()
-        with engine.connect() as conn:
-            insert_query = text("""
-                INSERT INTO interview_sessions (
-                    user_id, cv_session_id, questions, current_question
-                ) VALUES (
-                    :user_id, :cv_session_id, :questions, 1
-                )
-                RETURNING id
-            """)
+        print(f"DEBUG: Creating interview session in database...")
+        try:
+            engine = get_db_connection()
+            with engine.connect() as conn:
+                from sqlalchemy import text as sql_text  # Avoid any potential conflicts
+                insert_query = sql_text("""
+                    INSERT INTO interview_sessions (
+                        user_id, cv_session_id, questions, current_question
+                    ) VALUES (
+                        :user_id, :cv_session_id, :questions, 1
+                    )
+                    RETURNING id
+                """)
 
-            result = conn.execute(insert_query, {
-                "user_id": user_id,
-                "cv_session_id": cv_session_id,
-                "questions": json.dumps(questions)
-            })
-            conn.commit()
+                result = conn.execute(insert_query, {
+                    "user_id": user_id,
+                    "cv_session_id": cv_session_id,
+                    "questions": json.dumps(questions)
+                })
+                conn.commit()
 
-            interview_session_id = result.fetchone()[0]
+                interview_session_id = result.fetchone()[0]
 
-        print(f"✓ Created interview session {interview_session_id}")
+            print(f"✓ Created interview session {interview_session_id}")
+        except Exception as db_err:
+            print(f"ERROR creating interview session: {db_err}")
+            raise
 
         # Redirect to first question
         return redirect(f'/interview-prep/question/{interview_session_id}/1')
@@ -6101,7 +6136,8 @@ def interview_prep_start(cv_session_id):
         import traceback
         traceback.print_exc()
         # Return detailed error for debugging (remove in production)
-        return jsonify({'error': f'Failed to start session: {str(e)}'}), 500
+        error_message = repr(e)  # Use repr() instead of str() to avoid potential shadowing
+        return jsonify({'error': f'Failed to start session: {error_message}'}), 500
 
 
 @app.route("/interview-prep/question/<int:session_id>/<int:question_num>", methods=["GET"])
