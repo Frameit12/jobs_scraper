@@ -366,6 +366,49 @@ def init_cv_customization_sessions_table():
 init_cv_customization_sessions_table()
 
 
+def init_interview_sessions_table():
+    """Initialize table for storing interview practice sessions"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS interview_sessions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    cv_session_id INTEGER REFERENCES cv_customization_sessions(id) ON DELETE CASCADE,
+
+                    -- Progress tracking
+                    current_question INTEGER DEFAULT 1,
+                    completed BOOLEAN DEFAULT FALSE,
+
+                    -- All data in JSONB (flexible, fast, easy)
+                    questions JSONB NOT NULL,
+                    answers JSONB DEFAULT '{}',
+                    evaluations JSONB DEFAULT '{}',
+
+                    -- Summary scores (calculated when complete)
+                    overall_score DECIMAL(3,1),
+
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_interview_user_cv
+                ON interview_sessions(user_id, cv_session_id)
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_interview_completed
+                ON interview_sessions(user_id, completed)
+            """))
+
+            conn.commit()
+
+init_interview_sessions_table()
+
+
 def seed_initial_prompt_templates():
     """Seed initial prompt templates if they don't exist"""
     engine = get_db_connection()
@@ -1796,6 +1839,194 @@ def analyze_bullets_with_ai(bullets, job_description, user_id):
 
     except Exception as e:
         print(f"Error analyzing bullets with AI: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def generate_interview_questions(job_description, cv_bullets, selected_headline, user_id):
+    """
+    Generate 8 interview questions based on CV and job description
+    Returns list of question objects
+    """
+    client = get_anthropic_client()
+
+    # Format bullets for prompt
+    bullets_text = "\n".join([f"• {bullet}" for bullet in cv_bullets])
+
+    system_prompt = """You are an expert technical interviewer at a top-tier company.
+
+GENERATE 8 realistic interview questions that test if the candidate can explain their resume.
+
+QUESTION STRATEGY:
+- Questions 1-6: About specific CV bullets (test depth, trade-offs, decisions)
+- Questions 7-8: Behavioral questions mapped to their experience
+
+QUALITY REQUIREMENTS:
+- SPECIFIC to their resume (reference actual achievements/metrics)
+- PROGRESSIVE DIFFICULTY (start broad, get deeper)
+- TEST TRADE-OFFS and decision-making ("Why did you choose X over Y?")
+- PROBE OWNERSHIP (distinguish "I did" vs "we did")
+
+OUTPUT: Return ONLY a JSON array, no markdown fences:
+[
+  {
+    "question_number": 1,
+    "question_text": "...",
+    "type": "cv_bullet",
+    "bullet_reference": "..."
+  },
+  ...
+]"""
+
+    user_prompt = f"""Generate 8 interview questions for this candidate.
+
+**CANDIDATE'S HEADLINE:**
+{selected_headline}
+
+**CANDIDATE'S KEY EXPERIENCE:**
+{bullets_text}
+
+**JOB DESCRIPTION:**
+{job_description}
+
+Generate questions that probe:
+- Technical depth (not just what they did, but HOW and WHY)
+- Problem-solving approach
+- Ownership and impact
+- Relevant skills from the JD
+
+Return JSON array only (no markdown)."""
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=2048,
+            temperature=0.3,
+            system=[{
+                "type": "text",
+                "text": system_prompt
+            }],
+            messages=[{
+                "role": "user",
+                "content": user_prompt
+            }]
+        )
+
+        response_text = message.content[0].text.strip()
+
+        # Clean up JSON response (remove markdown fences if present)
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+
+        questions = json.loads(response_text.strip())
+
+        print(f"✓ Generated {len(questions)} interview questions")
+        return questions
+
+    except Exception as e:
+        print(f"Error generating interview questions: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def evaluate_interview_answer(question_text, user_answer, job_description, cv_bullets):
+    """
+    Evaluate a single interview answer
+    Returns evaluation with scores and feedback
+    """
+    client = get_anthropic_client()
+
+    bullets_text = "\n".join([f"• {bullet}" for bullet in cv_bullets])
+
+    system_prompt = """You are a senior recruiter evaluating interview answers.
+
+EVALUATE on 4 dimensions (1-5 scale):
+1. **Details** - Concrete specifics (metrics, names, numbers, tools)
+2. **Organization** - Clear STAR format (Situation, Task, Action, Result)
+3. **Analysis** - Explains WHY, trade-offs, alternatives considered
+4. **Ownership** - Clear "I did X" vs vague "we/team"
+
+PROVIDE:
+- Scores (1-5 each)
+- Feedback summary (2-3 sentences)
+- Strong points (2-3 bullet points)
+- Improvement areas (2-3 bullet points)
+- Better answer example (using their actual experience, not made up)
+
+OUTPUT: Return ONLY JSON, no markdown fences:
+{
+  "details_score": 1-5,
+  "organization_score": 1-5,
+  "analysis_score": 1-5,
+  "ownership_score": 1-5,
+  "feedback_summary": "...",
+  "strong_points": ["...", "..."],
+  "improvement_areas": ["...", "..."],
+  "better_answer_example": "..."
+}"""
+
+    user_prompt = f"""Evaluate this interview answer.
+
+**QUESTION:** {question_text}
+
+**CANDIDATE'S ANSWER:** {user_answer}
+
+**CONTEXT - Their CV:**
+{bullets_text}
+
+**CONTEXT - Job Requirements:**
+{job_description[:1000]}...
+
+Evaluate rigorously but fairly. Return JSON only."""
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=1536,
+            temperature=0.2,
+            system=[{
+                "type": "text",
+                "text": system_prompt
+            }],
+            messages=[{
+                "role": "user",
+                "content": user_prompt
+            }]
+        )
+
+        response_text = message.content[0].text.strip()
+
+        # Clean up JSON response
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+
+        evaluation = json.loads(response_text.strip())
+
+        # Calculate overall score (1-10 scale)
+        avg_score = (
+            evaluation['details_score'] +
+            evaluation['organization_score'] +
+            evaluation['analysis_score'] +
+            evaluation['ownership_score']
+        ) / 4.0
+
+        evaluation['overall_score'] = round(avg_score * 2, 1)  # Convert to 1-10 scale
+
+        print(f"✓ Evaluated answer: {evaluation['overall_score']}/10")
+        return evaluation
+
+    except Exception as e:
+        print(f"Error evaluating answer: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -5707,6 +5938,446 @@ def save_approved_bullets():
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Failed to save approved bullets'}), 500
+
+
+# ==================== INTERVIEW PREP ROUTES ====================
+
+@app.route("/interview-prep", methods=["GET"])
+def interview_prep():
+    """Main interview prep page - show completed CV customizations"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return "Database connection error", 500
+
+        with engine.connect() as conn:
+            # Get all completed CV customizations with their interview sessions
+            query = text("""
+                SELECT
+                    cvs.id as cv_session_id,
+                    cvs.job_title,
+                    cvs.job_company,
+                    cvs.analysis_id,
+                    cvs.selected_headline,
+                    cvs.approved_bullets,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'session_id', intv.id,
+                                'completed', intv.completed,
+                                'overall_score', intv.overall_score,
+                                'created_at', intv.created_at
+                            )
+                            ORDER BY intv.created_at DESC
+                        ) FILTER (WHERE intv.id IS NOT NULL),
+                        '[]'
+                    ) as practice_sessions
+                FROM cv_customization_sessions cvs
+                LEFT JOIN interview_sessions intv ON cvs.id = intv.cv_session_id AND intv.completed = TRUE
+                WHERE cvs.user_id = :user_id
+                    AND cvs.approved_bullets IS NOT NULL
+                    AND json_array_length(cvs.approved_bullets) >= 6
+                GROUP BY cvs.id
+                ORDER BY cvs.created_at DESC
+            """)
+
+            result = conn.execute(query, {"user_id": user_id})
+            rows = result.fetchall()
+
+            jobs = []
+            for row in rows:
+                jobs.append({
+                    'cv_session_id': row[0],
+                    'job_title': row[1],
+                    'job_company': row[2],
+                    'analysis_id': row[3],
+                    'selected_headline': row[4],
+                    'approved_bullets': row[5],
+                    'practice_sessions': row[6] if isinstance(row[6], list) else json.loads(row[6]) if row[6] else []
+                })
+
+        return render_template('interview_prep.html', jobs=jobs)
+
+    except Exception as e:
+        print(f"Error in interview prep: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading interview prep", 500
+
+
+@app.route("/interview-prep/start/<int:cv_session_id>", methods=["POST"])
+def interview_prep_start(cv_session_id):
+    """Start new interview practice session"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        # Get CV session data
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session or cv_session['user_id'] != user_id:
+            return jsonify({'error': 'Session not found'}), 404
+
+        # Get job analysis
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return jsonify({'error': 'Analysis not found'}), 404
+
+        # Extract approved bullet texts
+        approved_bullets = cv_session.get('approved_bullets', [])
+        bullet_texts = []
+        for bullet in approved_bullets:
+            text = bullet.get('customized_text') or bullet.get('approved_text', '')
+            if text:
+                bullet_texts.append(text)
+
+        # Generate questions
+        print(f"Generating interview questions for CV session {cv_session_id}...")
+        questions = generate_interview_questions(
+            job_description=analysis['job_description'],
+            cv_bullets=bullet_texts,
+            selected_headline=cv_session['selected_headline'],
+            user_id=user_id
+        )
+
+        if not questions:
+            return jsonify({'error': 'Failed to generate questions'}), 500
+
+        # Create interview session
+        engine = get_db_connection()
+        with engine.connect() as conn:
+            insert_query = text("""
+                INSERT INTO interview_sessions (
+                    user_id, cv_session_id, questions, current_question
+                ) VALUES (
+                    :user_id, :cv_session_id, :questions, 1
+                )
+                RETURNING id
+            """)
+
+            result = conn.execute(insert_query, {
+                "user_id": user_id,
+                "cv_session_id": cv_session_id,
+                "questions": json.dumps(questions)
+            })
+            conn.commit()
+
+            interview_session_id = result.fetchone()[0]
+
+        print(f"✓ Created interview session {interview_session_id}")
+
+        # Redirect to first question
+        return jsonify({
+            'success': True,
+            'session_id': interview_session_id
+        })
+
+    except Exception as e:
+        print(f"Error starting interview session: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to start session'}), 500
+
+
+@app.route("/interview-prep/question/<int:session_id>/<int:question_num>", methods=["GET"])
+def interview_prep_question(session_id, question_num):
+    """Show interview question"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        with engine.connect() as conn:
+            # Get session
+            query = text("""
+                SELECT
+                    intv.id, intv.user_id, intv.cv_session_id, intv.questions,
+                    intv.answers, intv.evaluations, intv.current_question, intv.completed,
+                    cvs.job_title, cvs.job_company
+                FROM interview_sessions intv
+                JOIN cv_customization_sessions cvs ON intv.cv_session_id = cvs.id
+                WHERE intv.id = :session_id AND intv.user_id = :user_id
+            """)
+
+            result = conn.execute(query, {"session_id": session_id, "user_id": user_id})
+            row = result.fetchone()
+
+            if not row:
+                return "Session not found", 404
+
+            questions = row[3]
+            answers = row[4] or {}
+            evaluations = row[5] or {}
+            current_question = row[6]
+            completed = row[7]
+            job_title = row[8]
+            job_company = row[9]
+
+        # Check if already completed
+        if completed:
+            return redirect(f'/interview-prep/summary/{session_id}')
+
+        # Validate question number
+        if question_num < 1 or question_num > len(questions):
+            return "Invalid question number", 400
+
+        # Get the question
+        question_data = questions[question_num - 1]
+
+        # Check if we're showing evaluation
+        question_key = str(question_num)
+        show_evaluation = question_key in evaluations
+
+        if show_evaluation:
+            evaluation = evaluations[question_key]
+            return render_template('interview_evaluation.html',
+                                 session_id=session_id,
+                                 question_num=question_num,
+                                 question_data=question_data,
+                                 user_answer=answers.get(question_key, ''),
+                                 evaluation=evaluation,
+                                 job_title=job_title,
+                                 job_company=job_company,
+                                 total_questions=len(questions))
+
+        # Show question form
+        return render_template('interview_question.html',
+                             session_id=session_id,
+                             question_num=question_num,
+                             question_data=question_data,
+                             job_title=job_title,
+                             job_company=job_company,
+                             total_questions=len(questions))
+
+    except Exception as e:
+        print(f"Error loading question: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading question", 500
+
+
+@app.route("/interview-prep/submit/<int:session_id>/<int:question_num>", methods=["POST"])
+def interview_prep_submit(session_id, question_num):
+    """Submit answer and get evaluation"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        # Get answer from form
+        answer = request.form.get('answer', '').strip()
+        if not answer:
+            return "Please provide an answer", 400
+
+        engine = get_db_connection()
+        with engine.connect() as conn:
+            # Get session and CV data
+            query = text("""
+                SELECT
+                    intv.questions, intv.answers, intv.evaluations, intv.cv_session_id,
+                    cvs.analysis_id, cvs.approved_bullets
+                FROM interview_sessions intv
+                JOIN cv_customization_sessions cvs ON intv.cv_session_id = cvs.id
+                WHERE intv.id = :session_id AND intv.user_id = :user_id
+            """)
+
+            result = conn.execute(query, {"session_id": session_id, "user_id": user_id})
+            row = result.fetchone()
+
+            if not row:
+                return "Session not found", 404
+
+            questions = row[0]
+            answers = row[1] or {}
+            evaluations = row[2] or {}
+            analysis_id = row[4]
+            approved_bullets = row[5]
+
+        # Get question
+        question_data = questions[question_num - 1]
+
+        # Get job description
+        analysis = get_analysis_by_id(analysis_id, user_id)
+
+        # Extract bullet texts
+        bullet_texts = []
+        for bullet in approved_bullets:
+            text = bullet.get('customized_text') or bullet.get('approved_text', '')
+            if text:
+                bullet_texts.append(text)
+
+        # Evaluate answer
+        print(f"Evaluating answer for question {question_num}...")
+        evaluation = evaluate_interview_answer(
+            question_text=question_data['question_text'],
+            user_answer=answer,
+            job_description=analysis['job_description'],
+            cv_bullets=bullet_texts
+        )
+
+        if not evaluation:
+            return "Failed to evaluate answer", 500
+
+        # Save answer and evaluation
+        question_key = str(question_num)
+        answers[question_key] = answer
+        evaluations[question_key] = evaluation
+
+        with engine.connect() as conn:
+            # Update session
+            update_query = text("""
+                UPDATE interview_sessions
+                SET answers = :answers,
+                    evaluations = :evaluations,
+                    current_question = :next_question,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """)
+
+            conn.execute(update_query, {
+                "session_id": session_id,
+                "answers": json.dumps(answers),
+                "evaluations": json.dumps(evaluations),
+                "next_question": question_num + 1 if question_num < len(questions) else question_num
+            })
+            conn.commit()
+
+        print(f"✓ Saved answer and evaluation for question {question_num}")
+
+        # Redirect to show evaluation
+        return redirect(f'/interview-prep/question/{session_id}/{question_num}')
+
+    except Exception as e:
+        print(f"Error submitting answer: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error processing answer", 500
+
+
+@app.route("/interview-prep/summary/<int:session_id>", methods=["GET"])
+def interview_prep_summary(session_id):
+    """Show final summary"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        with engine.connect() as conn:
+            # Get session
+            query = text("""
+                SELECT
+                    intv.evaluations, intv.completed, intv.overall_score,
+                    cvs.job_title, cvs.job_company
+                FROM interview_sessions intv
+                JOIN cv_customization_sessions cvs ON intv.cv_session_id = cvs.id
+                WHERE intv.id = :session_id AND intv.user_id = :user_id
+            """)
+
+            result = conn.execute(query, {"session_id": session_id, "user_id": user_id})
+            row = result.fetchone()
+
+            if not row:
+                return "Session not found", 404
+
+            evaluations = row[0] or {}
+            completed = row[1]
+            overall_score = row[2]
+            job_title = row[3]
+            job_company = row[4]
+
+        # If not completed yet, complete it now
+        if not completed and evaluations:
+            # Calculate overall scores
+            scores = []
+            details_scores = []
+            organization_scores = []
+            analysis_scores = []
+            ownership_scores = []
+
+            for eval_data in evaluations.values():
+                scores.append(eval_data['overall_score'])
+                details_scores.append(eval_data['details_score'])
+                organization_scores.append(eval_data['organization_score'])
+                analysis_scores.append(eval_data['analysis_score'])
+                ownership_scores.append(eval_data['ownership_score'])
+
+            overall_score = round(sum(scores) / len(scores), 1) if scores else 0
+
+            avg_scores = {
+                'details': round(sum(details_scores) / len(details_scores), 1) if details_scores else 0,
+                'organization': round(sum(organization_scores) / len(organization_scores), 1) if organization_scores else 0,
+                'analysis': round(sum(analysis_scores) / len(analysis_scores), 1) if analysis_scores else 0,
+                'ownership': round(sum(ownership_scores) / len(ownership_scores), 1) if ownership_scores else 0
+            }
+
+            # Mark as complete
+            with engine.connect() as conn:
+                update_query = text("""
+                    UPDATE interview_sessions
+                    SET completed = TRUE,
+                        overall_score = :overall_score,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :session_id
+                """)
+
+                conn.execute(update_query, {
+                    "session_id": session_id,
+                    "overall_score": overall_score
+                })
+                conn.commit()
+
+        else:
+            # Calculate avg scores from evaluations
+            avg_scores = {
+                'details': 0,
+                'organization': 0,
+                'analysis': 0,
+                'ownership': 0
+            }
+
+            if evaluations:
+                details_scores = []
+                organization_scores = []
+                analysis_scores = []
+                ownership_scores = []
+
+                for eval_data in evaluations.values():
+                    details_scores.append(eval_data['details_score'])
+                    organization_scores.append(eval_data['organization_score'])
+                    analysis_scores.append(eval_data['analysis_score'])
+                    ownership_scores.append(eval_data['ownership_score'])
+
+                avg_scores = {
+                    'details': round(sum(details_scores) / len(details_scores), 1) if details_scores else 0,
+                    'organization': round(sum(organization_scores) / len(organization_scores), 1) if organization_scores else 0,
+                    'analysis': round(sum(analysis_scores) / len(analysis_scores), 1) if analysis_scores else 0,
+                    'ownership': round(sum(ownership_scores) / len(ownership_scores), 1) if ownership_scores else 0
+                }
+
+        return render_template('interview_summary.html',
+                             session_id=session_id,
+                             overall_score=overall_score,
+                             avg_scores=avg_scores,
+                             job_title=job_title,
+                             job_company=job_company,
+                             total_questions=len(evaluations))
+
+    except Exception as e:
+        print(f"Error loading summary: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading summary", 500
 
 
 @app.route("/get-analysis/<int:analysis_id>", methods=["GET"])
