@@ -5971,6 +5971,7 @@ def interview_prep():
                                 'session_id', intv.id,
                                 'completed', intv.completed,
                                 'overall_score', intv.overall_score,
+                                'current_question', intv.current_question,
                                 'created_at', intv.created_at
                             )
                             ORDER BY intv.created_at DESC
@@ -5978,7 +5979,7 @@ def interview_prep():
                         '[]'
                     ) as practice_sessions
                 FROM cv_customization_sessions cvs
-                LEFT JOIN interview_sessions intv ON cvs.id = intv.cv_session_id AND intv.completed = TRUE
+                LEFT JOIN interview_sessions intv ON cvs.id = intv.cv_session_id
                 WHERE cvs.user_id = :user_id
                     AND cvs.approved_bullets IS NOT NULL
                     AND json_array_length(cvs.approved_bullets) >= 6
@@ -5989,10 +5990,10 @@ def interview_prep():
             result = conn.execute(query, {"user_id": user_id})
             rows = result.fetchall()
 
-            jobs = []
+            cv_sessions = []
             for row in rows:
-                jobs.append({
-                    'cv_session_id': row[0],
+                cv_sessions.append({
+                    'id': row[0],  # Changed from cv_session_id to id to match template
                     'job_title': row[1],
                     'job_company': row[2],
                     'analysis_id': row[3],
@@ -6001,7 +6002,7 @@ def interview_prep():
                     'practice_sessions': row[6] if isinstance(row[6], list) else json.loads(row[6]) if row[6] else []
                 })
 
-        return render_template('interview_prep.html', jobs=jobs)
+        return render_template('interview_prep.html', cv_sessions=cv_sessions)
 
     except Exception as e:
         print(f"Error in interview prep: {e}")
