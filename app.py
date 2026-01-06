@@ -5575,6 +5575,46 @@ def customize_cv_start(analysis_id):
         return "Error starting CV customization", 500
 
 
+@app.route("/customize-cv/resume/<int:cv_session_id>", methods=["GET"])
+def customize_cv_resume(cv_session_id):
+    """Resume an existing CV customization session"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        # Get the CV session
+        cv_session = get_cv_session(cv_session_id)
+
+        if not cv_session:
+            return redirect('/ai-match?error=session_not_found')
+
+        # Verify it belongs to this user
+        if cv_session['user_id'] != user_id:
+            return redirect('/ai-match?error=unauthorized')
+
+        # Store session ID in Flask session
+        session['cv_session_id'] = cv_session_id
+
+        # Determine which step to resume
+        if not cv_session.get('selected_headline'):
+            # No headline selected yet - go to headline step
+            return redirect('/customize-cv/headline')
+        elif not cv_session.get('approved_bullets') or len(cv_session.get('approved_bullets', [])) < 6:
+            # Headline selected but bullets incomplete - go to bullets step
+            return redirect('/customize-cv/bullets')
+        else:
+            # Everything done - go to preview
+            return redirect('/customize-cv/preview')
+
+    except Exception as e:
+        print(f"Error resuming CV customization: {e}")
+        import traceback
+        traceback.print_exc()
+        return redirect('/ai-match?error=resume_failed')
+
+
 @app.route("/customize-cv/headline", methods=["GET", "POST"])
 def customize_cv_headline():
     """Step 1: Headline selection with AI recommendations"""

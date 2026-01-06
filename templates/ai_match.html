@@ -866,11 +866,8 @@ We're looking for a Senior VP to lead our AI Risk team...
                         ? `${cvProgress.approved_bullets_count} bullets selected`
                         : stepLabel;
 
-                    const continueUrl = cvProgress.current_step === 'headline'
-                        ? `/customize-cv/headline`
-                        : cvProgress.current_step === 'bullets'
-                        ? `/customize-cv/bullets`
-                        : `/customize-cv/preview`;
+                    // Use resume route which will restore Flask session and redirect to correct step
+                    const continueUrl = `/customize-cv/resume/${cvProgress.session_id}`;
 
                     customizeButton = `
                         <div class="mt-6 text-center">
