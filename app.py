@@ -22,7 +22,6 @@ from flask import session
 import logging
 import sys
 from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 
 # Configure logging to show in Railway
 logging.basicConfig(
@@ -240,8 +239,15 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
 
 # Rate limiting to protect against bot floods
+# Use X-Forwarded-For so each real user IP is limited independently (Railway proxies requests)
+def get_real_ip():
+    forwarded_for = request.headers.get('X-Forwarded-For', '')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+    return request.remote_address
+
 limiter = Limiter(
-    get_remote_address,
+    get_real_ip,
     app=app,
     default_limits=["120 per minute"],
     storage_uri="memory://",
