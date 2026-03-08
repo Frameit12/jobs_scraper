@@ -21,6 +21,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask import session
 import logging
 import sys
+from flask_limiter import Limiter
 
 # Configure logging to show in Railway
 logging.basicConfig(
@@ -34,12 +35,15 @@ logger = logging.getLogger(__name__)
 
 
 # Database setup
+_db_engine = None
+
 def get_db_connection():
-    database_url = os.environ.get('DATABASE_URL')
-    if database_url:
-        engine = create_engine(database_url)
-        return engine
-    return None
+    global _db_engine
+    if _db_engine is None:
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            _db_engine = create_engine(database_url)
+    return _db_engine
 
 def init_database():
     engine = get_db_connection()
@@ -162,6 +166,37 @@ def init_search_limits_table():
 init_search_limits_table()
 
 
+def cleanup_old_records():
+    """Delete old records from tables that grow unbounded over time."""
+    engine = get_db_connection()
+    if not engine:
+        return
+    try:
+        with engine.connect() as conn:
+            # Keep only last 90 days of activity logs
+            conn.execute(text("""
+                DELETE FROM user_activity
+                WHERE created_at < NOW() - INTERVAL '90 days'
+            """))
+            # Daily search limits older than 30 days are never needed again
+            conn.execute(text("""
+                DELETE FROM daily_search_limits
+                WHERE search_date < CURRENT_DATE - INTERVAL '30 days'
+            """))
+            # Remove password reset tokens that are expired or used and older than 7 days
+            conn.execute(text("""
+                DELETE FROM password_reset_tokens
+                WHERE (used = TRUE OR expires_at < NOW())
+                AND created_at < NOW() - INTERVAL '7 days'
+            """))
+            conn.commit()
+        logger.info("✅ Database cleanup completed successfully")
+    except Exception as e:
+        logger.error(f"❌ Database cleanup failed: {e}")
+
+cleanup_old_records()
+
+
 def generate_reset_token():
     import secrets
     return secrets.token_urlsafe(32)
@@ -202,6 +237,21 @@ def create_password_reset_token(user_id):
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
+
+# Rate limiting to protect against bot floods
+# Use X-Forwarded-For so each real user IP is limited independently (Railway proxies requests)
+def get_real_ip():
+    forwarded_for = request.headers.get('X-Forwarded-For', '')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+    return request.remote_address
+
+limiter = Limiter(
+    get_real_ip,
+    app=app,
+    default_limits=["120 per minute"],
+    storage_uri="memory://",
+)
 
 def log_user_activity(action_type, details=None):
     """Log user activity to the database"""
@@ -765,7 +815,8 @@ if os.environ.get('ENABLE_SCHEDULER', 'false').lower() == 'true':
         print("🚀 SCHEDULER DEBUG: BackgroundScheduler created")
         def test_scheduler():
             print("🧪 TEST: Scheduler called a function!")
-        scheduler.add_job(func=run_scheduled_searches, trigger="cron", hour=5, minute=0) # Runs daily at 9am
+        scheduler.add_job(func=run_scheduled_searches, trigger="cron", hour=5, minute=0, max_instances=1, coalesce=True, misfire_grace_time=3600) # Runs daily at 5am
+        scheduler.add_job(func=cleanup_old_records, trigger="cron", hour=3, minute=0, max_instances=1, coalesce=True, misfire_grace_time=3600) # Cleanup old DB records daily at 3am
         print("🚀 SCHEDULER DEBUG: Job added to scheduler")
         scheduler.start()
         print("🚀 SCHEDULER DEBUG: Scheduler started successfully!") 
@@ -2545,8 +2596,50 @@ def test_gmail_direct():
         logger.error(f"❌ Gmail SMTP test failed: {e}")
         return f"Gmail test failed: {e}"
         
+@app.route("/admin/delete-bots")
+def delete_bot_accounts():
+    """One-time route to delete known bot/spam accounts. Only callable by the app owner (user id 3)."""
+    if get_current_user_id() != 3:
+        return "Unauthorized", 403
+
+    bot_ids = (10, 12, 13, 14)
+    engine = get_db_connection()
+    if not engine:
+        return "No database connection", 500
+
+    results = []
+    try:
+        with engine.connect() as conn:
+            # Find every table that has a user_id column and delete from it first
+            tables_with_user_id = conn.execute(text("""
+                SELECT table_name FROM information_schema.columns
+                WHERE table_schema = 'public'
+                AND column_name = 'user_id'
+                AND table_name != 'users'
+                ORDER BY table_name
+            """)).fetchall()
+
+            for (table,) in tables_with_user_id:
+                deleted = conn.execute(text(
+                    f"DELETE FROM {table} WHERE user_id = ANY(:ids)"
+                ), {"ids": list(bot_ids)}).rowcount
+                results.append(f"{table}: {deleted} rows deleted")
+
+            # Now delete the user accounts themselves
+            deleted_users = conn.execute(text(
+                "DELETE FROM users WHERE id = ANY(:ids)"
+            ), {"ids": list(bot_ids)}).rowcount
+            results.append(f"users: {deleted_users} accounts deleted")
+
+            conn.commit()
+
+        return "<pre>Bot cleanup complete:\n\n" + "\n".join(results) + "</pre>"
+    except Exception as e:
+        return f"Error during cleanup: {e}", 500
+
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=False)
 
 
 
