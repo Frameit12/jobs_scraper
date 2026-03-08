@@ -34,12 +34,15 @@ logger = logging.getLogger(__name__)
 
 
 # Database setup
+_db_engine = None
+
 def get_db_connection():
-    database_url = os.environ.get('DATABASE_URL')
-    if database_url:
-        engine = create_engine(database_url)
-        return engine
-    return None
+    global _db_engine
+    if _db_engine is None:
+        database_url = os.environ.get('DATABASE_URL')
+        if database_url:
+            _db_engine = create_engine(database_url)
+    return _db_engine
 
 def init_database():
     engine = get_db_connection()
@@ -160,6 +163,37 @@ def init_search_limits_table():
             conn.commit()
 
 init_search_limits_table()
+
+
+def cleanup_old_records():
+    """Delete old records from tables that grow unbounded over time."""
+    engine = get_db_connection()
+    if not engine:
+        return
+    try:
+        with engine.connect() as conn:
+            # Keep only last 90 days of activity logs
+            conn.execute(text("""
+                DELETE FROM user_activity
+                WHERE created_at < NOW() - INTERVAL '90 days'
+            """))
+            # Daily search limits older than 30 days are never needed again
+            conn.execute(text("""
+                DELETE FROM daily_search_limits
+                WHERE search_date < CURRENT_DATE - INTERVAL '30 days'
+            """))
+            # Remove password reset tokens that are expired or used and older than 7 days
+            conn.execute(text("""
+                DELETE FROM password_reset_tokens
+                WHERE (used = TRUE OR expires_at < NOW())
+                AND created_at < NOW() - INTERVAL '7 days'
+            """))
+            conn.commit()
+        logger.info("✅ Database cleanup completed successfully")
+    except Exception as e:
+        logger.error(f"❌ Database cleanup failed: {e}")
+
+cleanup_old_records()
 
 
 def generate_reset_token():
@@ -766,6 +800,7 @@ if os.environ.get('ENABLE_SCHEDULER', 'false').lower() == 'true':
         def test_scheduler():
             print("🧪 TEST: Scheduler called a function!")
         scheduler.add_job(func=run_scheduled_searches, trigger="cron", hour=5, minute=0) # Runs daily at 9am
+        scheduler.add_job(func=cleanup_old_records, trigger="cron", hour=3, minute=0) # Cleanup old DB records daily at 3am
         print("🚀 SCHEDULER DEBUG: Job added to scheduler")
         scheduler.start()
         print("🚀 SCHEDULER DEBUG: Scheduler started successfully!") 
@@ -2546,7 +2581,7 @@ def test_gmail_direct():
         return f"Gmail test failed: {e}"
         
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=False)
 
 
 
