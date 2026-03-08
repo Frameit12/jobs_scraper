@@ -21,6 +21,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask import session
 import logging
 import sys
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Configure logging to show in Railway
 logging.basicConfig(
@@ -236,6 +238,14 @@ def create_password_reset_token(user_id):
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
+
+# Rate limiting to protect against bot floods
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["120 per minute"],
+    storage_uri="memory://",
+)
 
 def log_user_activity(action_type, details=None):
     """Log user activity to the database"""
@@ -799,8 +809,8 @@ if os.environ.get('ENABLE_SCHEDULER', 'false').lower() == 'true':
         print("🚀 SCHEDULER DEBUG: BackgroundScheduler created")
         def test_scheduler():
             print("🧪 TEST: Scheduler called a function!")
-        scheduler.add_job(func=run_scheduled_searches, trigger="cron", hour=5, minute=0) # Runs daily at 9am
-        scheduler.add_job(func=cleanup_old_records, trigger="cron", hour=3, minute=0) # Cleanup old DB records daily at 3am
+        scheduler.add_job(func=run_scheduled_searches, trigger="cron", hour=5, minute=0, max_instances=1, coalesce=True, misfire_grace_time=3600) # Runs daily at 5am
+        scheduler.add_job(func=cleanup_old_records, trigger="cron", hour=3, minute=0, max_instances=1, coalesce=True, misfire_grace_time=3600) # Cleanup old DB records daily at 3am
         print("🚀 SCHEDULER DEBUG: Job added to scheduler")
         scheduler.start()
         print("🚀 SCHEDULER DEBUG: Scheduler started successfully!") 
