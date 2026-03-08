@@ -2580,6 +2580,48 @@ def test_gmail_direct():
         logger.error(f"❌ Gmail SMTP test failed: {e}")
         return f"Gmail test failed: {e}"
         
+@app.route("/admin/delete-bots")
+def delete_bot_accounts():
+    """One-time route to delete known bot/spam accounts. Only callable by the app owner (user id 3)."""
+    if get_current_user_id() != 3:
+        return "Unauthorized", 403
+
+    bot_ids = (10, 12, 13, 14)
+    engine = get_db_connection()
+    if not engine:
+        return "No database connection", 500
+
+    results = []
+    try:
+        with engine.connect() as conn:
+            # Find every table that has a user_id column and delete from it first
+            tables_with_user_id = conn.execute(text("""
+                SELECT table_name FROM information_schema.columns
+                WHERE table_schema = 'public'
+                AND column_name = 'user_id'
+                AND table_name != 'users'
+                ORDER BY table_name
+            """)).fetchall()
+
+            for (table,) in tables_with_user_id:
+                deleted = conn.execute(text(
+                    f"DELETE FROM {table} WHERE user_id = ANY(:ids)"
+                ), {"ids": list(bot_ids)}).rowcount
+                results.append(f"{table}: {deleted} rows deleted")
+
+            # Now delete the user accounts themselves
+            deleted_users = conn.execute(text(
+                "DELETE FROM users WHERE id = ANY(:ids)"
+            ), {"ids": list(bot_ids)}).rowcount
+            results.append(f"users: {deleted_users} accounts deleted")
+
+            conn.commit()
+
+        return "<pre>Bot cleanup complete:\n\n" + "\n".join(results) + "</pre>"
+    except Exception as e:
+        return f"Error during cleanup: {e}", 500
+
+
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=False)
 
