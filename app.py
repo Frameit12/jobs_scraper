@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, render_template, request, send_file, make_response, redirect, jsonify
 import pandas as pd
 from io import BytesIO
