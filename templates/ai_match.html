@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Job Match Tool - Find Me A Job</title>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-12Z087Z0KZ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-12Z087Z0KZ');
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
+        }
+
+        .tab {
+            position: relative;
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .tab.active {
+            border-bottom-color: #10b981;
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 600;
+        }
+
+        .cv-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .cv-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .cv-card.selected {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .upload-area {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.2s ease;
+        }
+
+        .upload-area:hover {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+
+        .skill-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #dbeafe;
+            color: #1e40af;
+            border-radius: 16px;
+            font-size: 0.875rem;
+            margin: 4px;
+        }
+
+        .skill-badge.missing {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .result-card {
+            border-left: 4px solid transparent;
+        }
+
+        .result-card.has-match {
+            border-left-color: #10b981;
+        }
+
+        .result-card.missing {
+            border-left-color: #f59e0b;
+        }
+
+        .result-card.recommendation {
+            border-left-color: #3b82f6;
+        }
+
+        #results-section {
+            display: none;
+        }
+
+        #results-section.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #10b981;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* History Sidebar Styles */
+        .history-sidebar {
+            position: fixed;
+            right: 0;
+            top: 0;
+            height: 100vh;
+            width: 380px;
+            background: white;
+            box-shadow: -4px 0 12px rgba(0, 0, 0, 0.1);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .history-sidebar.open {
+            transform: translateX(0);
+        }
+
+        .history-toggle {
+            position: fixed;
+            right: 0;
+            top: 200px;
+            background: #1e293b;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px 0 0 8px;
+            cursor: pointer;
+            z-index: 999;
+            box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.2);
+            transition: all 0.2s ease;
+        }
+
+        .history-toggle:hover {
+            background: #334155;
+            padding-right: 20px;
+        }
+
+        .analysis-history-card {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border-left: 4px solid transparent;
+        }
+
+        .analysis-history-card:hover {
+            background: #f8fafc;
+            border-left-color: #10b981;
+        }
+
+        .match-score-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .match-score-high {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .match-score-medium {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .match-score-low {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+    <!-- Header with Tabs -->
+    <div class="bg-slate-800 text-white p-6 mb-8">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h1 class="text-3xl font-bold">Find Me A Job</h1>
+                    <p class="text-slate-300 mt-2">Your AI-powered career companion</p>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <div class="text-slate-300">
+                        <span class="text-sm">Welcome,</span>
+                        <span class="font-semibold text-white">{{ username }}</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="#" onclick="showUsageStats()" class="text-slate-300 hover:text-white transition-colors text-base flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            Usage Stats
+                        </a>
+                        <a href="/my-resume-template" class="text-slate-300 hover:text-white transition-colors text-base flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Resume
+                        </a>
+                        <a href="/prompt-settings" class="text-slate-300 hover:text-white transition-colors text-base flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                            AI Prompt
+                        </a>
+                        <a href="/settings" class="text-slate-300 hover:text-white transition-colors text-base flex items-center">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            Settings
+                        </a>
+                        <a href="/logout" class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded-md text-base font-medium transition-colors">
+                            Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="flex space-x-1 border-b border-slate-600">
+                <div class="tab active">
+                    <svg class="w-5 h-5 inline-block mr-2 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                    AI Match Tool
+                </div>
+                <a href="/app" class="tab">
+                    <svg class="w-5 h-5 inline-block mr-2 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    Job Search
+                </a>
+                <a href="/interview-prep" class="tab">
+                    <svg class="w-5 h-5 inline-block mr-2 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    Interview Prep
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-6 pb-12">
+
+        <!-- Introduction Banner -->
+        <div class="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-xl p-6 mb-8">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-bold text-slate-800">AI-Powered Job Matching</h3>
+                    <p class="text-slate-600 mt-1">Upload your CV and paste any job description to get instant AI analysis of your match percentage, skill gaps, and tailored recommendations.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resume Source Selection -->
+        <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-8">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Choose Resume Source</h3>
+            <div class="flex gap-4">
+                <label class="flex-1 cursor-pointer">
+                    <input type="radio" name="resume-source" value="master-template" class="sr-only peer" onchange="toggleResumeSource('master-template')" {% if has_master_template %}checked{% endif %}>
+                    <div class="peer-checked:border-green-500 peer-checked:bg-green-50 border-2 border-gray-200 rounded-lg p-4 transition">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                            <div>
+                                <p class="font-semibold text-slate-800">Master Template</p>
+                                <p class="text-xs text-slate-500">Faster • Cached • Lower cost</p>
+                            </div>
+                        </div>
+                        {% if has_master_template %}
+                        <p class="text-xs text-green-700 mt-2">✓ Template uploaded</p>
+                        {% else %}
+                        <p class="text-xs text-yellow-700 mt-2">⚠ <a href="/my-resume-template" class="underline">Upload template first</a></p>
+                        {% endif %}
+                    </div>
+                </label>
+
+                <label class="flex-1 cursor-pointer">
+                    <input type="radio" name="resume-source" value="cv-upload" class="sr-only peer" onchange="toggleResumeSource('cv-upload')" {% if not has_master_template %}checked{% endif %}>
+                    <div class="peer-checked:border-blue-500 peer-checked:bg-blue-50 border-2 border-gray-200 rounded-lg p-4 transition">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <div>
+                                <p class="font-semibold text-slate-800">Upload CV</p>
+                                <p class="text-xs text-slate-500">One-time use • Full flexibility</p>
+                            </div>
+                        </div>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Main Input Section -->
+        <div class="grid grid-cols-2 gap-8 mb-8">
+
+            <!-- LEFT: CV Management -->
+            <div id="cv-upload-section" class="bg-white rounded-xl shadow-lg border border-gray-200 p-6" style="display: {% if has_master_template %}none{% else %}block{% endif %};">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-xl font-bold text-slate-800 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Your CV
+                    </h2>
+                    <span class="text-xs text-slate-500">PDF or DOCX</span>
+                </div>
+
+                <!-- Upload Area -->
+                <div class="upload-area rounded-lg p-8 text-center mb-6" id="upload-dropzone">
+                    <form id="cv-upload-form" enctype="multipart/form-data">
+                        <input type="file" id="cv-file-input" name="cv_file" accept=".pdf,.docx,.doc" style="display:none;">
+                        <label for="cv-file-input" style="cursor: pointer; display: block;">
+                            <svg class="w-12 h-12 mx-auto text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <p class="text-slate-600 font-medium">Click to upload or drag & drop</p>
+                            <p class="text-sm text-slate-400 mt-1">Supports PDF and DOCX (max 5MB)</p>
+                        </label>
+                    </form>
+                </div>
+
+                <!-- Saved CV Versions -->
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center justify-between">
+                        <span>📚 Saved CV Versions ({{ user_cvs|length }})</span>
+                    </h3>
+
+                    <div id="cv-list">
+                        {% if user_cvs|length == 0 %}
+                        <div class="text-center py-8 text-slate-400">
+                            <svg class="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <p>No CVs uploaded yet</p>
+                            <p class="text-xs mt-1">Upload your first CV to get started</p>
+                        </div>
+                        {% else %}
+                        {% for cv in user_cvs %}
+                        <div class="cv-card bg-white border-2 border-gray-200 rounded-lg p-4 mb-3 {% if loop.first %}selected{% endif %}"
+                             data-cv-id="{{ cv.id }}"
+                             data-cv-name="{{ cv.cv_name }}"
+                             onclick="selectCV({{ cv.id }}, '{{ cv.cv_name }}')">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center">
+                                        {% if loop.first %}
+                                        <svg class="w-4 h-4 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                        </svg>
+                                        {% endif %}
+                                        <h4 class="font-semibold text-slate-800">{{ cv.cv_name }}</h4>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-1">
+                                        Uploaded: {{ cv.created_at.strftime('%b %d, %Y') }} • {{ cv.file_type.upper() }} • {{ (cv.file_size / 1024)|round|int }} KB
+                                    </p>
+                                </div>
+                                <button onclick="deleteCV(event, {{ cv.id }})" class="text-slate-400 hover:text-red-600">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Job Description Input -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                <h2 class="text-xl font-bold text-slate-800 mb-6 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Job Posting
+                </h2>
+
+                <form id="job-analysis-form">
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            Paste Full Job Posting <span class="text-red-500">*</span>
+                        </label>
+                        <textarea
+                            id="job-posting"
+                            name="job_posting"
+                            placeholder="Paste the entire job posting here (including job title, company, and full description)...
+
+Example:
+Senior Vice President, Artificial Intelligence Risk
+Goldman Sachs - New York, NY
+
+We're looking for a Senior VP to lead our AI Risk team...
+[Full job description...]"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            rows="22"
+                            required
+                        ></textarea>
+                        <p class="text-xs text-slate-500 mt-2">💡 Tip: Just copy and paste the entire job posting from LinkedIn, Indeed, or any job board. AI will automatically extract the job title and company.</p>
+                    </div>
+
+                    <button
+                        type="submit"
+                        id="analyze-button"
+                        class="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-4 px-6 rounded-lg shadow-lg transition-all transform hover:scale-[1.02] flex items-center justify-center"
+                    >
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                        </svg>
+                        <span id="analyze-button-text">Analyze Match with AI</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Results Section (Initially Hidden) -->
+        <div id="results-section">
+            <div class="bg-gradient-to-r from-slate-800 to-slate-700 text-white rounded-xl p-6 mb-8">
+                <h2 class="text-2xl font-bold mb-2">Analysis Complete</h2>
+                <p class="text-slate-300">Here's how your profile matches this opportunity</p>
+            </div>
+
+            <!-- Match Score -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-8 mb-8 text-center">
+                <div class="mb-4">
+                    <div id="match-score-display" style="font-size: 4rem; font-weight: bold; background: linear-gradient(135deg, #10b981 0%, #059669 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                        --
+                    </div>
+                    <p class="text-slate-600 text-lg mt-2">Match Score</p>
+                </div>
+                <div id="match-stats" class="flex justify-center space-x-8 mt-6">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Detailed Analysis -->
+            <div id="detailed-analysis">
+                <!-- Will be populated by JavaScript -->
+            </div>
+
+            <!-- Recent Analyses Section -->
+            {% if recent_analyses|length > 0 %}
+            <div class="mt-12 pt-8 border-t border-gray-200">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold text-slate-800 flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Recent Analyses
+                    </h3>
+                    <button onclick="toggleHistorySidebar()" class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center">
+                        View All
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-6">
+                    {% for analysis in recent_analyses[:2] %}
+                    <div class="analysis-history-card bg-white border border-gray-200 rounded-lg p-5 shadow-sm"
+                         data-analysis-id="{{ analysis.id }}"
+                         onclick="loadAnalysis({{ analysis.id }})">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1">
+                                <h4 class="font-semibold text-slate-800">{{ analysis.job_title }}</h4>
+                                {% if analysis.job_company and analysis.job_company != 'Not specified' %}
+                                <p class="text-sm text-slate-500 mt-1">{{ analysis.job_company }}</p>
+                                {% endif %}
+                            </div>
+                            <button onclick="deleteAnalysisFromHistory(event, {{ analysis.id }})"
+                                    class="text-slate-400 hover:text-red-600 ml-2"
+                                    title="Delete analysis">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <span class="match-score-badge {% if analysis.match_score >= 70 %}match-score-high{% elif analysis.match_score >= 50 %}match-score-medium{% else %}match-score-low{% endif %}">
+                                {{ analysis.match_score }}% Match
+                            </span>
+                            <span class="text-xs text-slate-400">
+                                {{ analysis.created_at.strftime('%b %d, %Y') }}
+                            </span>
+                        </div>
+
+                        <div class="mt-3 pt-3 border-t border-gray-100">
+                            <p class="text-xs text-slate-500">
+                                <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                {{ analysis.cv_name }}
+                            </p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <!-- Usage Stats Modal -->
+    <div id="usage-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md mx-4 w-full">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">AI Usage Stats (This Month)</h3>
+            <div id="usage-stats-content">
+                <div class="spinner mx-auto"></div>
+            </div>
+            <button onclick="hideUsageStats()" class="mt-4 w-full bg-slate-600 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- History Toggle Button -->
+    <div class="history-toggle" onclick="toggleHistorySidebar()">
+        <div class="flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+                <div class="font-semibold text-sm">History</div>
+                <div class="text-xs text-slate-300" id="history-count">{{ recent_analyses|length }} analyses</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Sidebar -->
+    <div class="history-sidebar" id="history-sidebar">
+        <div class="p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-xl font-bold text-slate-800 flex items-center">
+                    <svg class="w-6 h-6 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Analysis History
+                </h2>
+                <button onclick="toggleHistorySidebar()" class="text-slate-400 hover:text-slate-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <p class="text-sm text-slate-600">{{ recent_analyses|length }} saved analyses</p>
+        </div>
+
+        <div class="p-4" id="history-list">
+            {% if recent_analyses|length == 0 %}
+            <div class="text-center py-12 text-slate-400">
+                <svg class="w-16 h-16 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <p class="font-medium">No analyses yet</p>
+                <p class="text-xs mt-1">Your analysis history will appear here</p>
+            </div>
+            {% else %}
+            {% for analysis in recent_analyses %}
+            <div class="analysis-history-card bg-white border border-gray-200 rounded-lg p-4 mb-3"
+                 data-analysis-id="{{ analysis.id }}"
+                 onclick="loadAnalysis({{ analysis.id }})">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-slate-800 text-sm">{{ analysis.job_title }}</h4>
+                        {% if analysis.job_company and analysis.job_company != 'Not specified' %}
+                        <p class="text-xs text-slate-500 mt-1">{{ analysis.job_company }}</p>
+                        {% endif %}
+                    </div>
+                    <button onclick="deleteAnalysisFromHistory(event, {{ analysis.id }})"
+                            class="text-slate-400 hover:text-red-600 ml-2"
+                            title="Delete analysis">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-between mt-3">
+                    <span class="match-score-badge {% if analysis.match_score >= 70 %}match-score-high{% elif analysis.match_score >= 50 %}match-score-medium{% else %}match-score-low{% endif %}">
+                        {{ analysis.match_score }}% Match
+                    </span>
+                    <span class="text-xs text-slate-400">
+                        {{ analysis.created_at.strftime('%b %d, %Y') }}
+                    </span>
+                </div>
+
+                <p class="text-xs text-slate-500 mt-2">
+                    <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    {{ analysis.cv_name }}
+                </p>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        let selectedCVId = {{ user_cvs[0].id if user_cvs|length > 0 else 'null' }};
+        let selectedCVName = "{{ user_cvs[0].cv_name if user_cvs|length > 0 else '' }}";
+        let currentResumeSource = {% if has_master_template %}'master-template'{% else %}'cv-upload'{% endif %};
+
+        // Toggle between master template and CV upload
+        function toggleResumeSource(source) {
+            currentResumeSource = source;
+            const cvSection = document.getElementById('cv-upload-section');
+
+            if (source === 'master-template') {
+                cvSection.style.display = 'none';
+            } else {
+                cvSection.style.display = 'block';
+            }
+        }
+
+        // CV Selection
+        function selectCV(cvId, cvName) {
+            selectedCVId = cvId;
+            selectedCVName = cvName;
+
+            document.querySelectorAll('.cv-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+        }
+
+        // CV Upload
+        document.getElementById('cv-file-input').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            await uploadCVFile(file);
+        });
+
+        // Helper function to upload CV file
+        async function uploadCVFile(file) {
+            const formData = new FormData();
+            formData.append('cv_file', file);
+            formData.append('cv_name', file.name.replace(/\.[^/.]+$/, '')); // Remove extension
+
+            try {
+                const response = await fetch('/upload-cv', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('CV uploaded successfully!');
+                    location.reload(); // Reload to show new CV
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Failed to upload CV');
+            }
+        }
+
+        // Drag & Drop functionality
+        const dropzone = document.getElementById('upload-dropzone');
+
+        dropzone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.style.borderColor = '#10b981';
+            dropzone.style.background = '#f0fdf4';
+        });
+
+        dropzone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.style.borderColor = '#cbd5e1';
+            dropzone.style.background = '';
+        });
+
+        dropzone.addEventListener('drop', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Reset visual feedback
+            dropzone.style.borderColor = '#cbd5e1';
+            dropzone.style.background = '';
+
+            const files = e.dataTransfer.files;
+            if (files.length === 0) return;
+
+            const file = files[0];
+
+            // Validate file type
+            const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
+            if (!allowedTypes.includes(file.type)) {
+                alert('Invalid file type. Please upload PDF or DOCX files only.');
+                return;
+            }
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File too large. Maximum size is 5MB.');
+                return;
+            }
+
+            await uploadCVFile(file);
+        });
+
+        // Delete CV
+        async function deleteCV(event, cvId) {
+            event.stopPropagation();
+
+            if (!confirm('Are you sure you want to delete this CV?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/delete-cv/${cvId}`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Failed to delete CV');
+            }
+        }
+
+        // Analyze Match
+        document.getElementById('job-analysis-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const jobPosting = document.getElementById('job-posting').value;
+
+            // Validate based on selected mode
+            if (currentResumeSource === 'cv-upload' && !selectedCVId) {
+                alert('Please upload and select a CV first');
+                return;
+            }
+
+            // Show loading state
+            const button = document.getElementById('analyze-button');
+            const buttonText = document.getElementById('analyze-button-text');
+            const originalHTML = buttonText.innerHTML;
+            buttonText.innerHTML = 'Analyzing...';
+            button.disabled = true;
+            button.innerHTML = '<div class="spinner mx-auto"></div> Analyzing with AI...';
+
+            try {
+                let endpoint, bodyData;
+
+                if (currentResumeSource === 'master-template') {
+                    // Use master template endpoint (with caching)
+                    endpoint = '/analyze-match-with-template';
+                    bodyData = {
+                        job_posting: jobPosting
+                    };
+                } else {
+                    // Use CV upload endpoint (existing)
+                    endpoint = '/analyze-match';
+                    bodyData = {
+                        cv_id: selectedCVId,
+                        job_posting: jobPosting
+                    };
+                }
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(bodyData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Display results and keep them visible
+                    displayResults(result.analysis, result.analysis_id, result.cv_progress || null);
+                    document.getElementById('results-section').classList.add('active');
+                    document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+                    // Analysis is saved - it will appear in sidebar on next page load
+                    // No reload needed - let user view results without interruption
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Analysis error:', error);
+                alert('Failed to analyze match');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalHTML;
+            }
+        });
+
+        // Display Results
+        function displayResults(analysis, analysisId, cvProgress = null) {
+            // Update match score
+            document.getElementById('match-score-display').textContent = analysis.match_score + '%';
+
+            // Update stats with Customize CV button
+            const statsHTML = `
+                <div>
+                    <div class="text-2xl font-bold text-green-600">${analysis.skills_match.length}</div>
+                    <div class="text-sm text-slate-600">Skills Match</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-orange-600">${analysis.skills_missing.length}</div>
+                    <div class="text-sm text-slate-600">Skills Missing</div>
+                </div>
+                <div>
+                    <div class="text-2xl font-bold text-blue-600">${analysis.recommendations.length}</div>
+                    <div class="text-sm text-slate-600">Recommendations</div>
+                </div>
+            `;
+            document.getElementById('match-stats').innerHTML = statsHTML;
+
+            // Add Customize CV button if analysis ID is available
+            if (analysisId && {{ 'true' if has_master_template else 'false' }}) {
+                let customizeButton;
+
+                if (cvProgress) {
+                    // User has already started CV customization - show Continue button
+                    const stepLabels = {
+                        'headline': 'Step 1: Select Headline',
+                        'bullets': 'Step 2: Select Bullets',
+                        'preview': 'Step 3: Preview & Download'
+                    };
+
+                    const stepLabel = stepLabels[cvProgress.current_step] || 'In Progress';
+                    const progressText = cvProgress.current_step === 'bullets' && cvProgress.approved_bullets_count > 0
+                        ? `${cvProgress.approved_bullets_count} bullets selected`
+                        : stepLabel;
+
+                    // Use resume route which will restore Flask session and redirect to correct step
+                    const continueUrl = `/customize-cv/resume/${cvProgress.session_id}`;
+
+                    customizeButton = `
+                        <div class="mt-6 text-center">
+                            <a href="${continueUrl}"
+                               class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-teal-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-teal-700 transition">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                ✓ Continue Customizing CV
+                            </a>
+                            <p class="text-sm text-slate-500 mt-2">📍 ${progressText}</p>
+                        </div>
+                    `;
+                } else {
+                    // No existing session - show start button
+                    customizeButton = `
+                        <div class="mt-6 text-center">
+                            <a href="/customize-cv/start/${analysisId}"
+                               class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-700 hover:to-blue-700 transition">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                                📄 Customize CV for This Role
+                            </a>
+                            <p class="text-sm text-slate-500 mt-2">Create a tailored CV using your master template</p>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('match-stats').insertAdjacentHTML('afterend', customizeButton);
+            }
+
+            // Build detailed analysis
+            let detailedHTML = '';
+
+            // Skills Match
+            if (analysis.skills_match && analysis.skills_match.length > 0) {
+                detailedHTML += `
+                    <div class="result-card has-match bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
+                        <div class="flex items-start mb-4">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <h3 class="text-lg font-bold text-slate-800">✅ What You Have</h3>
+                                <p class="text-slate-600 text-sm mt-1">Your qualifications that match this role</p>
+                            </div>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-4">
+                            ${analysis.skills_match.map(skill => `
+                                <div class="mb-3 pb-3 border-b border-green-100 last:border-0">
+                                    <div class="font-semibold text-slate-800">${skill.skill}</div>
+                                    <div class="text-sm text-slate-600 mt-1">${skill.evidence}</div>
+                                    <span class="text-xs px-2 py-1 bg-green-200 text-green-800 rounded mt-1 inline-block">${skill.strength}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Skills Missing
+            if (analysis.skills_missing && analysis.skills_missing.length > 0) {
+                detailedHTML += `
+                    <div class="result-card missing bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
+                        <div class="flex items-start mb-4">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <h3 class="text-lg font-bold text-slate-800">❌ What You're Missing</h3>
+                                <p class="text-slate-600 text-sm mt-1">Skills and qualifications you lack</p>
+                            </div>
+                        </div>
+                        <div class="bg-orange-50 rounded-lg p-4">
+                            ${analysis.skills_missing.map(skill => `
+                                <div class="mb-3 pb-3 border-b border-orange-100 last:border-0">
+                                    <div class="font-semibold text-slate-800">${skill.skill}</div>
+                                    <div class="text-sm text-slate-600 mt-1">${skill.impact}</div>
+                                    <span class="text-xs px-2 py-1 bg-orange-200 text-orange-800 rounded mt-1 inline-block">${skill.importance}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Recommendations
+            if (analysis.recommendations && analysis.recommendations.length > 0) {
+                detailedHTML += `
+                    <div class="result-card recommendation bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
+                        <div class="flex items-start mb-4">
+                            <div class="flex-shrink-0">
+                                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="ml-4 flex-1">
+                                <h3 class="text-lg font-bold text-slate-800">💡 AI Recommendations</h3>
+                                <p class="text-slate-600 text-sm mt-1">How to strengthen your application</p>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            ${analysis.recommendations.map((rec, index) => `
+                                <div class="bg-blue-50 rounded-lg p-4">
+                                    <h4 class="font-semibold text-slate-800 mb-2 flex items-center">
+                                        <span class="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-2">${index + 1}</span>
+                                        <span class="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded mr-2">${rec.priority}</span>
+                                    </h4>
+                                    <p class="text-sm text-slate-700 ml-8">${rec.recommendation}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Overall Assessment
+            if (analysis.overall_assessment) {
+                detailedHTML += `
+                    <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
+                        <h3 class="font-bold text-slate-800 mb-3">📝 Overall Assessment</h3>
+                        <p class="text-slate-700">${analysis.overall_assessment}</p>
+                    </div>
+                `;
+            }
+
+            document.getElementById('detailed-analysis').innerHTML = detailedHTML;
+        }
+
+        // Usage Stats
+        async function showUsageStats() {
+            document.getElementById('usage-modal').classList.remove('hidden');
+
+            try {
+                const response = await fetch('/ai-usage-stats');
+                const stats = await response.json();
+
+                const statsHTML = `
+                    <div class="space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-slate-600">Total Analyses:</span>
+                            <span class="font-bold">${stats.total_analyses}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-600">Input Tokens:</span>
+                            <span class="font-bold">${stats.total_input_tokens.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-600">Output Tokens:</span>
+                            <span class="font-bold">${stats.total_output_tokens.toLocaleString()}</span>
+                        </div>
+                        <div class="flex justify-between border-t pt-3">
+                            <span class="text-slate-600">Estimated Cost:</span>
+                            <span class="font-bold text-green-600">$${stats.total_cost.toFixed(4)}</span>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('usage-stats-content').innerHTML = statsHTML;
+            } catch (error) {
+                document.getElementById('usage-stats-content').innerHTML = '<p class="text-red-600">Failed to load stats</p>';
+            }
+        }
+
+        function hideUsageStats() {
+            document.getElementById('usage-modal').classList.add('hidden');
+        }
+
+        // History Sidebar Functions
+        function toggleHistorySidebar() {
+            const sidebar = document.getElementById('history-sidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        async function loadAnalysis(analysisId) {
+            try {
+                // Close sidebar on mobile
+                toggleHistorySidebar();
+
+                // Show loading state
+                const resultsSection = document.getElementById('results-section');
+                resultsSection.classList.add('active');
+                resultsSection.scrollIntoView({ behavior: 'smooth' });
+
+                const response = await fetch(`/get-analysis/${analysisId}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    // Display the loaded analysis with analysis ID and CV progress
+                    displayResults(result.analysis, analysisId, result.cv_progress || null);
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error loading analysis:', error);
+                alert('Failed to load analysis');
+            }
+        }
+
+        async function deleteAnalysisFromHistory(event, analysisId) {
+            event.stopPropagation(); // Prevent triggering loadAnalysis
+
+            if (!confirm('Are you sure you want to delete this analysis?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/delete-analysis/${analysisId}`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Remove ALL cards with this ID (sidebar + recent section)
+                    const cards = document.querySelectorAll(`[data-analysis-id="${analysisId}"]`);
+                    cards.forEach(card => card.remove());
+
+                    // Update count
+                    const historyList = document.getElementById('history-list');
+                    const remainingCards = historyList.querySelectorAll('.analysis-history-card');
+                    const count = remainingCards.length;
+
+                    document.getElementById('history-count').textContent = `${count} analyses`;
+                    document.querySelector('#history-sidebar p').textContent = `${count} saved analyses`;
+
+                    // Show empty state if no analyses left
+                    if (count === 0) {
+                        historyList.innerHTML = `
+                            <div class="text-center py-12 text-slate-400">
+                                <svg class="w-16 h-16 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <p class="font-medium">No analyses yet</p>
+                                <p class="text-xs mt-1">Your analysis history will appear here</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error deleting analysis:', error);
+                alert('Failed to delete analysis');
+            }
+        }
+    </script>
+</body>
+</html>

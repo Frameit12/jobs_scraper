@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Question {{ question_num }} - Evaluation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<div class="max-w-4xl mx-auto p-6 md:p-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h1 class="text-2xl font-bold text-gray-900">Answer Evaluation</h1>
+            <a href="/interview-prep" class="text-gray-500 hover:text-gray-700 text-sm font-medium">
+                Exit Practice
+            </a>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="flex items-center gap-3 mb-2">
+            <span class="text-sm font-semibold text-blue-600">Question {{ question_num }} of 8</span>
+            <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-2 bg-blue-600 rounded-full transition-all" style="width: {{ (question_num / 8 * 100)|round }}%"></div>
+            </div>
+            <span class="text-sm text-gray-500">{{ ((question_num / 8 * 100)|round)|int }}%</span>
+        </div>
+    </div>
+
+    <!-- Overall Score Card -->
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-8 mb-6 text-white text-center">
+        <div class="mb-2">
+            <svg class="w-16 h-16 mx-auto mb-4 opacity-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+        <h2 class="text-5xl font-bold mb-2">{{ overall_score }}<span class="text-3xl">/10</span></h2>
+        <p class="text-blue-100 text-lg">
+            {% if overall_score >= 8 %}
+            Excellent answer!
+            {% elif overall_score >= 6 %}
+            Good answer!
+            {% elif overall_score >= 4 %}
+            Decent answer - room to improve
+            {% else %}
+            Keep practicing!
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Dimension Scores -->
+    <div class="bg-white rounded-lg border-2 border-gray-200 shadow-sm p-8 mb-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-6">Score Breakdown</h3>
+
+        <div class="space-y-6">
+            <!-- Details Score -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-700">Details & Specifics</span>
+                    <span class="text-sm font-bold text-gray-900">{{ details_score }}/5</span>
+                </div>
+                <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-3 rounded-full transition-all {{ 'bg-green-500' if details_score >= 4 else ('bg-blue-500' if details_score >= 3 else 'bg-orange-500') }}"
+                         style="width: {{ (details_score / 5 * 100)|round }}%"></div>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">Concrete metrics, names, numbers, and tools</p>
+            </div>
+
+            <!-- Organization Score -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-700">Organization & Structure</span>
+                    <span class="text-sm font-bold text-gray-900">{{ organization_score }}/5</span>
+                </div>
+                <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-3 rounded-full transition-all {{ 'bg-green-500' if organization_score >= 4 else ('bg-blue-500' if organization_score >= 3 else 'bg-orange-500') }}"
+                         style="width: {{ (organization_score / 5 * 100)|round }}%"></div>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">Clear STAR format (Situation, Task, Action, Result)</p>
+            </div>
+
+            <!-- Analysis Score -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-700">Analysis & Reasoning</span>
+                    <span class="text-sm font-bold text-gray-900">{{ analysis_score }}/5</span>
+                </div>
+                <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-3 rounded-full transition-all {{ 'bg-green-500' if analysis_score >= 4 else ('bg-blue-500' if analysis_score >= 3 else 'bg-orange-500') }}"
+                         style="width: {{ (analysis_score / 5 * 100)|round }}%"></div>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">Explains WHY, trade-offs, alternatives considered</p>
+            </div>
+
+            <!-- Ownership Score -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-700">Ownership & Impact</span>
+                    <span class="text-sm font-bold text-gray-900">{{ ownership_score }}/5</span>
+                </div>
+                <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-3 rounded-full transition-all {{ 'bg-green-500' if ownership_score >= 4 else ('bg-blue-500' if ownership_score >= 3 else 'bg-orange-500') }}"
+                         style="width: {{ (ownership_score / 5 * 100)|round }}%"></div>
+                </div>
+                <p class="text-xs text-gray-600 mt-1">Clear "I did X" vs vague "we/team"</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Summary -->
+    <div class="bg-white rounded-lg border-2 border-gray-200 shadow-sm p-8 mb-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">Detailed Feedback</h3>
+        <p class="text-gray-700 leading-relaxed mb-6">{{ feedback_summary }}</p>
+
+        <!-- Strong Points -->
+        {% if strong_points and strong_points|length > 0 %}
+        <div class="mb-6">
+            <h4 class="text-sm font-semibold text-green-900 mb-3 flex items-center gap-2">
+                <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                What You Did Well
+            </h4>
+            <ul class="space-y-2">
+                {% for point in strong_points %}
+                <li class="flex items-start gap-3 bg-green-50 border-l-4 border-green-500 rounded-lg p-3">
+                    <span class="text-green-700 text-sm">{{ point }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Improvement Areas -->
+        {% if improvement_areas and improvement_areas|length > 0 %}
+        <div>
+            <h4 class="text-sm font-semibold text-orange-900 mb-3 flex items-center gap-2">
+                <svg class="w-5 h-5 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+                Areas to Improve
+            </h4>
+            <ul class="space-y-2">
+                {% for area in improvement_areas %}
+                <li class="flex items-start gap-3 bg-orange-50 border-l-4 border-orange-500 rounded-lg p-3">
+                    <span class="text-orange-800 text-sm">{{ area }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Better Answer Example (Collapsible) -->
+    {% if better_answer_example %}
+    <div class="bg-white rounded-lg border-2 border-blue-200 shadow-sm mb-6">
+        <button
+            onclick="toggleExample()"
+            class="w-full flex items-center justify-between p-6 text-left hover:bg-blue-50 transition"
+        >
+            <div class="flex items-center gap-3">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-900">See a Better Answer Example</h4>
+                    <p class="text-xs text-gray-600 mt-0.5">Click to expand and learn from this example</p>
+                </div>
+            </div>
+            <svg id="chevron" class="w-5 h-5 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+        <div id="exampleContent" class="hidden border-t-2 border-blue-100 p-6 bg-blue-50">
+            <p class="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{{ better_answer_example }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Navigation -->
+    <div class="flex justify-between items-center">
+        {% if question_num < 8 %}
+        <a href="/interview-prep/question/{{ session_id }}/{{ question_num }}"
+           class="text-blue-600 hover:text-blue-700 font-semibold text-sm">
+            ← Review Question
+        </a>
+        <a href="/interview-prep/question/{{ session_id }}/{{ question_num + 1 }}"
+           class="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center gap-2">
+            Continue to Next Question
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+        </a>
+        {% else %}
+        <a href="/interview-prep/question/{{ session_id }}/{{ question_num }}"
+           class="text-blue-600 hover:text-blue-700 font-semibold text-sm">
+            ← Review Question
+        </a>
+        <a href="/interview-prep/summary/{{ session_id }}"
+           class="px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center gap-2">
+            View Final Summary
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </a>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+function toggleExample() {
+    const content = document.getElementById('exampleContent');
+    const chevron = document.getElementById('chevron');
+
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        content.classList.add('hidden');
+        chevron.style.transform = 'rotate(0deg)';
+    }
+}
+</script>
+
+</body>
+</html>

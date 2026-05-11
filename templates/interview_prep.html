@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Prep - Practice Your Interviews</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<div class="max-w-6xl mx-auto p-6 md:p-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Interview Practice</h1>
+                <p class="text-gray-600 mt-2">
+                    Practice explaining your customized resume with AI-powered mock interviews
+                </p>
+            </div>
+            <a href="/ai-match" class="text-gray-500 hover:text-gray-700 text-sm font-medium">
+                ← Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Info Banner -->
+    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-8">
+        <div class="flex items-start">
+            <svg class="w-6 h-6 text-blue-500 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+                <h3 class="text-sm font-semibold text-blue-900">How it works</h3>
+                <p class="text-sm text-blue-800 mt-1">
+                    Select a role you've customized your CV for. You'll answer 8 questions designed to test how well you can explain your experience.
+                    Get detailed AI feedback on each answer to improve your interview skills.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    {% if cv_sessions and cv_sessions|length > 0 %}
+
+    <!-- Jobs Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {% for session in cv_sessions %}
+        <div class="bg-white rounded-lg border-2 border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all">
+            <div class="p-6">
+
+                <!-- Job Header -->
+                <div class="mb-4 pb-4 border-b border-gray-200">
+                    <h3 class="text-xl font-bold text-gray-900">{{ session.job_title }}</h3>
+                    {% if session.job_company %}
+                    <p class="text-gray-600 mt-1">{{ session.job_company }}</p>
+                    {% endif %}
+
+                    <!-- CV Customization Info -->
+                    <div class="mt-3 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        <span class="text-sm text-green-700 font-medium">CV Customized</span>
+                        <span class="text-gray-400">·</span>
+                        <span class="text-sm text-gray-600">{{ session.approved_bullets|length }} bullets selected</span>
+                    </div>
+                </div>
+
+                <!-- Practice History -->
+                {% if session.practice_sessions and session.practice_sessions|length > 0 and session.practice_sessions[0].session_id %}
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold text-gray-700 mb-3">Practice History</h4>
+                    <div class="space-y-2">
+                        {% for practice in session.practice_sessions[:3] %}
+                        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                            <div class="flex items-center gap-3">
+                                {% if practice.completed %}
+                                <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                                </svg>
+                                {% else %}
+                                <svg class="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                                </svg>
+                                {% endif %}
+                                <div>
+                                    <p class="text-sm font-medium text-gray-900">
+                                        {% if practice.completed %}
+                                        Score: {{ practice.overall_score }}/10
+                                        {% else %}
+                                        In Progress
+                                        {% endif %}
+                                    </p>
+                                    <p class="text-xs text-gray-500">{{ practice.created_at.strftime('%b %d, %Y') if practice.created_at else 'N/A' }}</p>
+                                </div>
+                            </div>
+                            {% if not practice.completed %}
+                            <a href="/interview-prep/question/{{ practice.session_id }}/{{ practice.current_question|default(1) }}"
+                               class="text-xs font-medium text-blue-600 hover:text-blue-700">
+                                Resume →
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Action Button -->
+                <form method="POST" action="/interview-prep/start/{{ session.id }}">
+                    <button type="submit"
+                            class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Start New Practice
+                    </button>
+                </form>
+
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+
+    <!-- Empty State -->
+    <div class="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+        <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">No Customized CVs Yet</h3>
+        <p class="text-gray-600 mb-6">
+            You need to customize your CV for a job before you can practice interviews.
+        </p>
+        <a href="/ai-match" class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+            Go to AI Match
+        </a>
+    </div>
+
+    {% endif %}
+
+</div>
+
+</body>
+</html>

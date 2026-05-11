@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Question {{ question_num }} of 8 - Interview Practice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<div class="max-w-4xl mx-auto p-6 md:p-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h1 class="text-2xl font-bold text-gray-900">Interview Practice</h1>
+            <a href="/interview-prep" class="text-gray-500 hover:text-gray-700 text-sm font-medium">
+                Exit Practice
+            </a>
+        </div>
+
+        <!-- Job Context -->
+        <p class="text-gray-600 mb-4">
+            Practicing for: <span class="font-semibold text-gray-900">{{ job_title }}</span>
+            {% if job_company %} at {{ job_company }}{% endif %}
+        </p>
+
+        <!-- Progress Bar -->
+        <div class="flex items-center gap-3 mb-2">
+            <span class="text-sm font-semibold text-blue-600">Question {{ question_num }} of 8</span>
+            <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div class="h-2 bg-blue-600 rounded-full transition-all" style="width: {{ (question_num / 8 * 100)|round }}%"></div>
+            </div>
+            <span class="text-sm text-gray-500">{{ ((question_num / 8 * 100)|round)|int }}%</span>
+        </div>
+    </div>
+
+    <!-- Question Display -->
+    <div class="bg-white rounded-lg border-2 border-gray-200 shadow-sm mb-6">
+
+        <!-- Question Bubble -->
+        <div class="p-8">
+            <div class="flex items-start gap-4">
+                <!-- Interviewer Icon -->
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Question Text -->
+                <div class="flex-1">
+                    <div class="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6">
+                        <p class="text-lg text-gray-900 leading-relaxed">
+                            {{ question_text }}
+                        </p>
+
+                        {% if bullet_reference %}
+                        <div class="mt-4 pt-4 border-t border-blue-200">
+                            <p class="text-sm text-gray-600 mb-2 font-medium">Referenced from your CV:</p>
+                            <p class="text-sm text-gray-800 italic">{{ bullet_reference }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Answer Form -->
+        <form method="POST" action="/interview-prep/submit/{{ session_id }}/{{ question_num }}" class="border-t-2 border-gray-100 p-8">
+
+            <!-- Instructions -->
+            <div class="mb-4">
+                <label for="answer" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Your Answer
+                </label>
+                <p class="text-sm text-gray-600 mb-4">
+                    Take your time to craft a thoughtful response. Aim for 150-300 words using the STAR format
+                    (Situation, Task, Action, Result).
+                </p>
+            </div>
+
+            <!-- Answer Textarea -->
+            <div class="mb-4">
+                <textarea
+                    id="answer"
+                    name="answer"
+                    rows="10"
+                    required
+                    class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none transition resize-y text-base"
+                    placeholder="Start typing your answer here...
+
+For example:
+Situation: Describe the context...
+Task: What needed to be done...
+Action: What you specifically did...
+Result: The outcome and impact..."
+                    oninput="updateCharCount()"
+                ></textarea>
+            </div>
+
+            <!-- Character Counter -->
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-2 text-sm">
+                    <span id="wordCount" class="font-medium text-gray-700">0 words</span>
+                    <span class="text-gray-400">·</span>
+                    <span id="charCount" class="text-gray-600">0 characters</span>
+                </div>
+                <div id="encouragement" class="text-sm text-gray-500"></div>
+            </div>
+
+            <!-- Submit Button -->
+            <button
+                type="submit"
+                class="w-full px-6 py-4 bg-blue-600 text-white rounded-lg font-semibold text-lg hover:bg-blue-700 transition shadow-sm hover:shadow-md flex items-center justify-center gap-2"
+            >
+                Submit Answer
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                </svg>
+            </button>
+
+        </form>
+    </div>
+
+    <!-- Tips Section -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-sm font-semibold text-blue-900 mb-3">Tips for a strong answer</h3>
+        <ul class="space-y-2 text-sm text-blue-800">
+            <li class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span><strong>Be specific:</strong> Use numbers, names of tools/technologies, and concrete metrics</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span><strong>Show ownership:</strong> Use "I did X" instead of "we did X" or "the team did X"</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span><strong>Explain why:</strong> Share your thought process, trade-offs, and alternatives you considered</span>
+            </li>
+            <li class="flex items-start gap-2">
+                <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span><strong>Structure clearly:</strong> Follow STAR format - Situation, Task, Action, Result</span>
+            </li>
+        </ul>
+    </div>
+
+</div>
+
+<script>
+function updateCharCount() {
+    const textarea = document.getElementById('answer');
+    const text = textarea.value;
+    const charCount = text.length;
+    const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+
+    document.getElementById('charCount').textContent = charCount + ' characters';
+    document.getElementById('wordCount').textContent = wordCount + ' words';
+
+    // Encouragement messages
+    const encouragement = document.getElementById('encouragement');
+    if (wordCount === 0) {
+        encouragement.textContent = '';
+    } else if (wordCount < 50) {
+        encouragement.textContent = 'Keep going...';
+        encouragement.className = 'text-sm text-gray-500';
+    } else if (wordCount < 150) {
+        encouragement.textContent = 'Good start! Add more details.';
+        encouragement.className = 'text-sm text-blue-600';
+    } else if (wordCount <= 300) {
+        encouragement.textContent = 'Great length!';
+        encouragement.className = 'text-sm text-green-600 font-medium';
+    } else {
+        encouragement.textContent = 'Consider being more concise';
+        encouragement.className = 'text-sm text-orange-600';
+    }
+}
+</script>
+
+</body>
+</html>
