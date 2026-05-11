@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Practice Complete - Final Summary</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<div class="max-w-4xl mx-auto p-6 md:p-8">
+
+    <!-- Celebration Header -->
+    <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
+            <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Practice Complete!</h1>
+        <p class="text-gray-600">
+            Great work! You've completed all 8 questions for
+            <span class="font-semibold text-gray-900">{{ job_title }}</span>
+            {% if job_company %} at {{ job_company }}{% endif %}
+        </p>
+    </div>
+
+    <!-- Overall Score Card -->
+    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-xl p-10 mb-8 text-white text-center">
+        <h2 class="text-lg font-semibold mb-3 opacity-90">Your Overall Score</h2>
+        <div class="text-7xl font-bold mb-3">{{ overall_score }}<span class="text-4xl">/10</span></div>
+        <p class="text-green-100 text-lg">
+            {% if overall_score >= 8 %}
+            Outstanding performance! You're well-prepared for interviews.
+            {% elif overall_score >= 6 %}
+            Strong performance! Keep practicing to reach excellence.
+            {% elif overall_score >= 4 %}
+            Good effort! Focus on improvement areas to boost your score.
+            {% else %}
+            Keep practicing! Each session will improve your skills.
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- Average Scores by Dimension -->
+    <div class="bg-white rounded-lg border-2 border-gray-200 shadow-sm p-8 mb-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-6">Performance Breakdown</h3>
+
+        <div class="space-y-6">
+            <!-- Details -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-700">Details & Specifics</span>
+                    <span class="text-sm font-bold text-gray-900">{{ avg_scores.details }}/5</span>
+                </div>
+                <div class="h-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-4 rounded-full transition-all {{ 'bg-green-500' if avg_scores.details >= 4 else ('bg-blue-500' if avg_scores.details >= 3 else 'bg-orange-500') }}"
+                         style="width: {{ (avg_scores.details / 5 * 100)|round }}%"></div>
+                </div>
+            </div>
+
+            <!-- Organization -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-700">Organization & Structure</span>
+                    <span class="text-sm font-bold text-gray-900">{{ avg_scores.organization }}/5</span>
+                </div>
+                <div class="h-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-4 rounded-full transition-all {{ 'bg-green-500' if avg_scores.organization >= 4 else ('bg-blue-500' if avg_scores.organization >= 3 else 'bg-orange-500') }}"
+                         style="width: {{ (avg_scores.organization / 5 * 100)|round }}%"></div>
+                </div>
+            </div>
+
+            <!-- Analysis -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-700">Analysis & Reasoning</span>
+                    <span class="text-sm font-bold text-gray-900">{{ avg_scores.analysis }}/5</span>
+                </div>
+                <div class="h-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-4 rounded-full transition-all {{ 'bg-green-500' if avg_scores.analysis >= 4 else ('bg-blue-500' if avg_scores.analysis >= 3 else 'bg-orange-500') }}"
+                         style="width: {{ (avg_scores.analysis / 5 * 100)|round }}%"></div>
+                </div>
+            </div>
+
+            <!-- Ownership -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-semibold text-gray-700">Ownership & Impact</span>
+                    <span class="text-sm font-bold text-gray-900">{{ avg_scores.ownership }}/5</span>
+                </div>
+                <div class="h-4 bg-gray-200 rounded-full overflow-hidden">
+                    <div class="h-4 rounded-full transition-all {{ 'bg-green-500' if avg_scores.ownership >= 4 else ('bg-blue-500' if avg_scores.ownership >= 3 else 'bg-orange-500') }}"
+                         style="width: {{ (avg_scores.ownership / 5 * 100)|round }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Insights -->
+    <div class="bg-white rounded-lg border-2 border-gray-200 shadow-sm p-8 mb-6">
+        <h3 class="text-lg font-bold text-gray-900 mb-4">Key Insights</h3>
+
+        <!-- Strongest Area -->
+        <div class="mb-6 bg-green-50 border-l-4 border-green-500 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+                <svg class="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <div>
+                    <h4 class="font-semibold text-green-900 mb-1">Your Strongest Area</h4>
+                    <p class="text-sm text-green-800">
+                        {% if avg_scores.details >= max([avg_scores.organization, avg_scores.analysis, avg_scores.ownership]) %}
+                        <strong>Details & Specifics</strong> - You excel at providing concrete metrics and specific examples. Keep this up!
+                        {% elif avg_scores.organization >= max([avg_scores.details, avg_scores.analysis, avg_scores.ownership]) %}
+                        <strong>Organization & Structure</strong> - Your answers are well-structured and follow the STAR format effectively.
+                        {% elif avg_scores.analysis >= max([avg_scores.details, avg_scores.organization, avg_scores.ownership]) %}
+                        <strong>Analysis & Reasoning</strong> - You do a great job explaining your thought process and trade-offs.
+                        {% else %}
+                        <strong>Ownership & Impact</strong> - You clearly demonstrate your personal contributions and impact.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Focus Area -->
+        <div class="bg-orange-50 border-l-4 border-orange-500 rounded-lg p-4">
+            <div class="flex items-start gap-3">
+                <svg class="w-6 h-6 text-orange-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                </svg>
+                <div>
+                    <h4 class="font-semibold text-orange-900 mb-1">Focus on Improving</h4>
+                    <p class="text-sm text-orange-800">
+                        {% if avg_scores.details <= min([avg_scores.organization, avg_scores.analysis, avg_scores.ownership]) %}
+                        <strong>Details & Specifics</strong> - Add more concrete metrics, tool names, and specific numbers to your answers.
+                        {% elif avg_scores.organization <= min([avg_scores.details, avg_scores.analysis, avg_scores.ownership]) %}
+                        <strong>Organization & Structure</strong> - Practice using the STAR format more consistently: Situation, Task, Action, Result.
+                        {% elif avg_scores.analysis <= min([avg_scores.details, avg_scores.organization, avg_scores.ownership]) %}
+                        <strong>Analysis & Reasoning</strong> - Explain WHY you made decisions and what alternatives you considered.
+                        {% else %}
+                        <strong>Ownership & Impact</strong> - Use more "I did X" statements instead of "we/team did X" to show your role clearly.
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Individual Question Scores -->
+    <div class="bg-white rounded-lg border-2 border-gray-200 shadow-sm p-8 mb-8">
+        <h3 class="text-lg font-bold text-gray-900 mb-6">Question-by-Question Breakdown</h3>
+
+        <div class="space-y-4">
+            {% for i in range(1, 9) %}
+            {% set q_key = 'q' ~ i %}
+            {% if evaluations[q_key] %}
+            <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1">
+                        <h4 class="text-sm font-semibold text-gray-900 mb-2">Question {{ i }}</h4>
+                        <p class="text-sm text-gray-700 mb-3">{{ questions[i-1].question_text[:120] }}...</p>
+                        <div class="flex items-center gap-3 text-xs text-gray-600">
+                            <span>Details: {{ evaluations[q_key].details_score }}/5</span>
+                            <span class="text-gray-400">·</span>
+                            <span>Organization: {{ evaluations[q_key].organization_score }}/5</span>
+                            <span class="text-gray-400">·</span>
+                            <span>Analysis: {{ evaluations[q_key].analysis_score }}/5</span>
+                            <span class="text-gray-400">·</span>
+                            <span>Ownership: {{ evaluations[q_key].ownership_score }}/5</span>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0 text-center">
+                        <div class="text-2xl font-bold {{ 'text-green-600' if evaluations[q_key].overall_score >= 8 else ('text-blue-600' if evaluations[q_key].overall_score >= 6 else 'text-orange-600') }}">
+                            {{ evaluations[q_key].overall_score }}
+                        </div>
+                        <div class="text-xs text-gray-500">/10</div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <a href="/interview-prep"
+           class="px-6 py-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-center flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Practice Again
+        </a>
+        <a href="/ai-match"
+           class="px-6 py-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition text-center flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+            Back to Dashboard
+        </a>
+    </div>
+
+</div>
+
+</body>
+</html>

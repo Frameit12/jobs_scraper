@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file, make_response, redirect
+from flask import Flask, render_template, request, send_file, make_response, redirect, jsonify
 import pandas as pd
 from io import BytesIO
 from flask import Response
@@ -33,6 +33,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Application Configuration
+APP_DOMAIN = "findmeajob.xyz"  # Production domain
+APP_URL = f"https://{APP_DOMAIN}"
 
 # Database setup
 _db_engine = None
@@ -196,6 +199,749 @@ def cleanup_old_records():
 
 cleanup_old_records()
 
+def init_cv_table():
+    """Initialize table for storing user CVs"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_cvs (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    cv_name VARCHAR(255) NOT NULL,
+                    file_data BYTEA NOT NULL,
+                    file_type VARCHAR(10) NOT NULL,
+                    file_size INTEGER NOT NULL,
+                    extracted_text TEXT,
+                    skills_detected TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, cv_name)
+                )
+            """))
+            conn.commit()
+
+init_cv_table()
+
+
+def init_job_analyses_table():
+    """Initialize table for storing job matching analyses"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS job_analyses (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    cv_id INTEGER REFERENCES user_cvs(id) ON DELETE CASCADE,
+                    job_title VARCHAR(500) NOT NULL,
+                    job_company VARCHAR(500),
+                    job_description TEXT NOT NULL,
+                    match_score INTEGER,
+                    skills_match JSONB,
+                    skills_missing JSONB,
+                    recommendations TEXT,
+                    full_analysis TEXT,
+                    decision VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+
+init_job_analyses_table()
+
+
+def init_ai_usage_tracking_table():
+    """Initialize table for tracking AI API usage and costs"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS ai_usage_tracking (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    feature_type VARCHAR(50) NOT NULL,
+                    tokens_input INTEGER,
+                    tokens_output INTEGER,
+                    estimated_cost DECIMAL(10, 6),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+
+init_ai_usage_tracking_table()
+
+
+def init_prompt_templates_table():
+    """Initialize table for storing system prompt templates"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS prompt_templates (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    description TEXT,
+                    prompt_text TEXT NOT NULL,
+                    target_profile VARCHAR(100),
+                    is_default BOOLEAN DEFAULT FALSE,
+                    version VARCHAR(20) DEFAULT 'v1',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+
+init_prompt_templates_table()
+
+
+def init_user_prompt_preferences_table():
+    """Initialize table for storing user prompt preferences"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_prompt_preferences (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    template_id INTEGER REFERENCES prompt_templates(id),
+                    custom_prompt_text TEXT,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    ab_test_group VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_user_prompt_active
+                ON user_prompt_preferences(user_id, is_active)
+            """))
+            conn.commit()
+
+init_user_prompt_preferences_table()
+
+
+def init_master_templates_table():
+    """Initialize table for storing user master resume templates"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS user_master_templates (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    template_text TEXT NOT NULL,
+                    original_filename VARCHAR(255),
+                    version INTEGER DEFAULT 1,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
+            # Create partial unique index - only one active template per user
+            conn.execute(text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_user_master_template_active_unique
+                ON user_master_templates(user_id)
+                WHERE is_active = TRUE
+            """))
+
+            # Create regular index for lookups
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_user_master_template_active
+                ON user_master_templates(user_id, is_active)
+            """))
+            conn.commit()
+
+init_master_templates_table()
+
+
+def init_cv_customization_sessions_table():
+    """Initialize table for storing CV customization sessions"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS cv_customization_sessions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    analysis_id INTEGER REFERENCES job_analyses(id) ON DELETE CASCADE,
+                    job_title VARCHAR(500),
+                    job_company VARCHAR(500),
+                    selected_headline TEXT,
+                    bullet_analysis JSONB,
+                    approved_bullets JSONB,
+                    new_bullets JSONB,
+                    match_score_progression JSONB,
+                    status VARCHAR(50) DEFAULT 'in_progress',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
+            # Add bullet_analysis column if it doesn't exist (for existing tables)
+            conn.execute(text("""
+                ALTER TABLE cv_customization_sessions
+                ADD COLUMN IF NOT EXISTS bullet_analysis JSONB
+            """))
+
+            # Add approved_bullets column if it doesn't exist (for existing tables)
+            conn.execute(text("""
+                ALTER TABLE cv_customization_sessions
+                ADD COLUMN IF NOT EXISTS approved_bullets JSONB
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_cv_sessions_user
+                ON cv_customization_sessions(user_id, status)
+            """))
+            conn.commit()
+
+init_cv_customization_sessions_table()
+
+
+def init_interview_sessions_table():
+    """Initialize table for storing interview practice sessions"""
+    engine = get_db_connection()
+    if engine:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS interview_sessions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                    cv_session_id INTEGER REFERENCES cv_customization_sessions(id) ON DELETE CASCADE,
+
+                    -- Progress tracking
+                    current_question INTEGER DEFAULT 1,
+                    completed BOOLEAN DEFAULT FALSE,
+
+                    -- All data in JSONB (flexible, fast, easy)
+                    questions JSONB NOT NULL,
+                    answers JSONB DEFAULT '{}',
+                    evaluations JSONB DEFAULT '{}',
+
+                    -- Summary scores (calculated when complete)
+                    overall_score DECIMAL(3,1),
+
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_interview_user_cv
+                ON interview_sessions(user_id, cv_session_id)
+            """))
+
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_interview_completed
+                ON interview_sessions(user_id, completed)
+            """))
+
+            conn.commit()
+
+init_interview_sessions_table()
+
+
+def seed_initial_prompt_templates():
+    """Seed initial prompt templates if they don't exist"""
+    engine = get_db_connection()
+    if not engine:
+        return
+
+    with engine.connect() as conn:
+        # Check if templates already exist
+        result = conn.execute(text("SELECT COUNT(*) FROM prompt_templates"))
+        count = result.fetchone()[0]
+
+        if count > 0:
+            return  # Templates already seeded
+
+        # Template #1: Default - General Professional
+        default_prompt = """You are an expert career coach and recruiter with 15+ years of experience evaluating candidates across various industries. Your goal is to provide honest, accurate assessments of how well a candidate's background matches a specific job opportunity.
+
+**YOUR TASK:**
+Analyze the candidate's CV against the job description and provide a comprehensive match assessment.
+
+**EVALUATION CRITERIA:**
+1. **Relevant Experience (40%):** How closely does their work history align with the role's requirements?
+2. **Skills Match (30%):** Do they possess the technical and soft skills needed?
+3. **Industry Fit (20%):** Does their industry background prepare them for this role?
+4. **Seniority Match (10%):** Does their career level align with the role's expectations?
+
+**SCORING GUIDELINES:**
+- **90-100%:** Exceptional match - candidate exceeds most requirements
+- **75-89%:** Strong match - candidate meets most key requirements with minor gaps
+- **60-74%:** Good match - candidate meets many requirements but has notable gaps
+- **50-59%:** Fair match - candidate has transferable skills but significant gaps
+- **Below 50%:** Poor match - major gaps in experience or skills
+
+**OUTPUT REQUIREMENTS:**
+Respond with valid JSON containing:
+- match_score (0-100)
+- skills_match: Array of matched skills with evidence
+- skills_missing: Array of skills needed but not demonstrated
+- recommendations: Array of specific suggestions for the candidate"""
+
+        # Template #2: Finance VP (Tier-1 IB) - Enhanced RECRUITER_SYSTEM_PROMPT
+        finance_vp_prompt = """You are an experienced recruiter at a top-tier executive search firm with 20+ years of experience placing VP, SVP, and ED-level candidates at tier-1 investment banks (Goldman Sachs, JP Morgan, Morgan Stanley, Citi, etc.). You specialize in evaluating senior financial services talent for AI/ML governance, risk management, and product leadership roles.
+
+**YOUR EXPERTISE:**
+You have personally placed 200+ VPs and 50+ SVPs/EDs in financial services. You understand what separates a 92% match from an 85% match. You provide calibrated, consistent evaluations that help candidates understand exactly where they stand.
+
+**CANDIDATE CONTEXT (Grace):**
+- 15+ years in financial services at tier-1 institutions (JP Morgan, Citi, Morgan Stanley)
+- Currently VP, AI Governance at JP Morgan
+- Deep expertise in AI/ML risk management, model validation, regulatory compliance
+- Led enterprise-wide AI governance frameworks
+- Looking for VP/SVP/ED roles in AI governance, risk management, or product management at financial institutions
+
+**YOUR EVALUATION FRAMEWORK (100-Point System):**
+
+**1. DIRECT EXPERIENCE MATCH (40 points)**
+- Exact role type match (AI Governance, Risk, Product)
+- Institution type match (tier-1 IB vs fintech vs tech)
+- Relevant domain expertise (AI/ML, regulatory, model risk)
+- Years of experience at appropriate level
+
+**2. TRANSFERABLE SKILLS (25 points)**
+- Technical skills (AI/ML, data governance, model validation)
+- Leadership skills (stakeholder management, cross-functional leadership)
+- Regulatory expertise (Fed, OCC, GDPR, AI regulations)
+- Strategic capabilities (framework design, policy development)
+
+**3. INDUSTRY FIT (20 points)**
+- Financial services background
+- Regulatory environment familiarity
+- Enterprise scale experience
+- Cultural fit (bank vs tech vs consulting)
+
+**4. SENIORITY MATCH (15 points)**
+- Title level alignment (VP to VP, VP to SVP, etc.)
+- Scope of responsibility match
+- People management experience
+- P&L or budget ownership
+
+**CALIBRATION EXAMPLES (Learn these scoring patterns):**
+
+**90-100% Matches:**
+1. VP AI Governance at Goldman Sachs → VP AI Governance at Morgan Stanley (95%)
+2. VP Model Risk at JP Morgan → VP AI Risk at Citi (92%)
+3. SVP AI Strategy at Bank of America → SVP AI Governance at Wells Fargo (94%)
+
+**75-89% Matches:**
+4. VP AI Governance at JP Morgan → VP AI Governance at Stripe (fintech) (82%)
+   - Reason: Strong role match but institution type shift (bank → fintech)
+5. VP AI Governance at JP Morgan → VP Product Management (AI) at Capital One (78%)
+   - Reason: Pivot from governance to product, different institution tier
+6. VP Model Risk at JP Morgan → Director AI Strategy at McKinsey (consulting) (76%)
+   - Reason: Title step down, industry shift to consulting
+
+**60-74% Matches:**
+7. VP AI Governance at JP Morgan → VP Product Management at tech company (68%)
+   - Reason: Industry shift (finance → tech), role pivot (governance → product)
+8. VP Model Risk at JP Morgan → VP Program Management (AI initiatives) at Citi (72%)
+   - Reason: Shift from risk to program management, less specialized role
+9. Senior Manager AI Governance at JP Morgan → VP AI Governance at regional bank (65%)
+   - Reason: Title promotion needed, institution tier drop
+
+**55-70% Matches:**
+10. VP AI Governance at JP Morgan → VP Risk Management (no AI focus) at Morgan Stanley (65%)
+    - Reason: Loses AI specialization, becomes generic risk role
+11. VP Model Risk at JP Morgan → Senior Director Analytics at tech company (62%)
+    - Reason: Title ambiguity, industry shift, role is more analytics than governance
+
+**Below 55% Matches:**
+12. VP AI Governance at JP Morgan → Head of Data Science at startup (48%)
+    - Reason: Major industry shift, completely different role (governance → IC technical)
+13. VP AI Governance at JP Morgan → Chief Risk Officer at small fintech (52%)
+    - Reason: Title seems senior but scope much smaller, institution scale mismatch
+14. VP Model Risk at JP Morgan → Product Manager (AI tools) at Series A startup (45%)
+    - Reason: Title demotion, industry shift, completely different scope/scale
+
+**CONSISTENCY RULES (Apply these strictly):**
+
+1. **Exact Title + Institution Type Match = Minimum 85%**
+   - VP AI Governance (bank) → VP AI Governance (bank) = 85-95%
+   - Only deduct for scope, team size, or institution prestige differences
+
+2. **Competitor Bank Match = Minimum 88%**
+   - JP Morgan ↔ Goldman/Morgan Stanley/Citi = very high match
+   - These are peer institutions with comparable complexity
+
+3. **Years of Experience Scope Match:**
+   - If candidate has "X years managing Y use cases" and JD requires "managing Z use cases," score should not drop below 80%
+   - Example: Candidate managed 50 AI models, JD requires managing AI models → 80%+ even if exact count differs
+
+4. **Exact Title Match (Different Institution Type) = Minimum 75%**
+   - VP AI Governance (tier-1 bank) → VP AI Governance (fintech) = 75-85%
+   - VP AI Governance (tier-1 bank) → VP AI Governance (tech company) = 70-82%
+
+5. **Role Pivot Within Same Institution Type:**
+   - Governance → Product (same industry) = 65-78%
+   - Governance → Risk (same industry) = 75-85%
+   - Risk → Program Management (same industry) = 68-76%
+
+6. **People Management Cap:**
+   - If role requires people management and candidate has NO direct reports mentioned → cap at 70%
+   - If candidate has people management and role doesn't require it → no penalty
+
+7. **P&L Ownership Cap:**
+   - If role requires P&L ownership and candidate has none → cap at 68%
+
+8. **Institution Type Penalties:**
+   - Tier-1 IB → Tier-2/regional bank = -8 to -12 points
+   - Bank → Fintech = -5 to -10 points
+   - Bank → Big Tech = -10 to -18 points
+   - Bank → Startup = -20 to -30 points
+
+9. **Seniority Mismatch Penalties:**
+   - VP → SVP (promotion needed) = -5 to -8 points
+   - SVP → VP (step down) = -8 to -12 points
+   - Director → VP (promotion needed) = -10 to -15 points
+
+10. **AI Specialization Rule:**
+    - If candidate is "AI Governance" specialist and role is generic "Risk Management" (no AI) → cap at 70%
+    - If candidate is generic risk and role requires AI specialization → cap at 60%
+
+11. **Regulatory Expertise Match:**
+    - If role requires specific regulatory knowledge (Fed, OCC, GDPR) and candidate has it → +5 to +8 points
+    - If role requires regulatory expertise and candidate has none → -15 to -20 points
+
+12. **Cross-Functional Leadership:**
+    - If candidate has "led cross-functional initiatives" and JD requires it → automatic inclusion in strengths
+    - If JD emphasizes stakeholder management and candidate has evidence → +5 points
+
+13. **Consistency Check:**
+    - If two job descriptions are 90% similar in requirements, the same candidate's scores should differ by no more than 5 points
+    - Review your scoring: Does this match the calibration examples above?
+
+**EVIDENCE REQUIREMENTS:**
+
+When assessing skills:
+- "Strong" evidence = explicitly mentioned in CV with concrete examples/metrics
+- "Moderate" evidence = clearly implied by role/responsibilities but not explicitly stated
+- "Basic" evidence = tangentially related experience that could transfer
+- NO evidence = do not list as a matched skill
+
+**OUTPUT FORMAT (JSON only, no markdown):**
+
+{
+  "match_score": <integer 0-100>,
+  "scoring_breakdown": {
+    "direct_experience": <0-40 points>,
+    "transferable_skills": <0-25 points>,
+    "industry_fit": <0-20 points>,
+    "seniority_match": <0-15 points>
+  },
+  "skills_match": [
+    {
+      "skill": "AI/ML Governance",
+      "evidence": "Led AI governance framework at JP Morgan for 3+ years",
+      "strength": "strong"
+    }
+  ],
+  "skills_missing": [
+    {
+      "skill": "P&L Ownership",
+      "importance": "high",
+      "impact": "May need to demonstrate budget management experience in interviews"
+    }
+  ],
+  "recommendations": [
+    "Emphasize your experience managing [specific area] in your application",
+    "Be prepared to discuss how your governance experience translates to [required skill]"
+  ],
+  "match_rationale": "Brief 2-3 sentence explanation of the score, referencing which calibration example this most resembles"
+}
+
+**REMEMBER:** You are evaluating Grace, a VP at JP Morgan with 15+ years in tier-1 financial services and deep AI governance expertise. Score accordingly using the calibration examples above."""
+
+        # Insert Template #1
+        conn.execute(text("""
+            INSERT INTO prompt_templates (name, description, prompt_text, target_profile, is_default, version)
+            VALUES (:name, :description, :prompt_text, :target_profile, :is_default, :version)
+        """), {
+            "name": "Default - General Professional",
+            "description": "A balanced, professional evaluation suitable for most career backgrounds and industries.",
+            "prompt_text": default_prompt,
+            "target_profile": "General",
+            "is_default": True,
+            "version": "v1"
+        })
+
+        # Insert Template #2
+        conn.execute(text("""
+            INSERT INTO prompt_templates (name, description, prompt_text, target_profile, is_default, version)
+            VALUES (:name, :description, :prompt_text, :target_profile, :is_default, :version)
+        """), {
+            "name": "Finance VP (Tier-1 IB)",
+            "description": "Specialized evaluation for VP/SVP-level financial services professionals with AI/ML governance, risk, or product experience at tier-1 investment banks. Includes detailed calibration for banking roles.",
+            "prompt_text": finance_vp_prompt,
+            "target_profile": "VP Banking - AI/Governance",
+            "is_default": False,
+            "version": "v1"
+        })
+
+        conn.commit()
+        print("✓ Seeded 2 initial prompt templates")
+
+seed_initial_prompt_templates()
+
+
+def assign_user_to_finance_vp_template():
+    """Assign user_id=1 (Grace) to the Finance VP template if user exists"""
+    engine = get_db_connection()
+    if not engine:
+        return
+
+    try:
+        with engine.connect() as conn:
+            # First, check if user_id=1 exists in users table
+            user_check = conn.execute(text("""
+                SELECT COUNT(*) FROM users WHERE id = 1
+            """))
+            user_exists = user_check.fetchone()[0] > 0
+
+            if not user_exists:
+                # User doesn't exist yet, skip gracefully (don't crash)
+                return
+
+            # Check if user_id=1 already has a preference assigned
+            result = conn.execute(text("""
+                SELECT COUNT(*) FROM user_prompt_preferences WHERE user_id = 1
+            """))
+            count = result.fetchone()[0]
+
+            if count > 0:
+                return  # User already has a template assigned
+
+            # Get the Finance VP template ID
+            template = conn.execute(text("""
+                SELECT id FROM prompt_templates WHERE name = 'Finance VP (Tier-1 IB)'
+            """))
+            template_row = template.fetchone()
+
+            if not template_row:
+                print("⚠ Finance VP template not found, skipping user assignment")
+                return
+
+            template_id = template_row[0]
+
+            # Assign user_id=1 to this template
+            conn.execute(text("""
+                INSERT INTO user_prompt_preferences (user_id, template_id, is_active)
+                VALUES (:user_id, :template_id, TRUE)
+            """), {"user_id": 1, "template_id": template_id})
+
+            conn.commit()
+            print(f"✓ Assigned user_id=1 to Finance VP (Tier-1 IB) template (template_id={template_id})")
+    except Exception as e:
+        # Gracefully handle any errors during assignment (don't crash the app)
+        print(f"⚠ Could not auto-assign template to user_id=1: {e}")
+        return
+
+assign_user_to_finance_vp_template()
+
+
+def update_finance_vp_template_remove_persona():
+    """Update the Finance VP template to remove persona name"""
+    engine = get_db_connection()
+    if not engine:
+        return
+
+    with engine.connect() as conn:
+        # Updated prompt without persona name
+        finance_vp_prompt = """You are an experienced recruiter at a top-tier executive search firm with 20+ years of experience placing VP, SVP, and ED-level candidates at tier-1 investment banks (Goldman Sachs, JP Morgan, Morgan Stanley, Citi, etc.). You specialize in evaluating senior financial services talent for AI/ML governance, risk management, and product leadership roles.
+
+**YOUR EXPERTISE:**
+You have personally placed 200+ VPs and 50+ SVPs/EDs in financial services. You understand what separates a 92% match from an 85% match. You provide calibrated, consistent evaluations that help candidates understand exactly where they stand.
+
+**CANDIDATE CONTEXT (Grace):**
+- 15+ years in financial services at tier-1 institutions (JP Morgan, Citi, Morgan Stanley)
+- Currently VP, AI Governance at JP Morgan
+- Deep expertise in AI/ML risk management, model validation, regulatory compliance
+- Led enterprise-wide AI governance frameworks
+- Looking for VP/SVP/ED roles in AI governance, risk management, or product management at financial institutions
+
+**YOUR EVALUATION FRAMEWORK (100-Point System):**
+
+**1. DIRECT EXPERIENCE MATCH (40 points)**
+- Exact role type match (AI Governance, Risk, Product)
+- Institution type match (tier-1 IB vs fintech vs tech)
+- Relevant domain expertise (AI/ML, regulatory, model risk)
+- Years of experience at appropriate level
+
+**2. TRANSFERABLE SKILLS (25 points)**
+- Technical skills (AI/ML, data governance, model validation)
+- Leadership skills (stakeholder management, cross-functional leadership)
+- Regulatory expertise (Fed, OCC, GDPR, AI regulations)
+- Strategic capabilities (framework design, policy development)
+
+**3. INDUSTRY FIT (20 points)**
+- Financial services background
+- Regulatory environment familiarity
+- Enterprise scale experience
+- Cultural fit (bank vs tech vs consulting)
+
+**4. SENIORITY MATCH (15 points)**
+- Title level alignment (VP to VP, VP to SVP, etc.)
+- Scope of responsibility match
+- People management experience
+- P&L or budget ownership
+
+**CALIBRATION EXAMPLES (Learn these scoring patterns):**
+
+**90-100% Matches:**
+1. VP AI Governance at Goldman Sachs → VP AI Governance at Morgan Stanley (95%)
+2. VP Model Risk at JP Morgan → VP AI Risk at Citi (92%)
+3. SVP AI Strategy at Bank of America → SVP AI Governance at Wells Fargo (94%)
+
+**75-89% Matches:**
+4. VP AI Governance at JP Morgan → VP AI Governance at Stripe (fintech) (82%)
+   - Reason: Strong role match but institution type shift (bank → fintech)
+5. VP AI Governance at JP Morgan → VP Product Management (AI) at Capital One (78%)
+   - Reason: Pivot from governance to product, different institution tier
+6. VP Model Risk at JP Morgan → Director AI Strategy at McKinsey (consulting) (76%)
+   - Reason: Title step down, industry shift to consulting
+
+**60-74% Matches:**
+7. VP AI Governance at JP Morgan → VP Product Management at tech company (68%)
+   - Reason: Industry shift (finance → tech), role pivot (governance → product)
+8. VP Model Risk at JP Morgan → VP Program Management (AI initiatives) at Citi (72%)
+   - Reason: Shift from risk to program management, less specialized role
+9. Senior Manager AI Governance at JP Morgan → VP AI Governance at regional bank (65%)
+   - Reason: Title promotion needed, institution tier drop
+
+**55-70% Matches:**
+10. VP AI Governance at JP Morgan → VP Risk Management (no AI focus) at Morgan Stanley (65%)
+    - Reason: Loses AI specialization, becomes generic risk role
+11. VP Model Risk at JP Morgan → Senior Director Analytics at tech company (62%)
+    - Reason: Title ambiguity, industry shift, role is more analytics than governance
+
+**Below 55% Matches:**
+12. VP AI Governance at JP Morgan → Head of Data Science at startup (48%)
+    - Reason: Major industry shift, completely different role (governance → IC technical)
+13. VP AI Governance at JP Morgan → Chief Risk Officer at small fintech (52%)
+    - Reason: Title seems senior but scope much smaller, institution scale mismatch
+14. VP Model Risk at JP Morgan → Product Manager (AI tools) at Series A startup (45%)
+    - Reason: Title demotion, industry shift, completely different scope/scale
+
+**CONSISTENCY RULES (Apply these strictly):**
+
+1. **Exact Title + Institution Type Match = Minimum 85%**
+   - VP AI Governance (bank) → VP AI Governance (bank) = 85-95%
+   - Only deduct for scope, team size, or institution prestige differences
+
+2. **Competitor Bank Match = Minimum 88%**
+   - JP Morgan ↔ Goldman/Morgan Stanley/Citi = very high match
+   - These are peer institutions with comparable complexity
+
+3. **Years of Experience Scope Match:**
+   - If candidate has "X years managing Y use cases" and JD requires "managing Z use cases," score should not drop below 80%
+   - Example: Candidate managed 50 AI models, JD requires managing AI models → 80%+ even if exact count differs
+
+4. **Exact Title Match (Different Institution Type) = Minimum 75%**
+   - VP AI Governance (tier-1 bank) → VP AI Governance (fintech) = 75-85%
+   - VP AI Governance (tier-1 bank) → VP AI Governance (tech company) = 70-82%
+
+5. **Role Pivot Within Same Institution Type:**
+   - Governance → Product (same industry) = 65-78%
+   - Governance → Risk (same industry) = 75-85%
+   - Risk → Program Management (same industry) = 68-76%
+
+6. **People Management Cap:**
+   - If role requires people management and candidate has NO direct reports mentioned → cap at 70%
+   - If candidate has people management and role doesn't require it → no penalty
+
+7. **P&L Ownership Cap:**
+   - If role requires P&L ownership and candidate has none → cap at 68%
+
+8. **Institution Type Penalties:**
+   - Tier-1 IB → Tier-2/regional bank = -8 to -12 points
+   - Bank → Fintech = -5 to -10 points
+   - Bank → Big Tech = -10 to -18 points
+   - Bank → Startup = -20 to -30 points
+
+9. **Seniority Mismatch Penalties:**
+   - VP → SVP (promotion needed) = -5 to -8 points
+   - SVP → VP (step down) = -8 to -12 points
+   - Director → VP (promotion needed) = -10 to -15 points
+
+10. **AI Specialization Rule:**
+    - If candidate is "AI Governance" specialist and role is generic "Risk Management" (no AI) → cap at 70%
+    - If candidate is generic risk and role requires AI specialization → cap at 60%
+
+11. **Regulatory Expertise Match:**
+    - If role requires specific regulatory knowledge (Fed, OCC, GDPR) and candidate has it → +5 to +8 points
+    - If role requires regulatory expertise and candidate has none → -15 to -20 points
+
+12. **Cross-Functional Leadership:**
+    - If candidate has "led cross-functional initiatives" and JD requires it → automatic inclusion in strengths
+    - If JD emphasizes stakeholder management and candidate has evidence → +5 points
+
+13. **Consistency Check:**
+    - If two job descriptions are 90% similar in requirements, the same candidate's scores should differ by no more than 5 points
+    - Review your scoring: Does this match the calibration examples above?
+
+**EVIDENCE REQUIREMENTS:**
+
+When assessing skills:
+- "Strong" evidence = explicitly mentioned in CV with concrete examples/metrics
+- "Moderate" evidence = clearly implied by role/responsibilities but not explicitly stated
+- "Basic" evidence = tangentially related experience that could transfer
+- NO evidence = do not list as a matched skill
+
+**OUTPUT FORMAT (JSON only, no markdown):**
+
+{
+  "match_score": <integer 0-100>,
+  "scoring_breakdown": {
+    "direct_experience": <0-40 points>,
+    "transferable_skills": <0-25 points>,
+    "industry_fit": <0-20 points>,
+    "seniority_match": <0-15 points>
+  },
+  "skills_match": [
+    {
+      "skill": "AI/ML Governance",
+      "evidence": "Led AI governance framework at JP Morgan for 3+ years",
+      "strength": "strong"
+    }
+  ],
+  "skills_missing": [
+    {
+      "skill": "P&L Ownership",
+      "importance": "high",
+      "impact": "May need to demonstrate budget management experience in interviews"
+    }
+  ],
+  "recommendations": [
+    "Emphasize your experience managing [specific area] in your application",
+    "Be prepared to discuss how your governance experience translates to [required skill]"
+  ],
+  "match_rationale": "Brief 2-3 sentence explanation of the score, referencing which calibration example this most resembles"
+}
+
+**REMEMBER:** You are evaluating Grace, a VP at JP Morgan with 15+ years in tier-1 financial services and deep AI governance expertise. Score accordingly using the calibration examples above."""
+
+        # Update the template
+        result = conn.execute(text("""
+            UPDATE prompt_templates
+            SET prompt_text = :prompt_text,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE name = 'Finance VP (Tier-1 IB)'
+        """), {"prompt_text": finance_vp_prompt})
+
+        conn.commit()
+
+        if result.rowcount > 0:
+            print(f"✓ Updated Finance VP template to remove persona name (affected {result.rowcount} row)")
+        else:
+            print("⚠ Finance VP template not found or not updated")
+
+update_finance_vp_template_remove_persona()
+
 
 def generate_reset_token():
     import secrets
@@ -234,6 +980,1735 @@ def create_password_reset_token(user_id):
     except Exception as e:
         print(f"Error creating reset token: {e}")
         return None
+
+
+# ==================== AI MATCH TOOL: CV PARSING FUNCTIONS ====================
+
+def extract_text_from_pdf(file_data):
+    """Extract text from PDF file"""
+    try:
+        from PyPDF2 import PdfReader
+        import io
+
+        pdf_file = io.BytesIO(file_data)
+        reader = PdfReader(pdf_file)
+
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() + "\n"
+
+        return text.strip()
+    except ImportError as e:
+        print(f"PyPDF2 not installed: {e}")
+        raise Exception("PyPDF2 library not installed. Please install it.")
+    except Exception as e:
+        print(f"Error extracting text from PDF: {e}")
+        import traceback
+        traceback.print_exc()
+        raise Exception(f"Failed to parse PDF: {str(e)}")
+
+
+def extract_text_from_docx(file_data):
+    """Extract text from DOCX file"""
+    try:
+        from docx import Document
+        import io
+
+        docx_file = io.BytesIO(file_data)
+        doc = Document(docx_file)
+
+        text = ""
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+
+        return text.strip()
+    except ImportError as e:
+        print(f"python-docx not installed: {e}")
+        raise Exception("python-docx library not installed. Please install it.")
+    except Exception as e:
+        print(f"Error extracting text from DOCX: {e}")
+        import traceback
+        traceback.print_exc()
+        raise Exception(f"Failed to parse DOCX: {str(e)}")
+
+
+def parse_cv(file_data, file_type):
+    """Parse CV and extract text based on file type"""
+    if file_type.lower() == 'pdf':
+        return extract_text_from_pdf(file_data)
+    elif file_type.lower() in ['docx', 'doc']:
+        return extract_text_from_docx(file_data)
+    else:
+        raise Exception(f"Unsupported file type: {file_type}")
+
+
+def save_cv_to_db(user_id, cv_name, file_data, file_type, extracted_text):
+    """Save CV to database"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        file_size = len(file_data)
+
+        with engine.connect() as conn:
+            # Check if CV with same name exists, update if yes
+            result = conn.execute(text("""
+                SELECT id FROM user_cvs
+                WHERE user_id = :user_id AND cv_name = :cv_name
+            """), {"user_id": user_id, "cv_name": cv_name})
+
+            existing_cv = result.fetchone()
+
+            if existing_cv:
+                # Update existing CV
+                conn.execute(text("""
+                    UPDATE user_cvs
+                    SET file_data = :file_data, file_type = :file_type,
+                        file_size = :file_size, extracted_text = :extracted_text,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :cv_id
+                """), {
+                    "file_data": file_data,
+                    "file_type": file_type,
+                    "file_size": file_size,
+                    "extracted_text": extracted_text,
+                    "cv_id": existing_cv[0]
+                })
+                conn.commit()
+                return existing_cv[0]
+            else:
+                # Insert new CV
+                result = conn.execute(text("""
+                    INSERT INTO user_cvs (user_id, cv_name, file_data, file_type, file_size, extracted_text)
+                    VALUES (:user_id, :cv_name, :file_data, :file_type, :file_size, :extracted_text)
+                    RETURNING id
+                """), {
+                    "user_id": user_id,
+                    "cv_name": cv_name,
+                    "file_data": file_data,
+                    "file_type": file_type,
+                    "file_size": file_size,
+                    "extracted_text": extracted_text
+                })
+                conn.commit()
+                cv_id = result.fetchone()[0]
+                return cv_id
+    except Exception as e:
+        print(f"Error saving CV to database: {e}")
+        return None
+
+
+def get_user_cvs(user_id):
+    """Get all CVs for a user"""
+    engine = get_db_connection()
+    if not engine:
+        return []
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, cv_name, file_type, file_size, created_at, updated_at
+                FROM user_cvs
+                WHERE user_id = :user_id
+                ORDER BY updated_at DESC
+            """), {"user_id": user_id})
+
+            cvs = []
+            for row in result:
+                cvs.append({
+                    'id': row[0],
+                    'cv_name': row[1],
+                    'file_type': row[2],
+                    'file_size': row[3],
+                    'created_at': row[4],
+                    'updated_at': row[5]
+                })
+            return cvs
+    except Exception as e:
+        print(f"Error getting user CVs: {e}")
+        return []
+
+
+def get_cv_by_id(cv_id, user_id):
+    """Get specific CV by ID (with user verification)"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, cv_name, file_data, file_type, extracted_text
+                FROM user_cvs
+                WHERE id = :cv_id AND user_id = :user_id
+            """), {"cv_id": cv_id, "user_id": user_id})
+
+            row = result.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'cv_name': row[1],
+                    'file_data': row[2],
+                    'file_type': row[3],
+                    'extracted_text': row[4]
+                }
+            return None
+    except Exception as e:
+        print(f"Error getting CV: {e}")
+        return None
+
+
+# ==================== AI MATCH TOOL: MASTER TEMPLATE FUNCTIONS ====================
+
+def save_master_template(user_id, template_text, filename):
+    """Save or update user's master resume template"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            # Deactivate any existing active templates for this user
+            conn.execute(text("""
+                UPDATE user_master_templates
+                SET is_active = FALSE
+                WHERE user_id = :user_id AND is_active = TRUE
+            """), {"user_id": user_id})
+
+            # Get the next version number
+            version_result = conn.execute(text("""
+                SELECT COALESCE(MAX(version), 0) + 1
+                FROM user_master_templates
+                WHERE user_id = :user_id
+            """), {"user_id": user_id})
+            version = version_result.fetchone()[0]
+
+            # Insert new template
+            result = conn.execute(text("""
+                INSERT INTO user_master_templates
+                (user_id, template_text, original_filename, version, is_active)
+                VALUES (:user_id, :template_text, :filename, :version, TRUE)
+                RETURNING id
+            """), {
+                "user_id": user_id,
+                "template_text": template_text,
+                "filename": filename,
+                "version": version
+            })
+
+            template_id = result.fetchone()[0]
+            conn.commit()
+
+            return template_id
+
+    except Exception as e:
+        print(f"Error saving master template: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def get_user_master_template(user_id):
+    """Get user's active master resume template"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, template_text, original_filename, version, created_at, updated_at
+                FROM user_master_templates
+                WHERE user_id = :user_id AND is_active = TRUE
+                ORDER BY created_at DESC
+                LIMIT 1
+            """), {"user_id": user_id})
+
+            row = result.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'template_text': row[1],
+                    'original_filename': row[2],
+                    'version': row[3],
+                    'created_at': row[4],
+                    'updated_at': row[5]
+                }
+            return None
+
+    except Exception as e:
+        print(f"Error getting master template: {e}")
+        return None
+
+
+def extract_text_from_docx(file_data):
+    """Extract text from .docx file while preserving structure"""
+    try:
+        from docx import Document
+        from io import BytesIO
+
+        # Load document from binary data
+        doc = Document(BytesIO(file_data))
+
+        text_parts = []
+
+        for para in doc.paragraphs:
+            # Preserve heading levels
+            if para.style.name.startswith('Heading'):
+                text_parts.append(f"\n## {para.text}\n")
+            elif para.text.strip():
+                # Check if it's a list item (starts with bullet or number)
+                text = para.text.strip()
+                if text.startswith('•') or text.startswith('-') or (len(text) > 2 and text[0].isdigit() and text[1] in '.):'):
+                    text_parts.append(f"  {text}")
+                else:
+                    text_parts.append(text)
+
+        # Join with newlines to preserve structure
+        extracted_text = '\n'.join(text_parts)
+
+        return extracted_text
+
+    except Exception as e:
+        print(f"Error extracting text from docx: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+# ==================== CV CUSTOMIZATION: HELPER FUNCTIONS ====================
+
+def parse_headlines_from_template(template_text):
+    """Extract all headline variations from master template
+
+    Handles both numbered (1. Headline) and unnumbered (plain text) formats.
+    """
+    import re
+
+    headlines = []
+    lines = template_text.split('\n')
+
+    in_headlines_section = False
+
+    print(f"\n=== PARSING HEADLINES ===")
+    print(f"Total lines in template: {len(lines)}")
+
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+
+        # Detect start of HEADLINES section
+        if 'HEADLINE' in line_stripped.upper() and ('VARIATION' in line_stripped.upper() or '(' in line_stripped):
+            in_headlines_section = True
+            print(f"Found HEADLINES section at line {i}: '{line_stripped[:50]}...'")
+            continue
+
+        # Detect end of HEADLINES section
+        if in_headlines_section and line_stripped:
+            # Check if this is a separator line
+            if line_stripped.startswith('___'):
+                print(f"End of HEADLINES section at line {i}: separator line")
+                break
+
+            # Check if this is an ALL CAPS section header (e.g., "CORE SKILLS & COMPETENCIES")
+            # Must be all uppercase AND contain multiple words OR common section keywords
+            upper_line = line_stripped.upper()
+            if line_stripped.isupper() and len(line_stripped) > 10:
+                print(f"End of HEADLINES section at line {i}: section header '{line_stripped[:50]}...'")
+                break
+
+            # Check if starts with known section keywords
+            if upper_line.startswith('CORE SKILLS') or \
+               upper_line.startswith('EXPERIENCE:') or \
+               upper_line.startswith('EDUCATION:') or \
+               upper_line.startswith('TECHNICAL ACUMEN:') or \
+               upper_line.startswith('WORK HISTORY') or \
+               upper_line.startswith('JP MORGAN'):
+                print(f"End of HEADLINES section at line {i}: section keyword '{line_stripped[:50]}...'")
+                break
+
+        # Extract headlines (both numbered and unnumbered formats)
+        if in_headlines_section and line_stripped:
+            # Try numbered format first (e.g., "1. Headline text")
+            match = re.match(r'^(\d+)[.\t]\s*(.+)', line_stripped)
+            if match:
+                headline_number = int(match.group(1))
+                headline_text = match.group(2).strip()
+                print(f"  Line {i}: Found numbered headline #{headline_number}")
+            else:
+                # Unnumbered format - treat entire line as headline
+                headline_text = line_stripped
+                headline_number = len(headlines) + 1
+                print(f"  Line {i}: Found unnumbered headline (will be #{headline_number})")
+
+            # Validate headline length (must be substantial text, not a section marker)
+            if len(headline_text) > 30:
+                headlines.append({
+                    'id': len(headlines),  # 0-indexed
+                    'number': headline_number,
+                    'text': headline_text
+                })
+                print(f"    ✓ Added: '{headline_text[:60]}...'")
+            else:
+                print(f"    ✗ Too short (< 30 chars): '{headline_text}'")
+
+    print(f"=== TOTAL HEADLINES FOUND: {len(headlines)} ===\n")
+    return headlines
+
+
+def parse_bullets_from_template(template_text):
+    """Extract all bullet points from JP Morgan section in master template
+
+    Template structure:
+    - Section header: "JP MORGAN CHASE BULLETS (66 Unique Variations)"
+    - Category markers: "CATEGORY: [Name]"
+    - Bullets: Plain text paragraphs (no prefix markers)
+    """
+    import re
+
+    bullets = []
+    lines = template_text.split('\n')
+
+    in_bullets_section = False
+    current_category = "Uncategorized"
+
+    print(f"\n=== PARSING JP MORGAN BULLETS ===")
+    print(f"Total lines in template: {len(lines)}")
+
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+
+        # Detect start of JP Morgan bullets section
+        # Must match the exact pattern: "JP MORGAN CHASE BULLETS (XX Unique Variations)"
+        # NOT just any line mentioning "JP Morgan" and "bullets"
+        if ('JP MORGAN' in line_stripped.upper() and
+            'BULLETS' in line_stripped.upper() and  # Note: BULLETS plural
+            'VARIATION' in line_stripped.upper()):  # And contains "Variation"
+            in_bullets_section = True
+            print(f"✓ Found JP MORGAN BULLETS section at line {i}: '{line_stripped}'")
+            continue
+
+        # Only process if we're in the bullets section
+        if not in_bullets_section:
+            continue
+
+        # Skip empty lines
+        if not line_stripped:
+            continue
+
+        # Extract category markers
+        if line_stripped.startswith('CATEGORY:'):
+            current_category = line_stripped.replace('CATEGORY:', '').strip()
+            print(f"  ✓ Line {i}: Found category '{current_category}'")
+            continue
+
+        # Check if we've hit the end of the bullets section
+        # End conditions: next major section header or separator
+        upper_line = line_stripped.upper()
+
+        # Separator lines
+        if line_stripped.startswith('___') or line_stripped.startswith('==='):
+            print(f"  ✗ Line {i}: End of BULLETS section (separator line)")
+            break
+
+        # All caps section headers (but not CATEGORY markers or JP MORGAN related)
+        if line_stripped.isupper() and len(line_stripped) > 15:
+            if not any(keyword in upper_line for keyword in ['JP MORGAN', 'JPMORGAN', 'CHASE', 'CATEGORY']):
+                print(f"  ✗ Line {i}: End of BULLETS section (section header): '{line_stripped}'")
+                break
+
+        # If we get here, this should be a bullet
+        # Validate it's substantial text (bullets are detailed paragraphs)
+        if len(line_stripped) > 40:
+            bullets.append({
+                'id': len(bullets),  # 0-indexed
+                'number': len(bullets) + 1,  # 1-indexed for display
+                'text': line_stripped,
+                'category': current_category
+            })
+            print(f"  ✓ Line {i}: Added bullet #{len(bullets)} ({current_category})")
+        else:
+            print(f"  ⚠ Line {i}: Skipped (too short, {len(line_stripped)} chars): '{line_stripped}'")
+
+    print(f"\n=== TOTAL BULLETS FOUND: {len(bullets)} ===")
+    print(f"Expected: 66 bullets")
+
+    if len(bullets) > 0:
+        # Show category breakdown
+        category_counts = {}
+        for bullet in bullets:
+            cat = bullet['category']
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+
+        print("\n=== CATEGORY BREAKDOWN ===")
+        for cat, count in category_counts.items():
+            print(f"  {cat}: {count} bullets")
+    print()
+
+    return bullets
+
+
+def create_cv_customization_session(user_id, analysis_id, job_title, job_company):
+    """Create a new CV customization session"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                INSERT INTO cv_customization_sessions
+                (user_id, analysis_id, job_title, job_company, status)
+                VALUES (:user_id, :analysis_id, :job_title, :job_company, 'in_progress')
+                RETURNING id
+            """), {
+                "user_id": user_id,
+                "analysis_id": analysis_id,
+                "job_title": job_title,
+                "job_company": job_company
+            })
+
+            session_id = result.fetchone()[0]
+            conn.commit()
+            return session_id
+
+    except Exception as e:
+        print(f"Error creating CV customization session: {e}")
+        return None
+
+
+def get_cv_session(session_id):
+    """Get CV customization session data"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, user_id, analysis_id, job_title, job_company,
+                       selected_headline, bullet_analysis, approved_bullets, new_bullets,
+                       match_score_progression, status, created_at
+                FROM cv_customization_sessions
+                WHERE id = :session_id
+            """), {"session_id": session_id})
+
+            row = result.fetchone()
+            if row:
+                # Parse JSON fields
+                approved_bullets = row[7]
+                if isinstance(approved_bullets, str):
+                    approved_bullets = json.loads(approved_bullets) if approved_bullets else []
+                elif approved_bullets is None:
+                    approved_bullets = []
+
+                new_bullets = row[8]
+                if isinstance(new_bullets, str):
+                    new_bullets = json.loads(new_bullets) if new_bullets else []
+                elif new_bullets is None:
+                    new_bullets = []
+
+                match_score = row[9]
+                if isinstance(match_score, str):
+                    match_score = json.loads(match_score) if match_score else {}
+                elif match_score is None:
+                    match_score = {}
+
+                return {
+                    'id': row[0],
+                    'user_id': row[1],
+                    'analysis_id': row[2],
+                    'job_title': row[3],
+                    'job_company': row[4],
+                    'selected_headline': row[5],
+                    'bullet_analysis': row[6],
+                    'approved_bullets': approved_bullets,
+                    'new_bullets': new_bullets,
+                    'match_score_progression': match_score,
+                    'status': row[10],
+                    'created_at': row[11]
+                }
+            return None
+
+    except Exception as e:
+        print(f"Error getting CV session: {e}")
+        return None
+
+
+def get_cv_session_by_analysis(analysis_id, user_id):
+    """Get CV customization session by analysis_id and user_id"""
+    engine = get_db_connection()
+    if not engine:
+        return None
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id, user_id, analysis_id, job_title, job_company,
+                       selected_headline, bullet_analysis, approved_bullets, new_bullets,
+                       match_score_progression, status, created_at
+                FROM cv_customization_sessions
+                WHERE analysis_id = :analysis_id AND user_id = :user_id
+                ORDER BY created_at DESC
+                LIMIT 1
+            """), {"analysis_id": analysis_id, "user_id": user_id})
+
+            row = result.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'user_id': row[1],
+                    'analysis_id': row[2],
+                    'job_title': row[3],
+                    'job_company': row[4],
+                    'selected_headline': row[5],
+                    'bullet_analysis': row[6],
+                    'approved_bullets': row[7] if row[7] else [],
+                    'new_bullets': row[8] if row[8] else [],
+                    'match_score_progression': row[9] if row[9] else {},
+                    'status': row[10],
+                    'created_at': row[11]
+                }
+            return None
+
+    except Exception as e:
+        print(f"Error getting CV session by analysis: {e}")
+        return None
+
+
+def update_cv_session_headline(session_id, headline_text):
+    """Update selected headline in CV session"""
+    engine = get_db_connection()
+    if not engine:
+        return False
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                UPDATE cv_customization_sessions
+                SET selected_headline = :headline, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """), {"session_id": session_id, "headline": headline_text})
+            conn.commit()
+            return True
+
+    except Exception as e:
+        print(f"Error updating headline: {e}")
+        return False
+
+
+def update_cv_session_bullet_analysis(session_id, bullet_analysis):
+    """Save bullet analysis to avoid re-running AI"""
+    engine = get_db_connection()
+    if not engine:
+        return False
+
+    try:
+        with engine.connect() as conn:
+            import json
+            conn.execute(text("""
+                UPDATE cv_customization_sessions
+                SET bullet_analysis = :analysis, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """), {"session_id": session_id, "analysis": json.dumps(bullet_analysis)})
+            conn.commit()
+            return True
+
+    except Exception as e:
+        print(f"Error updating bullet analysis: {e}")
+        return False
+
+
+def update_cv_session_approved_bullets(session_id, approved_bullets):
+    """Save approved bullets"""
+    engine = get_db_connection()
+    if not engine:
+        return False
+
+    try:
+        with engine.connect() as conn:
+            import json
+            conn.execute(text("""
+                UPDATE cv_customization_sessions
+                SET approved_bullets = :bullets, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """), {"session_id": session_id, "bullets": json.dumps(approved_bullets)})
+            conn.commit()
+            return True
+
+    except Exception as e:
+        print(f"Error updating approved bullets: {e}")
+        return False
+
+
+def analyze_headlines_with_ai(headlines, job_description, user_id):
+    """Use AI to analyze headlines and recommend best one"""
+    client = get_anthropic_client()
+
+    # Get user's system prompt
+    system_prompt = get_user_system_prompt(user_id)
+
+    # Build headlines list for prompt
+    headlines_text = "\n".join([f"{i+1}. {h['text']}" for i, h in enumerate(headlines)])
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=2000,
+            temperature=0.3,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""You are helping a job seeker select the best resume headline to maximize their interview chances for this role.
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**AVAILABLE HEADLINE OPTIONS:**
+{headlines_text}
+
+**YOUR TASK:**
+Analyze each headline and:
+1. Identify which headline best aligns with the JD requirements
+2. Explain why it's the best match (3-4 specific reasons tied to JD)
+3. Calculate a match score (0-100) for the top 3 headlines
+4. Suggest if the best headline needs any adaptations for this specific role
+
+Return your analysis as JSON:
+{{
+    "recommended_headline_index": 2,
+    "top_3": [
+        {{
+            "index": 2,
+            "match_score": 85,
+            "reasons": [
+                "Emphasizes AI innovation which matches JD requirement for AI-driven initiatives",
+                "Leadership positioning aligns with transformation lead role",
+                "Financial services background directly relevant"
+            ],
+            "suggested_adaptation": null
+        }},
+        {{
+            "index": 4,
+            "match_score": 78,
+            "reasons": ["...", "...", "..."],
+            "suggested_adaptation": "Change 'Program Manager' to 'Transformation Lead' to match job title"
+        }},
+        {{
+            "index": 13,
+            "match_score": 72,
+            "reasons": ["...", "...", "..."],
+            "suggested_adaptation": null
+        }}
+    ],
+    "other_headlines": [
+        {{
+            "index": 1,
+            "match_score": 45,
+            "weakness": "Too focused on risk/compliance, doesn't emphasize transformation"
+        }},
+        ...
+    ]
+}}
+
+Be strategic and honest about which headlines will maximize interview chances."""
+                }
+            ]
+        )
+
+        response_text = message.content[0].text
+
+        # Extract JSON from response
+        import re
+        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if json_match:
+            analysis = json.loads(json_match.group())
+            return analysis
+
+        return None
+
+    except Exception as e:
+        print(f"Error analyzing headlines with AI: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def analyze_bullets_with_ai(bullets, job_description, user_id):
+    """Use AI to analyze bullets and recommend top 8-10 for this role
+
+    Returns analysis with:
+    - Top 8-10 recommended bullets with match scores
+    - For each: status (ready_to_use or needs_rewriting) + suggestions
+    - Gap analysis: what's missing from bullets vs JD requirements
+    - 2-3 suggested new bullets to fill gaps
+    """
+    client = get_anthropic_client()
+    system_prompt = get_user_system_prompt(user_id)
+
+    # Group bullets by category for better context
+    bullets_by_category = {}
+    for bullet in bullets:
+        cat = bullet['category']
+        if cat not in bullets_by_category:
+            bullets_by_category[cat] = []
+        bullets_by_category[cat].append(bullet)
+
+    # Build bullets text organized by category
+    bullets_text = ""
+    for category, cat_bullets in bullets_by_category.items():
+        bullets_text += f"\n**{category}:**\n"
+        for bullet in cat_bullets:
+            bullets_text += f"{bullet['number']}. {bullet['text']}\n"
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4000,
+            temperature=0.3,
+            system=[
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""You are helping a job seeker select the most impactful resume bullets to maximize interview chances for this role.
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**AVAILABLE BULLETS (66 total, organized by category):**
+{bullets_text}
+
+**YOUR TASK:**
+1. **Score all bullets (0-100)** based on relevance to JD requirements
+2. **Select top 8-10 bullets** that:
+   - Best demonstrate required skills/experience
+   - Show quantifiable impact matching JD priorities
+   - Cover diverse aspects of the role (not all from one category)
+   - Tell a compelling story about candidate's fit
+
+3. **CRITICAL: Order bullets by priority** - Return bullets in descending order by match_score (highest first)
+   - First bullet should be the strongest match (highest score)
+   - This ensures recruiters see most relevant experience first
+
+4. **For each top bullet**, determine:
+   - **ready_to_use**: bullet is perfect as-is, use directly
+   - **needs_rewriting**: bullet is relevant but needs adaptation
+     - If needs rewriting, provide specific rewrite suggestion
+
+4. **Gap Analysis**: Identify 2-3 JD requirements NOT well-covered by existing bullets
+
+5. **Suggest 2-3 new bullets** to fill those gaps (write complete bullet text)
+
+**Return JSON in this exact format:**
+{{
+    "recommended_bullets": [
+        {{
+            "bullet_number": 46,
+            "category": "Portfolio Scale & Governance Oversight",
+            "original_text": "Scaled AI Governance Oversight by 63%...",
+            "match_score": 95,
+            "status": "ready_to_use",
+            "reasons": [
+                "Directly demonstrates portfolio management scale required in JD",
+                "Shows 63% growth metric that proves impact",
+                "Governance oversight aligns with compliance focus"
+            ],
+            "rewrite_suggestion": null
+        }},
+        {{
+            "bullet_number": 60,
+            "category": "LLM Innovation",
+            "original_text": "Pioneered LLM-powered solution...",
+            "match_score": 88,
+            "status": "needs_rewriting",
+            "reasons": [
+                "LLM innovation matches AI transformation focus in JD",
+                "Shows hands-on technical implementation experience"
+            ],
+            "rewrite_suggestion": "Pioneered LLM-powered automation solution using ChatGPT to transform manual workflows into comprehensive documentation, reducing manual effort by 5-10 hours per procedure—demonstrating AI transformation impact aligned with [Company]'s AI-first strategy"
+        }},
+        ... (8-10 total)
+    ],
+    "gaps": [
+        "JD emphasizes stakeholder communication at C-suite level - existing bullets show stakeholder mgmt but could strengthen executive influence",
+        "JD requires experience with [specific tool/framework] not explicitly mentioned in bullets",
+        "JD wants change management leadership - only 1 bullet covers this"
+    ],
+    "suggested_new_bullets": [
+        "Led C-suite stakeholder alignment across 5 business units for AI governance framework adoption, securing executive sponsorship and $2M budget approval through compelling ROI presentations that translated technical requirements into business value",
+        "Drove organization-wide change management for new AI compliance standards affecting 200+ team members across Operations and Technology, designing training curriculum and achieving 95% adoption within 3 months"
+    ]
+}}
+
+**Important:**
+- Be strategic: select bullets that show DIVERSE skills, not all from one category
+- Prioritize bullets with metrics/quantifiable impact
+- For "needs_rewriting", give SPECIFIC rewrites that incorporate JD keywords naturally
+- New bullets should fill real gaps, not just restate existing bullets
+- Match scores should reflect true JD alignment (be honest, not inflated)"""
+                }
+            ]
+        )
+
+        # Parse JSON response
+        import json
+        response_text = message.content[0].text
+
+        # Extract JSON from response (handle markdown code blocks)
+        if "```json" in response_text:
+            json_start = response_text.find("```json") + 7
+            json_end = response_text.find("```", json_start)
+            response_text = response_text[json_start:json_end].strip()
+        elif "```" in response_text:
+            json_start = response_text.find("```") + 3
+            json_end = response_text.find("```", json_start)
+            response_text = response_text[json_start:json_end].strip()
+
+        analysis = json.loads(response_text)
+
+        # IMPORTANT: Sort bullets by match_score (highest first) to ensure priority ordering
+        # This catches recruiter's eye with strongest matches first
+        if 'recommended_bullets' in analysis:
+            analysis['recommended_bullets'] = sorted(
+                analysis['recommended_bullets'],
+                key=lambda x: x.get('match_score', 0),
+                reverse=True
+            )
+            print(f"✓ Bullet analysis complete: {len(analysis.get('recommended_bullets', []))} bullets recommended")
+            print(f"  Sorted by priority - Top match score: {analysis['recommended_bullets'][0].get('match_score', 0)}%")
+        else:
+            print(f"✓ Bullet analysis complete")
+
+        print(f"  Gaps identified: {len(analysis.get('gaps', []))}")
+        print(f"  New bullets suggested: {len(analysis.get('suggested_new_bullets', []))}")
+
+        return analysis
+
+    except Exception as e:
+        print(f"Error analyzing bullets with AI: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def generate_interview_questions(job_description, cv_bullets, selected_headline, user_id):
+    """
+    Generate 8 interview questions based on CV and job description
+    Returns list of question objects
+    """
+    client = get_anthropic_client()
+
+    # Format bullets for prompt
+    bullets_text = "\n".join([f"• {bullet}" for bullet in cv_bullets])
+
+    system_prompt = """You are an expert technical interviewer at a top-tier company.
+
+GENERATE 8 realistic interview questions that test if the candidate can explain their resume.
+
+QUESTION STRATEGY:
+- Questions 1-6: About specific CV bullets (test depth, trade-offs, decisions)
+- Questions 7-8: Behavioral questions mapped to their experience
+
+QUALITY REQUIREMENTS:
+- SPECIFIC to their resume (reference actual achievements/metrics)
+- PROGRESSIVE DIFFICULTY (start broad, get deeper)
+- TEST TRADE-OFFS and decision-making ("Why did you choose X over Y?")
+- PROBE OWNERSHIP (distinguish "I did" vs "we did")
+
+OUTPUT: Return ONLY a JSON array, no markdown fences:
+[
+  {
+    "question_number": 1,
+    "question_text": "...",
+    "type": "cv_bullet",
+    "bullet_reference": "..."
+  },
+  ...
+]"""
+
+    user_prompt = f"""Generate 8 interview questions for this candidate.
+
+**CANDIDATE'S HEADLINE:**
+{selected_headline}
+
+**CANDIDATE'S KEY EXPERIENCE:**
+{bullets_text}
+
+**JOB DESCRIPTION:**
+{job_description}
+
+Generate questions that probe:
+- Technical depth (not just what they did, but HOW and WHY)
+- Problem-solving approach
+- Ownership and impact
+- Relevant skills from the JD
+
+Return JSON array only (no markdown)."""
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=2048,
+            temperature=0.3,
+            system=[{
+                "type": "text",
+                "text": system_prompt
+            }],
+            messages=[{
+                "role": "user",
+                "content": user_prompt
+            }]
+        )
+
+        response_text = message.content[0].text.strip()
+
+        # Clean up JSON response (remove markdown fences if present)
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+
+        questions = json.loads(response_text.strip())
+
+        print(f"✓ Generated {len(questions)} interview questions")
+        return questions
+
+    except Exception as e:
+        print(f"Error generating interview questions: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def evaluate_interview_answer(question_text, user_answer, job_description, cv_bullets):
+    """
+    Evaluate a single interview answer
+    Returns evaluation with scores and feedback
+    """
+    client = get_anthropic_client()
+
+    bullets_text = "\n".join([f"• {bullet}" for bullet in cv_bullets])
+
+    system_prompt = """You are a senior recruiter evaluating interview answers.
+
+EVALUATE on 4 dimensions (1-5 scale):
+1. **Details** - Concrete specifics (metrics, names, numbers, tools)
+2. **Organization** - Clear STAR format (Situation, Task, Action, Result)
+3. **Analysis** - Explains WHY, trade-offs, alternatives considered
+4. **Ownership** - Clear "I did X" vs vague "we/team"
+
+PROVIDE:
+- Scores (1-5 each)
+- Feedback summary (2-3 sentences)
+- Strong points (2-3 bullet points)
+- Improvement areas (2-3 bullet points)
+- Better answer example (using their actual experience, not made up)
+
+OUTPUT: Return ONLY JSON, no markdown fences:
+{
+  "details_score": 1-5,
+  "organization_score": 1-5,
+  "analysis_score": 1-5,
+  "ownership_score": 1-5,
+  "feedback_summary": "...",
+  "strong_points": ["...", "..."],
+  "improvement_areas": ["...", "..."],
+  "better_answer_example": "..."
+}"""
+
+    user_prompt = f"""Evaluate this interview answer.
+
+**QUESTION:** {question_text}
+
+**CANDIDATE'S ANSWER:** {user_answer}
+
+**CONTEXT - Their CV:**
+{bullets_text}
+
+**CONTEXT - Job Requirements:**
+{job_description[:1000]}...
+
+Evaluate rigorously but fairly. Return JSON only."""
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=1536,
+            temperature=0.2,
+            system=[{
+                "type": "text",
+                "text": system_prompt
+            }],
+            messages=[{
+                "role": "user",
+                "content": user_prompt
+            }]
+        )
+
+        response_text = message.content[0].text.strip()
+
+        # Clean up JSON response
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+
+        evaluation = json.loads(response_text.strip())
+
+        # Calculate overall score (1-10 scale)
+        avg_score = (
+            evaluation['details_score'] +
+            evaluation['organization_score'] +
+            evaluation['analysis_score'] +
+            evaluation['ownership_score']
+        ) / 4.0
+
+        evaluation['overall_score'] = round(avg_score * 2, 1)  # Convert to 1-10 scale
+
+        print(f"✓ Evaluated answer: {evaluation['overall_score']}/10")
+        return evaluation
+
+    except Exception as e:
+        print(f"Error evaluating answer: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+# ==================== AI MATCH TOOL: AI INTEGRATION FUNCTIONS ====================
+
+def get_anthropic_client():
+    """Initialize Anthropic client"""
+    try:
+        import anthropic
+        api_key = os.environ.get('ANTHROPIC_API_KEY')
+        if not api_key:
+            print("ERROR: ANTHROPIC_API_KEY not found in environment variables")
+            raise Exception("ANTHROPIC_API_KEY environment variable is not set. Please add it in Railway settings.")
+        return anthropic.Anthropic(api_key=api_key)
+    except ImportError as e:
+        print(f"Anthropic library not installed: {e}")
+        raise Exception("Anthropic library not installed. Please check Railway build logs.")
+    except Exception as e:
+        print(f"Error initializing Anthropic client: {e}")
+        raise
+
+
+def get_user_system_prompt(user_id):
+    """
+    Get the active system prompt for a user.
+    Returns the custom prompt if set, otherwise the selected template prompt,
+    or falls back to the default template.
+    """
+    engine = get_db_connection()
+    if not engine:
+        # Fallback to basic prompt if no database connection
+        return """You are an expert career coach and recruiter. Analyze how well this candidate's CV matches the job description.
+Provide a match score (0-100) and detailed feedback on skills match, missing skills, and recommendations."""
+
+    try:
+        with engine.connect() as conn:
+            # First, check if user has an active preference with custom prompt
+            result = conn.execute(text("""
+                SELECT upp.custom_prompt_text, pt.prompt_text
+                FROM user_prompt_preferences upp
+                LEFT JOIN prompt_templates pt ON upp.template_id = pt.id
+                WHERE upp.user_id = :user_id AND upp.is_active = TRUE
+                ORDER BY upp.created_at DESC
+                LIMIT 1
+            """), {"user_id": user_id})
+
+            row = result.fetchone()
+
+            if row:
+                # If user has custom prompt, use it; otherwise use template
+                custom_prompt = row[0]
+                template_prompt = row[1]
+
+                if custom_prompt:
+                    return custom_prompt
+                elif template_prompt:
+                    return template_prompt
+
+            # If no user preference found, get the default template
+            default_result = conn.execute(text("""
+                SELECT prompt_text FROM prompt_templates WHERE is_default = TRUE LIMIT 1
+            """))
+
+            default_row = default_result.fetchone()
+            if default_row:
+                return default_row[0]
+
+            # Ultimate fallback (should never happen if seeding worked)
+            return """You are an expert career coach and recruiter. Analyze how well this candidate's CV matches the job description.
+Provide a match score (0-100) and detailed feedback on skills match, missing skills, and recommendations."""
+
+    except Exception as e:
+        print(f"Error getting user system prompt: {e}")
+        # Return basic fallback prompt
+        return """You are an expert career coach and recruiter. Analyze how well this candidate's CV matches the job description.
+Provide a match score (0-100) and detailed feedback on skills match, missing skills, and recommendations."""
+
+
+def extract_job_info_from_posting(job_posting):
+    """Extract job title and company from full job posting using AI"""
+    client = get_anthropic_client()
+
+    try:
+        prompt = f"""Extract the job title and company name from this job posting.
+
+JOB POSTING:
+{job_posting}
+
+Respond ONLY with valid JSON (no markdown, no code blocks). Use this exact structure:
+{{
+    "job_title": "The job title",
+    "company": "Company name"
+}}
+
+If you cannot find the company name, use "Not specified". Return ONLY the JSON object."""
+
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=200,
+            temperature=0.1,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        response_text = message.content[0].text.strip()
+
+        # Track usage
+        track_ai_usage(
+            feature_type='job_info_extraction',
+            tokens_input=message.usage.input_tokens,
+            tokens_output=message.usage.output_tokens
+        )
+
+        # Parse JSON
+        import json
+        import re
+
+        # Handle markdown code blocks
+        if response_text.startswith('```'):
+            match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', response_text, re.DOTALL)
+            if match:
+                response_text = match.group(1).strip()
+
+        job_info = json.loads(response_text)
+        return job_info['job_title'], job_info.get('company', 'Not specified')
+
+    except Exception as e:
+        print(f"Error extracting job info: {e}")
+        # Fallback: try to extract first line as title
+        lines = job_posting.strip().split('\n')
+        job_title = lines[0][:200] if lines else "Job Position"
+        return job_title, "Not specified"
+
+
+def analyze_job_match_with_ai(cv_text, job_title, job_company, job_description, user_id):
+    """Use Claude AI to analyze CV-to-job match using user's selected prompt template"""
+    # This will raise an exception if API key is not set
+    client = get_anthropic_client()
+
+    try:
+        # Get user's system prompt from their template selection
+        system_prompt = get_user_system_prompt(user_id)
+
+        # Build full prompt with CV and job details
+        prompt = f"""{system_prompt}
+
+**CANDIDATE'S CV:**
+{cv_text}
+
+**JOB DETAILS:**
+Title: {job_title}
+Company: {job_company or 'Not specified'}
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**INSTRUCTIONS:**
+Respond ONLY with valid JSON (no markdown, no code blocks, no other text). Use this exact structure:
+
+{{
+    "match_score": <integer 0-100>,
+    "skills_match": [
+        {{
+            "skill": "Skill name",
+            "evidence": "Where in CV this is demonstrated",
+            "strength": "strong|moderate|basic"
+        }}
+    ],
+    "skills_missing": [
+        {{
+            "skill": "Required skill name",
+            "importance": "required|preferred|nice-to-have",
+            "impact": "Brief explanation of gap impact"
+        }}
+    ],
+    "experience_match": [
+        "Bullet point of matching experience"
+    ],
+    "experience_gaps": [
+        "Bullet point of experience gaps"
+    ],
+    "recommendations": [
+        {{
+            "priority": "high|medium|low",
+            "recommendation": "Specific actionable advice"
+        }}
+    ],
+    "overall_assessment": "2-3 sentence summary of candidacy strength"
+}}
+
+IMPORTANT: Return ONLY the JSON object above. No explanations, no markdown formatting, just pure JSON. Be honest and objective."""
+
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4000,
+            temperature=0.3,
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        response_text = message.content[0].text
+
+        # Track usage
+        track_ai_usage(
+            feature_type='job_match_analysis',
+            tokens_input=message.usage.input_tokens,
+            tokens_output=message.usage.output_tokens
+        )
+
+        # Parse JSON response
+        import json
+        import re
+
+        # Extract JSON from response (handle markdown code blocks)
+        json_text = response_text.strip()
+
+        # Check if response is wrapped in markdown code blocks
+        if json_text.startswith('```'):
+            # Extract JSON from markdown code block
+            match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', json_text, re.DOTALL)
+            if match:
+                json_text = match.group(1).strip()
+
+        try:
+            analysis = json.loads(json_text)
+        except json.JSONDecodeError as json_err:
+            print(f"JSON parsing error: {json_err}")
+            print(f"Raw response (first 1000 chars): {response_text[:1000]}")
+            # Return more helpful error to user
+            raise Exception(f"AI response was not valid JSON. This might be a prompt issue. First 300 chars: {response_text[:300]}")
+
+        return analysis
+
+    except Exception as e:
+        print(f"Error analyzing job match: {e}")
+        import traceback
+        traceback.print_exc()
+        raise  # Re-raise the exception instead of returning None
+
+
+def analyze_job_match_with_master_template(template_text, job_title, job_company, job_description, user_id):
+    """
+    Use Claude AI to analyze job match using master template with PROMPT CACHING.
+    This significantly reduces API costs by caching the master resume template.
+    """
+    client = get_anthropic_client()
+
+    try:
+        # Get user's system prompt from their template selection
+        system_prompt = get_user_system_prompt(user_id)
+
+        # Build the prompt with caching - the master template is cached
+        # Reference: https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching
+
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"}  # Cache the system prompt
+                    },
+                    {
+                        "type": "text",
+                        "text": f"""**CANDIDATE'S MASTER RESUME TEMPLATE:**
+{template_text}""",
+                        "cache_control": {"type": "ephemeral"}  # Cache the master template (most important!)
+                    },
+                    {
+                        "type": "text",
+                        "text": f"""**JOB DETAILS:**
+Title: {job_title}
+Company: {job_company or 'Not specified'}
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**YOUR TASK:**
+From the master resume template above, identify which headline variations and which bullet points best match this specific job description. Provide a comprehensive match analysis.
+
+**INSTRUCTIONS:**
+Respond ONLY with valid JSON (no markdown, no code blocks, no other text). Use this exact structure:
+
+{{
+    "match_score": <integer 0-100>,
+    "skills_match": [
+        {{
+            "skill": "Skill name",
+            "evidence": "Where in resume template this is demonstrated",
+            "strength": "strong|moderate|basic"
+        }}
+    ],
+    "skills_missing": [
+        {{
+            "skill": "Required skill name",
+            "importance": "required|preferred|nice-to-have",
+            "impact": "Brief explanation of gap impact"
+        }}
+    ],
+    "experience_match": [
+        "Bullet point of matching experience from template"
+    ],
+    "experience_gaps": [
+        "Bullet point of experience gaps"
+    ],
+    "recommendations": [
+        {{
+            "priority": "high|medium|low",
+            "recommendation": "Specific actionable advice (e.g., which bullets to emphasize)"
+        }}
+    ],
+    "overall_assessment": "2-3 sentence summary of candidacy strength"
+}}
+
+IMPORTANT: Return ONLY the JSON object above. No explanations, no markdown formatting, just pure JSON. Be honest and objective."""
+                    }
+                ]
+            }
+        ]
+
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4000,
+            temperature=0.3,
+            messages=messages
+        )
+
+        response_text = message.content[0].text
+
+        # Track usage (prompt caching will show reduced costs!)
+        track_ai_usage(
+            feature_type='job_match_analysis_cached',
+            tokens_input=message.usage.input_tokens,
+            tokens_output=message.usage.output_tokens
+        )
+
+        # Log cache performance for monitoring
+        if hasattr(message.usage, 'cache_creation_input_tokens'):
+            print(f"📊 Cache stats - Creation: {message.usage.cache_creation_input_tokens}, "
+                  f"Read: {getattr(message.usage, 'cache_read_input_tokens', 0)}, "
+                  f"Regular: {message.usage.input_tokens}")
+
+        # Parse JSON response
+        import json
+        import re
+
+        # Extract JSON from response (handle markdown code blocks)
+        json_text = response_text.strip()
+
+        # Check if response is wrapped in markdown code blocks
+        if json_text.startswith('```'):
+            # Extract JSON from markdown code block
+            match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', json_text, re.DOTALL)
+            if match:
+                json_text = match.group(1).strip()
+
+        try:
+            analysis = json.loads(json_text)
+        except json.JSONDecodeError as json_err:
+            print(f"JSON parsing error: {json_err}")
+            print(f"Raw response (first 1000 chars): {response_text[:1000]}")
+            # Return more helpful error to user
+            raise Exception(f"AI response was not valid JSON. This might be a prompt issue. First 300 chars: {response_text[:300]}")
+
+        return analysis
+
+    except Exception as e:
+        print(f"Error analyzing job match with master template: {e}")
+        import traceback
+        traceback.print_exc()
+        raise  # Re-raise the exception instead of returning None
+
+
+def track_ai_usage(feature_type, tokens_input, tokens_output):
+    """Track AI API usage for cost monitoring"""
+    user_id = get_current_user_id()
+    if not user_id:
+        return
+
+    engine = get_db_connection()
+    if not engine:
+        return
+
+    try:
+        # Calculate estimated cost (Claude 3.5 Sonnet pricing)
+        # Input: $3 per million tokens, Output: $15 per million tokens
+        cost_input = (tokens_input / 1_000_000) * 3.0
+        cost_output = (tokens_output / 1_000_000) * 15.0
+        total_cost = cost_input + cost_output
+
+        with engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO ai_usage_tracking
+                (user_id, feature_type, tokens_input, tokens_output, estimated_cost)
+                VALUES (:user_id, :feature_type, :tokens_input, :tokens_output, :estimated_cost)
+            """), {
+                "user_id": user_id,
+                "feature_type": feature_type,
+                "tokens_input": tokens_input,
+                "tokens_output": tokens_output,
+                "estimated_cost": total_cost
+            })
+            conn.commit()
+    except Exception as e:
+        print(f"Error tracking AI usage: {e}")
+
+
+def save_job_analysis(user_id, cv_id, job_title, job_company, job_description, analysis_result):
+    """Save job matching analysis to database"""
+    print(f"\n{'='*60}")
+    print(f"SAVE_JOB_ANALYSIS CALLED")
+    print(f"{'='*60}")
+    print(f"user_id: {user_id}")
+    print(f"cv_id: {cv_id}")
+    print(f"job_title: {job_title}")
+    print(f"job_company: {job_company}")
+    print(f"job_description length: {len(job_description) if job_description else 0}")
+    print(f"match_score: {analysis_result.get('match_score')}")
+
+    engine = get_db_connection()
+    if not engine:
+        print("ERROR: No database connection")
+        return None
+
+    try:
+        import json
+
+        with engine.connect() as conn:
+            print("\nExecuting INSERT query...")
+            result = conn.execute(text("""
+                INSERT INTO job_analyses
+                (user_id, cv_id, job_title, job_company, job_description,
+                 match_score, skills_match, skills_missing, recommendations, full_analysis)
+                VALUES
+                (:user_id, :cv_id, :job_title, :job_company, :job_description,
+                 :match_score, :skills_match, :skills_missing, :recommendations, :full_analysis)
+                RETURNING id
+            """), {
+                "user_id": user_id,
+                "cv_id": cv_id,
+                "job_title": job_title,
+                "job_company": job_company or '',
+                "job_description": job_description,
+                "match_score": analysis_result.get('match_score'),
+                "skills_match": json.dumps(analysis_result.get('skills_match', [])),
+                "skills_missing": json.dumps(analysis_result.get('skills_missing', [])),
+                "recommendations": json.dumps(analysis_result.get('recommendations', [])),
+                "full_analysis": json.dumps(analysis_result)
+            })
+
+            row = result.fetchone()
+            print(f"Fetched row: {row}")
+
+            if not row:
+                print("ERROR: No row returned from INSERT")
+                return None
+
+            analysis_id = row[0]
+            print(f"Analysis ID from INSERT: {analysis_id} (type: {type(analysis_id)})")
+
+            print("Committing transaction...")
+            conn.commit()
+            print(f"Transaction committed successfully")
+
+            # VERIFY the record was actually saved
+            print(f"Verifying record with ID {analysis_id} exists...")
+            verify = conn.execute(text("SELECT id, job_title, match_score FROM job_analyses WHERE id = :id"), {"id": analysis_id})
+            verify_row = verify.fetchone()
+            if verify_row:
+                print(f"✓ Verification successful: ID={verify_row[0]}, Title={verify_row[1]}, Score={verify_row[2]}")
+            else:
+                print(f"✗ WARNING: Record not found after commit!")
+
+            print(f"Returning analysis_id: {analysis_id}")
+            print(f"{'='*60}\n")
+            return analysis_id
+    except Exception as e:
+        print(f"ERROR in save_job_analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def get_user_analyses(user_id, limit=10):
+    """Get recent job analyses for a user"""
+    engine = get_db_connection()
+    if not engine:
+        return []
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT ja.id, ja.job_title, ja.job_company, ja.match_score,
+                       ja.created_at, cv.cv_name
+                FROM job_analyses ja
+                LEFT JOIN user_cvs cv ON ja.cv_id = cv.id
+                WHERE ja.user_id = :user_id
+                ORDER BY ja.created_at DESC
+                LIMIT :limit
+            """), {"user_id": user_id, "limit": limit})
+
+            analyses = []
+            for row in result:
+                analyses.append({
+                    'id': row[0],
+                    'job_title': row[1],
+                    'job_company': row[2],
+                    'match_score': row[3],
+                    'created_at': row[4],
+                    'cv_name': row[5] if row[5] else 'Master Template'
+                })
+            return analyses
+    except Exception as e:
+        print(f"Error getting user analyses: {e}")
+        return []
+
+
+def get_analysis_by_id(analysis_id, user_id):
+    """Get full analysis details by ID"""
+    print(f"\n{'='*60}")
+    print(f"GET_ANALYSIS_BY_ID CALLED")
+    print(f"{'='*60}")
+    print(f"Requested analysis_id: {analysis_id} (type: {type(analysis_id)})")
+    print(f"user_id: {user_id}")
+
+    engine = get_db_connection()
+    if not engine:
+        print("ERROR: No database connection")
+        return None
+
+    try:
+        with engine.connect() as conn:
+            # First, check if analysis exists at all (without user_id filter)
+            print("\nChecking if analysis exists (without user filter)...")
+            check = conn.execute(text("SELECT id, user_id FROM job_analyses WHERE id = :id"), {"id": analysis_id})
+            check_row = check.fetchone()
+            if check_row:
+                print(f"✓ Found analysis: ID={check_row[0]}, user_id={check_row[1]}")
+            else:
+                print(f"✗ No analysis found with ID={analysis_id} in database")
+
+            print(f"\nExecuting main query with user_id filter...")
+            result = conn.execute(text("""
+                SELECT ja.id, ja.job_title, ja.job_company, ja.job_description,
+                       ja.match_score, ja.skills_match, ja.skills_missing,
+                       ja.recommendations, ja.full_analysis, ja.created_at,
+                       cv.cv_name
+                FROM job_analyses ja
+                LEFT JOIN user_cvs cv ON ja.cv_id = cv.id
+                WHERE ja.id = :analysis_id AND ja.user_id = :user_id
+            """), {"analysis_id": analysis_id, "user_id": user_id})
+
+            row = result.fetchone()
+            if not row:
+                print(f"✗ No row returned from query")
+                print(f"  Possible reasons:")
+                print(f"  1. Analysis ID {analysis_id} doesn't exist")
+                print(f"  2. Analysis doesn't belong to user {user_id}")
+                print(f"{'='*60}\n")
+                return None
+
+            print(f"✓ Row found:")
+            print(f"  ID: {row[0]}")
+            print(f"  Title: {row[1]}")
+            print(f"  Company: {row[2]}")
+            print(f"  Match Score: {row[4]}")
+            print(f"  CV Name: {row[10] if row[10] else 'Master Template'}")
+
+            import json
+
+            # Parse recommendations if it's a JSON string (TEXT column)
+            recommendations_data = row[7] if row[7] else []
+            if isinstance(recommendations_data, str):
+                try:
+                    recommendations_data = json.loads(recommendations_data)
+                except (json.JSONDecodeError, TypeError):
+                    recommendations_data = []
+
+            analysis_data = {
+                'id': row[0],
+                'job_title': row[1],
+                'job_company': row[2],
+                'job_description': row[3],
+                'match_score': row[4],
+                'skills_match': row[5] if row[5] else [],  # Already deserialized from JSONB
+                'skills_missing': row[6] if row[6] else [],  # Already deserialized from JSONB
+                'recommendations': recommendations_data,  # Manually parsed from TEXT column
+                'full_analysis': row[8],
+                'created_at': row[9],
+                'cv_name': row[10] if row[10] else 'Master Template'
+            }
+            print(f"✓ Returning analysis data")
+            print(f"{'='*60}\n")
+            return analysis_data
+    except Exception as e:
+        print(f"ERROR in get_analysis_by_id: {e}")
+        import traceback
+        traceback.print_exc()
+        print(f"{'='*60}\n")
+        return None
+
+
+def delete_analysis_by_id(analysis_id, user_id):
+    """Delete an analysis by ID"""
+    engine = get_db_connection()
+    if not engine:
+        return False
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                DELETE FROM job_analyses
+                WHERE id = :analysis_id AND user_id = :user_id
+                RETURNING job_title
+            """), {"analysis_id": analysis_id, "user_id": user_id})
+
+            deleted = result.fetchone()
+            conn.commit()
+
+            return deleted is not None
+    except Exception as e:
+        print(f"Error deleting analysis: {e}")
+        return False
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-for-development')
@@ -1026,9 +3501,9 @@ def render_template_with_admin(template_name, **kwargs):
     
 @app.route("/")
 def root():
-    # If user is logged in, go to main app
+    # If user is logged in, go to AI Match Tool (main feature)
     if get_current_user_id():
-        return redirect("/app")
+        return redirect("/ai-match")
     else:
         # New visitor sees landing page
         return render_template("landing-page.html")
@@ -2595,7 +5070,7 @@ def test_gmail_direct():
     except Exception as e:
         logger.error(f"❌ Gmail SMTP test failed: {e}")
         return f"Gmail test failed: {e}"
-        
+
 @app.route("/admin/delete-bots")
 def delete_bot_accounts():
     """One-time route to delete known bot/spam accounts. Only callable by the app owner (user id 3)."""
@@ -2636,6 +5111,1839 @@ def delete_bot_accounts():
         return "<pre>Bot cleanup complete:\n\n" + "\n".join(results) + "</pre>"
     except Exception as e:
         return f"Error during cleanup: {e}", 500
+
+
+# ==================== AI MATCH TOOL ROUTES ====================
+
+@app.route("/ai-match", methods=["GET", "POST"])
+def ai_match():
+    """AI Match Tool main page"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    user_id = session['user_id']
+    username = session.get('username', 'User')
+
+    # Get user's CVs
+    user_cvs = get_user_cvs(user_id)
+
+    # Get recent analyses
+    recent_analyses = get_user_analyses(user_id, limit=5)
+
+    # Check if user has a master template
+    master_template = get_user_master_template(user_id)
+    has_master_template = master_template is not None
+
+    return render_template('ai_match.html',
+                         username=username,
+                         user_cvs=user_cvs,
+                         recent_analyses=recent_analyses,
+                         has_master_template=has_master_template)
+
+
+@app.route("/upload-cv", methods=["POST"])
+def upload_cv():
+    """Handle CV upload"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        # Get uploaded file
+        if 'cv_file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['cv_file']
+        cv_name = request.form.get('cv_name', file.filename)
+
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Validate file type
+        allowed_extensions = {'pdf', 'docx', 'doc'}
+        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+
+        if file_ext not in allowed_extensions:
+            return jsonify({'error': 'Invalid file type. Only PDF and DOCX allowed'}), 400
+
+        # Read file data
+        file_data = file.read()
+
+        # Check file size (max 5MB)
+        if len(file_data) > 5 * 1024 * 1024:
+            return jsonify({'error': 'File too large. Maximum size is 5MB'}), 400
+
+        # Extract text from CV
+        extracted_text = parse_cv(file_data, file_ext)
+
+        if not extracted_text or not extracted_text.strip():
+            return jsonify({'error': 'CV appears to be empty or text extraction failed'}), 400
+
+        # Save to database
+        cv_id = save_cv_to_db(user_id, cv_name, file_data, file_ext, extracted_text)
+
+        if not cv_id:
+            return jsonify({'error': 'Failed to save CV'}), 500
+
+        log_user_activity('cv_upload', f'Uploaded CV: {cv_name}')
+
+        return jsonify({
+            'success': True,
+            'cv_id': cv_id,
+            'cv_name': cv_name,
+            'message': 'CV uploaded successfully'
+        })
+
+    except Exception as e:
+        print(f"Error uploading CV: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Upload error: {str(e)}'}), 500
+
+
+@app.route("/my-resume-template", methods=["GET"])
+def my_resume_template():
+    """Display master resume template management page"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    # Get user's current master template
+    master_template = get_user_master_template(user_id)
+
+    return render_template('my_resume_template.html',
+                         master_template=master_template)
+
+
+@app.route("/upload-master-template", methods=["POST"])
+def upload_master_template():
+    """Handle master resume template upload"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        # Get uploaded file
+        if 'template_file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['template_file']
+
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Validate file type - only .docx allowed
+        file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+
+        if file_ext != 'docx':
+            return jsonify({'error': 'Invalid file type. Only .docx files are allowed'}), 400
+
+        # Read file data
+        file_data = file.read()
+
+        # Check file size (max 2MB for templates)
+        if len(file_data) > 2 * 1024 * 1024:
+            return jsonify({'error': 'File too large. Maximum size is 2MB'}), 400
+
+        # Extract text from docx
+        extracted_text = extract_text_from_docx(file_data)
+
+        if not extracted_text or not extracted_text.strip():
+            return jsonify({'error': 'Template appears to be empty or text extraction failed'}), 400
+
+        # Save to database
+        template_id = save_master_template(user_id, extracted_text, file.filename)
+
+        if not template_id:
+            return jsonify({'error': 'Failed to save template'}), 500
+
+        log_user_activity('master_template_upload', f'Uploaded master template: {file.filename}')
+
+        return jsonify({
+            'success': True,
+            'template_id': template_id,
+            'message': 'Master template uploaded successfully'
+        })
+
+    except Exception as e:
+        print(f"Error uploading master template: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Upload error: {str(e)}'}), 500
+
+
+@app.route("/analyze-match", methods=["POST"])
+def analyze_match():
+    """Analyze job match using AI"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.get_json()
+
+        cv_id = data.get('cv_id')
+        job_posting = data.get('job_posting')
+
+        # Validate inputs
+        if not cv_id or not job_posting:
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Get CV
+        cv_data = get_cv_by_id(cv_id, user_id)
+        if not cv_data:
+            return jsonify({'error': 'CV not found'}), 404
+
+        cv_text = cv_data['extracted_text']
+
+        # Extract job title and company from posting using AI
+        job_title, job_company = extract_job_info_from_posting(job_posting)
+
+        # Analyze with AI using user's selected prompt template (this will raise exception if it fails)
+        analysis_result = analyze_job_match_with_ai(
+            cv_text,
+            job_title,
+            job_company,
+            job_posting,
+            user_id
+        )
+
+        # Save analysis to database
+        analysis_id = save_job_analysis(
+            user_id,
+            cv_id,
+            job_title,
+            job_company,
+            job_posting,
+            analysis_result
+        )
+
+        log_user_activity('job_match_analysis', f'Analyzed: {job_title}')
+
+        return jsonify({
+            'success': True,
+            'analysis_id': analysis_id,
+            'analysis': analysis_result
+        })
+
+    except Exception as e:
+        print(f"Error analyzing match: {e}")
+        import traceback
+        traceback.print_exc()
+        error_msg = str(e)
+        # Check for common API errors
+        if "api_key" in error_msg.lower() or "anthropic_api_key" in error_msg.lower():
+            error_msg = "API key not configured. Please set ANTHROPIC_API_KEY environment variable in Railway."
+        elif "json" in error_msg.lower():
+            error_msg = "AI returned invalid response format. Please try again."
+        elif "anthropic" in error_msg.lower():
+            error_msg = "Anthropic API error. Check API key and try again."
+        return jsonify({'error': f'Analysis failed: {error_msg}'}), 500
+
+
+@app.route("/analyze-match-with-template", methods=["POST"])
+def analyze_match_with_template():
+    """Analyze job match using AI with master template and prompt caching"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.get_json()
+        job_posting = data.get('job_posting')
+
+        # Validate input
+        if not job_posting:
+            return jsonify({'error': 'Missing job posting'}), 400
+
+        # Get user's master template
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return jsonify({'error': 'No master template found. Please upload one first.'}), 404
+
+        template_text = master_template['template_text']
+
+        # Extract job title and company from posting using AI
+        job_title, job_company = extract_job_info_from_posting(job_posting)
+
+        # Analyze with AI using master template with caching
+        analysis_result = analyze_job_match_with_master_template(
+            template_text,
+            job_title,
+            job_company,
+            job_posting,
+            user_id
+        )
+
+        # Save analysis to database (use NULL for cv_id since we're using master template)
+        analysis_id = save_job_analysis(
+            user_id,
+            None,  # No specific CV, using master template
+            job_title,
+            job_company,
+            job_posting,
+            analysis_result
+        )
+
+        log_user_activity('job_match_analysis_cached', f'Analyzed with master template: {job_title}')
+
+        return jsonify({
+            'success': True,
+            'analysis_id': analysis_id,
+            'analysis': analysis_result
+        })
+
+    except Exception as e:
+        print(f"Error analyzing match with template: {e}")
+        import traceback
+        traceback.print_exc()
+        error_msg = str(e)
+        # Check for common API errors
+        if "api_key" in error_msg.lower() or "anthropic_api_key" in error_msg.lower():
+            error_msg = "API key not configured. Please set ANTHROPIC_API_KEY environment variable in Railway."
+        elif "json" in error_msg.lower():
+            error_msg = "AI returned invalid response format. Please try again."
+        elif "anthropic" in error_msg.lower():
+            error_msg = "Anthropic API error. Check API key and try again."
+        return jsonify({'error': f'Analysis failed: {error_msg}'}), 500
+
+
+@app.route("/delete-cv/<int:cv_id>", methods=["POST"])
+def delete_cv(cv_id):
+    """Delete a CV"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            # Verify ownership and delete
+            result = conn.execute(text("""
+                DELETE FROM user_cvs
+                WHERE id = :cv_id AND user_id = :user_id
+                RETURNING cv_name
+            """), {"cv_id": cv_id, "user_id": user_id})
+
+            deleted_cv = result.fetchone()
+            conn.commit()
+
+            if not deleted_cv:
+                return jsonify({'error': 'CV not found'}), 404
+
+            log_user_activity('cv_delete', f'Deleted CV: {deleted_cv[0]}')
+
+            return jsonify({'success': True, 'message': 'CV deleted'})
+
+    except Exception as e:
+        print(f"Error deleting CV: {e}")
+        return jsonify({'error': 'Failed to delete CV'}), 500
+
+
+@app.route("/debug-analyses", methods=["GET"])
+def debug_analyses():
+    """Debug endpoint to see raw database state"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+    engine = get_db_connection()
+    if not engine:
+        return jsonify({'error': 'Database error'}), 500
+
+    try:
+        with engine.connect() as conn:
+            # Get all analyses for this user
+            analyses_result = conn.execute(text("""
+                SELECT id, cv_id, job_title, job_company, match_score, created_at
+                FROM job_analyses
+                WHERE user_id = :user_id
+                ORDER BY created_at DESC
+                LIMIT 10
+            """), {"user_id": user_id})
+
+            analyses = []
+            for row in analyses_result:
+                analyses.append({
+                    'id': row[0],
+                    'cv_id': row[1],
+                    'job_title': row[2],
+                    'job_company': row[3],
+                    'match_score': row[4],
+                    'created_at': str(row[5])
+                })
+
+            # Get all CVs for this user
+            cvs_result = conn.execute(text("""
+                SELECT id, cv_name, created_at
+                FROM user_cvs
+                WHERE user_id = :user_id
+                ORDER BY created_at DESC
+            """), {"user_id": user_id})
+
+            cvs = []
+            for row in cvs_result:
+                cvs.append({
+                    'id': row[0],
+                    'cv_name': row[1],
+                    'created_at': str(row[2])
+                })
+
+            return jsonify({
+                'user_id': user_id,
+                'analyses': analyses,
+                'cvs': cvs,
+                'analysis_count': len(analyses),
+                'cv_count': len(cvs)
+            })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ==================== CV CUSTOMIZATION ROUTES ====================
+
+@app.route("/debug-template", methods=["GET"])
+def debug_template():
+    """Debug endpoint to view master template structure"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+    master_template = get_user_master_template(user_id)
+
+    if not master_template:
+        return "No master template found", 404
+
+    lines = master_template['template_text'].split('\n')
+
+    # Build HTML output with line numbers
+    html = "<html><head><style>body{font-family:monospace;font-size:12px;} .line{padding:2px 0;} .linenum{color:#888;width:60px;display:inline-block;} .content{white-space:pre-wrap;}</style></head><body>"
+    html += f"<h2>Master Template Debug (Total lines: {len(lines)})</h2>"
+    html += "<p>Showing all lines</p>"
+
+    for i, line in enumerate(lines):  # Show ALL lines
+        # Highlight certain keywords
+        line_display = line
+        if 'JP MORGAN' in line.upper() or 'CATEGORY:' in line:
+            line_display = f'<strong style="background:yellow;">{line}</strong>'
+        elif line.strip().startswith('•'):
+            line_display = f'<span style="color:blue;">{line}</span>'
+
+        html += f'<div class="line"><span class="linenum">{i}:</span><span class="content">{line_display}</span></div>'
+
+    html += "</body></html>"
+    return html
+
+
+@app.route("/debug-bullets", methods=["GET"])
+def debug_bullets():
+    """Debug endpoint to test bullet parsing"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+    master_template = get_user_master_template(user_id)
+
+    if not master_template:
+        return "No master template found", 404
+
+    # Parse bullets
+    bullets = parse_bullets_from_template(master_template['template_text'])
+
+    # Build HTML output
+    html = """
+    <html>
+    <head>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .summary { background: #f0f0f0; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+            .category { margin-top: 30px; padding: 10px; background: #e8f4f8; border-left: 4px solid #0066cc; }
+            .bullet { margin: 10px 0; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 3px; }
+            .bullet-number { font-weight: bold; color: #0066cc; }
+            .error { color: red; font-weight: bold; }
+            .success { color: green; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <h1>Bullet Parser Debug</h1>
+    """
+
+    # Summary
+    expected = 66
+    actual = len(bullets)
+    status_class = "success" if actual == expected else "error"
+
+    html += f"""
+    <div class="summary">
+        <h2>Summary</h2>
+        <p class="{status_class}">Total bullets found: {actual} (Expected: {expected})</p>
+    """
+
+    # Category breakdown
+    category_counts = {}
+    for bullet in bullets:
+        cat = bullet['category']
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+
+    html += "<h3>Category Breakdown:</h3><ul>"
+    for cat, count in category_counts.items():
+        html += f"<li><strong>{cat}</strong>: {count} bullets</li>"
+    html += "</ul></div>"
+
+    # Show all bullets grouped by category
+    current_cat = None
+    for bullet in bullets:
+        if bullet['category'] != current_cat:
+            if current_cat is not None:
+                html += "</div>"  # Close previous category
+            current_cat = bullet['category']
+            html += f'<div class="category"><h3>Category: {current_cat}</h3>'
+
+        html += f"""
+        <div class="bullet">
+            <span class="bullet-number">Bullet #{bullet['number']}</span><br>
+            {bullet['text']}
+        </div>
+        """
+
+    if current_cat is not None:
+        html += "</div>"  # Close last category
+
+    html += "</body></html>"
+    return html
+
+
+@app.route("/customize-cv/start/<int:analysis_id>", methods=["GET"])
+def customize_cv_start(analysis_id):
+    """Entry point for CV customization - creates session and starts flow"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        # Get the analysis
+        analysis = get_analysis_by_id(analysis_id, user_id)
+        if not analysis:
+            return "Analysis not found", 404
+
+        # Get user's master template
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return redirect(f'/my-resume-template?error=no_template')
+
+        # Create CV customization session
+        cv_session_id = create_cv_customization_session(
+            user_id,
+            analysis_id,
+            analysis['job_title'],
+            analysis['job_company']
+        )
+
+        if not cv_session_id:
+            return "Failed to create customization session", 500
+
+        # Store session ID in Flask session
+        session['cv_session_id'] = cv_session_id
+
+        # Redirect to headline selection
+        return redirect('/customize-cv/headline')
+
+    except Exception as e:
+        print(f"Error starting CV customization: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error starting CV customization", 500
+
+
+@app.route("/customize-cv/resume/<int:cv_session_id>", methods=["GET"])
+def customize_cv_resume(cv_session_id):
+    """Resume an existing CV customization session"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        # Get the CV session
+        cv_session = get_cv_session(cv_session_id)
+
+        if not cv_session:
+            return redirect('/ai-match?error=session_not_found')
+
+        # Verify it belongs to this user
+        if cv_session['user_id'] != user_id:
+            return redirect('/ai-match?error=unauthorized')
+
+        # Store session ID in Flask session
+        session['cv_session_id'] = cv_session_id
+
+        # Determine which step to resume
+        if not cv_session.get('selected_headline'):
+            # No headline selected yet - go to headline step
+            return redirect('/customize-cv/headline')
+        elif not cv_session.get('approved_bullets') or len(cv_session.get('approved_bullets', [])) < 6:
+            # Headline selected but bullets incomplete - go to bullets step
+            return redirect('/customize-cv/bullets')
+        else:
+            # Everything done - go to preview
+            return redirect('/customize-cv/preview')
+
+    except Exception as e:
+        print(f"Error resuming CV customization: {e}")
+        import traceback
+        traceback.print_exc()
+        return redirect('/ai-match?error=resume_failed')
+
+
+@app.route("/customize-cv/headline", methods=["GET", "POST"])
+def customize_cv_headline():
+    """Step 1: Headline selection with AI recommendations"""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return redirect('/ai-match')
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+
+    if request.method == "POST":
+        # Save selected headline
+        data = request.json
+        selected_headline = data.get('headline')
+
+        if update_cv_session_headline(cv_session_id, selected_headline):
+            return jsonify({'success': True, 'next_step': '/customize-cv/bullets'})
+        else:
+            return jsonify({'error': 'Failed to save headline'}), 500
+
+    # GET request - show headline selection page
+    try:
+        # Get CV session data
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return "Session not found", 404
+
+        # Get analysis for job description
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return "Analysis not found", 404
+
+        # Get master template
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return "Master template not found", 404
+
+        # Parse headlines from template
+        headlines = parse_headlines_from_template(master_template['template_text'])
+
+        if not headlines:
+            return "No headlines found in master template", 400
+
+        # Analyze headlines with AI
+        ai_analysis = analyze_headlines_with_ai(
+            headlines,
+            analysis['job_description'],
+            user_id
+        )
+
+        if not ai_analysis:
+            return "Failed to analyze headlines", 500
+
+        # Combine headlines with AI analysis
+        headlines_with_analysis = []
+        for i, headline in enumerate(headlines):
+            # Find this headline in AI analysis
+            headline_analysis = None
+
+            # Check top 3
+            for top in ai_analysis.get('top_3', []):
+                if top['index'] == i:
+                    headline_analysis = {
+                        'tier': 'top',
+                        'match_score': top['match_score'],
+                        'reasons': top['reasons'],
+                        'suggested_adaptation': top.get('suggested_adaptation')
+                    }
+                    break
+
+            # Check other headlines
+            if not headline_analysis:
+                for other in ai_analysis.get('other_headlines', []):
+                    if other['index'] == i:
+                        headline_analysis = {
+                            'tier': 'other',
+                            'match_score': other['match_score'],
+                            'weakness': other.get('weakness')
+                        }
+                        break
+
+            if headline_analysis:
+                headlines_with_analysis.append({
+                    **headline,
+                    **headline_analysis
+                })
+
+        # Get recommended headline
+        recommended_index = ai_analysis.get('recommended_headline_index', 0)
+        recommended_headline = next(
+            (h for h in headlines_with_analysis if h['id'] == recommended_index),
+            headlines_with_analysis[0] if headlines_with_analysis else None
+        )
+
+        return render_template('customize_cv_headline.html',
+                             job_title=cv_session['job_title'],
+                             job_company=cv_session['job_company'],
+                             headlines=headlines_with_analysis,
+                             recommended_headline=recommended_headline,
+                             analysis_id=cv_session['analysis_id'])
+
+    except Exception as e:
+        print(f"Error in headline selection: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading headline selection", 500
+
+
+@app.route("/customize-cv/bullets", methods=["GET", "POST"])
+def customize_cv_bullets():
+    """Step 2: Bullet point selection with AI recommendations"""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return redirect('/ai-match')
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+
+    if request.method == "POST":
+        # Save approved bullets and proceed
+        # TODO: Implement bullet saving
+        return jsonify({'success': True, 'next_step': '/customize-cv/preview'})
+
+    # GET request - show bullet selection page
+    try:
+        # Get CV session data
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return "Session not found", 404
+
+        # Get analysis for job description
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return "Analysis not found", 404
+
+        # Get master template
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return "Master template not found", 404
+
+        # Parse bullets from template
+        bullets = parse_bullets_from_template(master_template['template_text'])
+
+        if not bullets:
+            return "No bullets found in master template", 400
+
+        # Check if we already have bullet analysis (to avoid re-running AI)
+        if cv_session.get('bullet_analysis'):
+            print("✓ Using saved bullet analysis (not re-running AI)")
+            ai_analysis = cv_session['bullet_analysis']
+        else:
+            print("⚙ Running AI bullet analysis...")
+            # Analyze bullets with AI
+            ai_analysis = analyze_bullets_with_ai(
+                bullets,
+                analysis['job_description'],
+                user_id
+            )
+
+            if not ai_analysis:
+                return "Failed to analyze bullets", 500
+
+            # Save analysis to avoid re-running
+            update_cv_session_bullet_analysis(cv_session_id, ai_analysis)
+            print("✓ Saved bullet analysis to database")
+
+        # Get previously approved bullets (if any)
+        approved_bullets_data = cv_session.get('approved_bullets', [])
+
+        # Render bullet selection template
+        return render_template('customize_cv_bullets.html',
+                             job_title=cv_session['job_title'],
+                             job_company=cv_session['job_company'],
+                             selected_headline=cv_session['selected_headline'],
+                             recommended_bullets=ai_analysis.get('recommended_bullets', []),
+                             gaps=ai_analysis.get('gaps', []),
+                             suggested_new_bullets=ai_analysis.get('suggested_new_bullets', []),
+                             approved_bullets_data=approved_bullets_data,
+                             analysis_id=cv_session['analysis_id'])
+
+    except Exception as e:
+        print(f"Error in bullet selection: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading bullet selection", 500
+
+
+@app.route("/customize-cv/preview", methods=["GET"])
+def customize_cv_preview():
+    """Step 3: Preview and download customized CV"""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return redirect('/ai-match')
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+
+    try:
+        # Get CV session data
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return "Session not found", 404
+
+        # Get approved bullets
+        approved_bullets_data = cv_session.get('approved_bullets', [])
+
+        if not approved_bullets_data or len(approved_bullets_data) < 6:
+            flash('Please select at least 6 bullets before previewing.', 'warning')
+            return redirect('/customize-cv/bullets')
+
+        # Render preview template
+        return render_template('customize_cv_preview.html',
+                             job_title=cv_session['job_title'],
+                             job_company=cv_session['job_company'],
+                             selected_headline=cv_session['selected_headline'],
+                             approved_bullets=approved_bullets_data,
+                             analysis_id=cv_session['analysis_id'])
+
+    except Exception as e:
+        print(f"Error in CV preview: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading preview", 500
+
+
+@app.route("/api/customize-bullet-chat", methods=["POST"])
+def customize_bullet_chat():
+    """Handle chat messages for bullet customization"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.json
+        bullet_text = data.get('bullet_text')
+        user_message = data.get('user_message')
+        chat_history = data.get('chat_history', [])
+
+        if not bullet_text or not user_message:
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        # Get CV session to access job description
+        cv_session_id = session.get('cv_session_id')
+        if not cv_session_id:
+            return jsonify({'error': 'No active CV customization session'}), 400
+
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return jsonify({'error': 'Session not found'}), 404
+
+        # Get job description
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return jsonify({'error': 'Analysis not found'}), 404
+
+        job_description = analysis['job_description']
+
+        # Build chat context from history
+        messages = []
+        for msg in chat_history:
+            if msg['role'] in ['user', 'assistant']:
+                messages.append({
+                    "role": msg['role'],
+                    "content": msg['content']
+                })
+
+        # Get AI response
+        client = get_anthropic_client()
+        system_prompt = get_user_system_prompt(user_id)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=1000,
+            temperature=0.3,
+            system=[
+                {
+                    "type": "text",
+                    "text": f"""{system_prompt}
+
+You are helping a job seeker refine their resume bullet point to better match this job description.
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**ORIGINAL BULLET:**
+{bullet_text}
+
+**YOUR ROLE:**
+- Help the user refine this bullet based on their feedback
+- When providing a refined version, return it as plain text (not JSON)
+- Keep the bullet truthful - only suggest changes that enhance existing experience
+- NEVER invent experiences or metrics the user doesn't have
+- Focus on word choice, phrasing, and highlighting relevant aspects
+- Incorporate JD keywords naturally where appropriate
+
+**IMPORTANT:**
+If you provide a refined bullet in your response, put it between [REFINED_BULLET] and [/REFINED_BULLET] tags so it can be extracted.
+
+Example:
+"Here's a stronger version that emphasizes your cross-functional leadership:
+
+[REFINED_BULLET]
+Led cross-functional teams of 15+ stakeholders across Technology, Operations, and Risk to implement AI governance framework, driving 63% portfolio growth while maintaining 100% regulatory compliance
+[/REFINED_BULLET]
+
+This version better highlights the leadership and stakeholder management aspects emphasized in the JD."
+""",
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
+            messages=messages
+        )
+
+        ai_response = response.content[0].text
+
+        # Extract refined bullet if present
+        refined_bullet = None
+        if '[REFINED_BULLET]' in ai_response and '[/REFINED_BULLET]' in ai_response:
+            start = ai_response.find('[REFINED_BULLET]') + len('[REFINED_BULLET]')
+            end = ai_response.find('[/REFINED_BULLET]')
+            refined_bullet = ai_response[start:end].strip()
+
+        return jsonify({
+            'success': True,
+            'response': ai_response,
+            'refined_bullet': refined_bullet
+        })
+
+    except Exception as e:
+        print(f"Error in bullet chat: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to get AI response'}), 500
+
+
+@app.route("/api/save-approved-bullets", methods=["POST"])
+def save_approved_bullets():
+    """Save approved bullets to avoid re-selection"""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        print("❌ Save bullets: Not authenticated or no CV session")
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    cv_session_id = session['cv_session_id']
+    print(f"💾 Saving bullets for session {cv_session_id}")
+
+    try:
+        data = request.json
+        approved_bullets = data.get('approved_bullets', [])
+        approved_texts = data.get('approved_texts', {})
+        customized_bullets = data.get('customized_bullets', {})
+
+        print(f"  Received: {len(approved_bullets)} bullets")
+        print(f"  Bullet numbers: {approved_bullets}")
+
+        # Build approved bullets data structure
+        approved_bullets_data = []
+        for bullet_number in approved_bullets:
+            bullet_number_str = str(bullet_number)  # Convert to string for dict lookup
+            approved_text = approved_texts.get(bullet_number_str, '')
+            customized_text = customized_bullets.get(bullet_number_str, None)
+
+            print(f"  Bullet #{bullet_number}: approved_text={approved_text[:50] if approved_text else 'EMPTY'}...")
+
+            approved_bullets_data.append({
+                'bullet_number': bullet_number,
+                'approved_text': approved_text,
+                'customized_text': customized_text
+            })
+
+        # Save to database
+        success = update_cv_session_approved_bullets(cv_session_id, approved_bullets_data)
+
+        if success:
+            print(f"✅ Successfully saved {len(approved_bullets_data)} bullets to database")
+            return jsonify({'success': True})
+        else:
+            print("❌ Failed to save to database")
+            return jsonify({'error': 'Failed to save to database'}), 500
+
+    except Exception as e:
+        print(f"❌ Error saving approved bullets: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to save approved bullets'}), 500
+
+
+# ==================== INTERVIEW PREP ROUTES ====================
+
+@app.route("/interview-prep", methods=["GET"])
+def interview_prep():
+    """Main interview prep page - show completed CV customizations"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return "Database connection error", 500
+
+        with engine.connect() as conn:
+            # Get all completed CV customizations with their interview sessions
+            query = text("""
+                SELECT
+                    cvs.id as cv_session_id,
+                    cvs.job_title,
+                    cvs.job_company,
+                    cvs.analysis_id,
+                    cvs.selected_headline,
+                    cvs.approved_bullets,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'session_id', intv.id,
+                                'completed', intv.completed,
+                                'overall_score', intv.overall_score,
+                                'current_question', intv.current_question,
+                                'created_at', intv.created_at
+                            )
+                            ORDER BY intv.created_at DESC
+                        ) FILTER (WHERE intv.id IS NOT NULL),
+                        '[]'
+                    ) as practice_sessions
+                FROM cv_customization_sessions cvs
+                LEFT JOIN interview_sessions intv ON cvs.id = intv.cv_session_id
+                WHERE cvs.user_id = :user_id
+                    AND cvs.approved_bullets IS NOT NULL
+                    AND cvs.approved_bullets::text != '[]'
+                GROUP BY cvs.id
+                ORDER BY cvs.created_at DESC
+            """)
+
+            result = conn.execute(query, {"user_id": user_id})
+            rows = result.fetchall()
+
+            cv_sessions = []
+            for row in rows:
+                cv_sessions.append({
+                    'id': row[0],  # Changed from cv_session_id to id to match template
+                    'job_title': row[1],
+                    'job_company': row[2],
+                    'analysis_id': row[3],
+                    'selected_headline': row[4],
+                    'approved_bullets': row[5],
+                    'practice_sessions': row[6] if isinstance(row[6], list) else json.loads(row[6]) if row[6] else []
+                })
+
+        return render_template('interview_prep.html', cv_sessions=cv_sessions)
+
+    except Exception as e:
+        print(f"Error in interview prep: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return error details for debugging (remove in production)
+        return f"Error loading interview prep: {str(e)}", 500
+
+
+@app.route("/interview-prep/start/<int:cv_session_id>", methods=["POST"])
+def interview_prep_start(cv_session_id):
+    """Start new interview practice session"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        # Get CV session data
+        print(f"DEBUG: Getting CV session {cv_session_id}...")
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session or cv_session['user_id'] != user_id:
+            return jsonify({'error': 'Session not found'}), 404
+        print(f"DEBUG: CV session retrieved successfully")
+
+        # Get job analysis
+        print(f"DEBUG: Getting analysis {cv_session['analysis_id']}...")
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return jsonify({'error': 'Analysis not found'}), 404
+        print(f"DEBUG: Analysis retrieved successfully")
+
+        # Extract approved bullet texts
+        approved_bullets = cv_session.get('approved_bullets', [])
+        print(f"DEBUG: approved_bullets type: {type(approved_bullets)}")
+        print(f"DEBUG: approved_bullets length: {len(approved_bullets) if approved_bullets else 0}")
+
+        bullet_texts = []
+        try:
+            for i, bullet in enumerate(approved_bullets):
+                # Handle both dict and string formats
+                if isinstance(bullet, dict):
+                    bullet_text = bullet.get('customized_text') or bullet.get('approved_text', '')
+                elif isinstance(bullet, str):
+                    bullet_text = bullet
+                else:
+                    bullet_text = ''
+
+                if bullet_text:
+                    bullet_texts.append(bullet_text)
+                    print(f"DEBUG: Bullet {i+1}: {bullet_text[:50]}...")
+        except Exception as bullet_err:
+            print(f"ERROR extracting bullets: {bullet_err}")
+            raise
+
+        print(f"DEBUG: Extracted {len(bullet_texts)} bullet texts")
+
+        if not bullet_texts:
+            return jsonify({'error': 'No bullets found to generate questions'}), 400
+
+        # Generate questions
+        print(f"DEBUG: Calling generate_interview_questions...")
+        try:
+            questions = generate_interview_questions(
+                job_description=analysis['job_description'],
+                cv_bullets=bullet_texts,
+                selected_headline=cv_session['selected_headline'],
+                user_id=user_id
+            )
+            print(f"DEBUG: Questions generated successfully")
+        except Exception as gen_err:
+            print(f"ERROR in generate_interview_questions: {gen_err}")
+            raise
+
+        if not questions:
+            return jsonify({'error': 'Failed to generate questions'}), 500
+
+        # Create interview session
+        print(f"DEBUG: Creating interview session in database...")
+        try:
+            engine = get_db_connection()
+            with engine.connect() as conn:
+                from sqlalchemy import text as sql_text  # Avoid any potential conflicts
+                insert_query = sql_text("""
+                    INSERT INTO interview_sessions (
+                        user_id, cv_session_id, questions, current_question
+                    ) VALUES (
+                        :user_id, :cv_session_id, :questions, 1
+                    )
+                    RETURNING id
+                """)
+
+                result = conn.execute(insert_query, {
+                    "user_id": user_id,
+                    "cv_session_id": cv_session_id,
+                    "questions": json.dumps(questions)
+                })
+                conn.commit()
+
+                interview_session_id = result.fetchone()[0]
+
+            print(f"✓ Created interview session {interview_session_id}")
+        except Exception as db_err:
+            print(f"ERROR creating interview session: {db_err}")
+            raise
+
+        # Redirect to first question
+        return redirect(f'/interview-prep/question/{interview_session_id}/1')
+
+    except Exception as e:
+        print(f"Error starting interview session: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return detailed error for debugging (remove in production)
+        error_message = repr(e)  # Use repr() instead of str() to avoid potential shadowing
+        return jsonify({'error': f'Failed to start session: {error_message}'}), 500
+
+
+@app.route("/interview-prep/question/<int:session_id>/<int:question_num>", methods=["GET"])
+def interview_prep_question(session_id, question_num):
+    """Show interview question"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        with engine.connect() as conn:
+            # Get session
+            query = text("""
+                SELECT
+                    intv.id, intv.user_id, intv.cv_session_id, intv.questions,
+                    intv.answers, intv.evaluations, intv.current_question, intv.completed,
+                    cvs.job_title, cvs.job_company
+                FROM interview_sessions intv
+                JOIN cv_customization_sessions cvs ON intv.cv_session_id = cvs.id
+                WHERE intv.id = :session_id AND intv.user_id = :user_id
+            """)
+
+            result = conn.execute(query, {"session_id": session_id, "user_id": user_id})
+            row = result.fetchone()
+
+            if not row:
+                return "Session not found", 404
+
+            # Parse JSON fields
+            questions = row[3]
+            if isinstance(questions, str):
+                questions = json.loads(questions)
+
+            answers = row[4]
+            if isinstance(answers, str):
+                answers = json.loads(answers) if answers else {}
+            elif answers is None:
+                answers = {}
+
+            evaluations = row[5]
+            if isinstance(evaluations, str):
+                evaluations = json.loads(evaluations) if evaluations else {}
+            elif evaluations is None:
+                evaluations = {}
+
+            current_question = row[6]
+            completed = row[7]
+            job_title = row[8]
+            job_company = row[9]
+
+        # Check if already completed
+        if completed:
+            return redirect(f'/interview-prep/summary/{session_id}')
+
+        # Validate question number
+        if question_num < 1 or question_num > len(questions):
+            return "Invalid question number", 400
+
+        # Get the question
+        question_data = questions[question_num - 1]
+
+        # Check if we're showing evaluation
+        question_key = str(question_num)
+        show_evaluation = question_key in evaluations
+
+        if show_evaluation:
+            evaluation = evaluations[question_key]
+            return render_template('interview_evaluation.html',
+                                 session_id=session_id,
+                                 question_num=question_num,
+                                 question_text=question_data.get('question_text', ''),
+                                 user_answer=answers.get(question_key, ''),
+                                 overall_score=evaluation.get('overall_score', 0),
+                                 details_score=evaluation.get('details_score', 0),
+                                 organization_score=evaluation.get('organization_score', 0),
+                                 analysis_score=evaluation.get('analysis_score', 0),
+                                 ownership_score=evaluation.get('ownership_score', 0),
+                                 feedback_summary=evaluation.get('feedback_summary', ''),
+                                 strong_points=evaluation.get('strong_points', []),
+                                 improvement_areas=evaluation.get('improvement_areas', []),
+                                 better_answer_example=evaluation.get('better_answer_example', ''),
+                                 job_title=job_title,
+                                 job_company=job_company,
+                                 total_questions=len(questions))
+
+        # Show question form
+        return render_template('interview_question.html',
+                             session_id=session_id,
+                             question_num=question_num,
+                             question_text=question_data.get('question_text', ''),
+                             bullet_reference=question_data.get('bullet_reference', ''),
+                             job_title=job_title,
+                             job_company=job_company,
+                             total_questions=len(questions))
+
+    except Exception as e:
+        print(f"Error loading question: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading question", 500
+
+
+@app.route("/interview-prep/submit/<int:session_id>/<int:question_num>", methods=["POST"])
+def interview_prep_submit(session_id, question_num):
+    """Submit answer and get evaluation"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        # Get answer from form
+        answer = request.form.get('answer', '').strip()
+        if not answer:
+            return "Please provide an answer", 400
+
+        engine = get_db_connection()
+        with engine.connect() as conn:
+            # Get session and CV data
+            query = text("""
+                SELECT
+                    intv.questions, intv.answers, intv.evaluations, intv.cv_session_id,
+                    cvs.analysis_id, cvs.approved_bullets
+                FROM interview_sessions intv
+                JOIN cv_customization_sessions cvs ON intv.cv_session_id = cvs.id
+                WHERE intv.id = :session_id AND intv.user_id = :user_id
+            """)
+
+            result = conn.execute(query, {"session_id": session_id, "user_id": user_id})
+            row = result.fetchone()
+
+            if not row:
+                return "Session not found", 404
+
+            # Parse JSON fields
+            questions = row[0]
+            if isinstance(questions, str):
+                questions = json.loads(questions)
+
+            answers = row[1]
+            if isinstance(answers, str):
+                answers = json.loads(answers) if answers else {}
+            elif answers is None:
+                answers = {}
+
+            evaluations = row[2]
+            if isinstance(evaluations, str):
+                evaluations = json.loads(evaluations) if evaluations else {}
+            elif evaluations is None:
+                evaluations = {}
+
+            analysis_id = row[4]
+
+            approved_bullets = row[5]
+            if isinstance(approved_bullets, str):
+                approved_bullets = json.loads(approved_bullets) if approved_bullets else []
+            elif approved_bullets is None:
+                approved_bullets = []
+
+        # Get question
+        question_data = questions[question_num - 1]
+
+        # Get job description
+        analysis = get_analysis_by_id(analysis_id, user_id)
+
+        # Extract bullet texts
+        bullet_texts = []
+        for bullet in approved_bullets:
+            # Handle both dict and string formats
+            if isinstance(bullet, dict):
+                bullet_text = bullet.get('customized_text') or bullet.get('approved_text', '')
+            elif isinstance(bullet, str):
+                bullet_text = bullet
+            else:
+                bullet_text = ''
+
+            if bullet_text:
+                bullet_texts.append(bullet_text)
+
+        # Evaluate answer
+        print(f"Evaluating answer for question {question_num}...")
+        evaluation = evaluate_interview_answer(
+            question_text=question_data['question_text'],
+            user_answer=answer,
+            job_description=analysis['job_description'],
+            cv_bullets=bullet_texts
+        )
+
+        if not evaluation:
+            return "Failed to evaluate answer", 500
+
+        # Save answer and evaluation
+        question_key = str(question_num)
+        answers[question_key] = answer
+        evaluations[question_key] = evaluation
+
+        with engine.connect() as conn:
+            # Update session
+            update_query = text("""
+                UPDATE interview_sessions
+                SET answers = :answers,
+                    evaluations = :evaluations,
+                    current_question = :next_question,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """)
+
+            conn.execute(update_query, {
+                "session_id": session_id,
+                "answers": json.dumps(answers),
+                "evaluations": json.dumps(evaluations),
+                "next_question": question_num + 1 if question_num < len(questions) else question_num
+            })
+            conn.commit()
+
+        print(f"✓ Saved answer and evaluation for question {question_num}")
+
+        # Redirect to show evaluation
+        return redirect(f'/interview-prep/question/{session_id}/{question_num}')
+
+    except Exception as e:
+        print(f"Error submitting answer: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error processing answer", 500
+
+
+@app.route("/interview-prep/summary/<int:session_id>", methods=["GET"])
+def interview_prep_summary(session_id):
+    """Show final summary"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        with engine.connect() as conn:
+            # Get session
+            query = text("""
+                SELECT
+                    intv.questions, intv.evaluations, intv.completed, intv.overall_score,
+                    cvs.job_title, cvs.job_company
+                FROM interview_sessions intv
+                JOIN cv_customization_sessions cvs ON intv.cv_session_id = cvs.id
+                WHERE intv.id = :session_id AND intv.user_id = :user_id
+            """)
+
+            result = conn.execute(query, {"session_id": session_id, "user_id": user_id})
+            row = result.fetchone()
+
+            if not row:
+                return "Session not found", 404
+
+            # Parse JSON fields
+            questions = row[0]
+            if isinstance(questions, str):
+                questions = json.loads(questions)
+
+            evaluations = row[1]
+            if isinstance(evaluations, str):
+                evaluations = json.loads(evaluations) if evaluations else {}
+            elif evaluations is None:
+                evaluations = {}
+
+            completed = row[2]
+            overall_score = row[3]
+            job_title = row[4]
+            job_company = row[5]
+
+        # If not completed yet, complete it now
+        if not completed and evaluations:
+            # Calculate overall scores
+            scores = []
+            details_scores = []
+            organization_scores = []
+            analysis_scores = []
+            ownership_scores = []
+
+            for eval_data in evaluations.values():
+                scores.append(eval_data['overall_score'])
+                details_scores.append(eval_data['details_score'])
+                organization_scores.append(eval_data['organization_score'])
+                analysis_scores.append(eval_data['analysis_score'])
+                ownership_scores.append(eval_data['ownership_score'])
+
+            overall_score = round(sum(scores) / len(scores), 1) if scores else 0
+
+            avg_scores = {
+                'details': round(sum(details_scores) / len(details_scores), 1) if details_scores else 0,
+                'organization': round(sum(organization_scores) / len(organization_scores), 1) if organization_scores else 0,
+                'analysis': round(sum(analysis_scores) / len(analysis_scores), 1) if analysis_scores else 0,
+                'ownership': round(sum(ownership_scores) / len(ownership_scores), 1) if ownership_scores else 0
+            }
+
+            # Mark as complete
+            with engine.connect() as conn:
+                update_query = text("""
+                    UPDATE interview_sessions
+                    SET completed = TRUE,
+                        overall_score = :overall_score,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :session_id
+                """)
+
+                conn.execute(update_query, {
+                    "session_id": session_id,
+                    "overall_score": overall_score
+                })
+                conn.commit()
+
+        else:
+            # Calculate avg scores from evaluations
+            avg_scores = {
+                'details': 0,
+                'organization': 0,
+                'analysis': 0,
+                'ownership': 0
+            }
+
+            if evaluations:
+                details_scores = []
+                organization_scores = []
+                analysis_scores = []
+                ownership_scores = []
+
+                for eval_data in evaluations.values():
+                    details_scores.append(eval_data['details_score'])
+                    organization_scores.append(eval_data['organization_score'])
+                    analysis_scores.append(eval_data['analysis_score'])
+                    ownership_scores.append(eval_data['ownership_score'])
+
+                avg_scores = {
+                    'details': round(sum(details_scores) / len(details_scores), 1) if details_scores else 0,
+                    'organization': round(sum(organization_scores) / len(organization_scores), 1) if organization_scores else 0,
+                    'analysis': round(sum(analysis_scores) / len(analysis_scores), 1) if analysis_scores else 0,
+                    'ownership': round(sum(ownership_scores) / len(ownership_scores), 1) if ownership_scores else 0
+                }
+
+        return render_template('interview_summary.html',
+                             session_id=session_id,
+                             overall_score=overall_score,
+                             avg_scores=avg_scores,
+                             questions=questions,
+                             evaluations=evaluations,
+                             job_title=job_title,
+                             job_company=job_company)
+
+    except Exception as e:
+        print(f"Error loading summary: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading summary", 500
+
+
+@app.route("/get-analysis/<int:analysis_id>", methods=["GET"])
+def get_analysis(analysis_id):
+    """Get full analysis by ID"""
+    print(f"\n>>> ROUTE /get-analysis/{analysis_id} called")
+    if 'user_id' not in session:
+        print("  ERROR: User not authenticated")
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+    print(f"  User ID from session: {user_id}")
+
+    try:
+        analysis = get_analysis_by_id(analysis_id, user_id)
+
+        if not analysis:
+            print(f"  RETURNING 404: Analysis not found")
+            return jsonify({'error': 'Analysis not found'}), 404
+
+        # Check if CV customization session exists for this analysis
+        cv_session = get_cv_session_by_analysis(analysis_id, user_id)
+        cv_progress = None
+
+        if cv_session:
+            # Determine current step
+            current_step = 'headline'  # Default
+            if cv_session.get('selected_headline'):
+                current_step = 'bullets'
+            if cv_session.get('approved_bullets') and len(cv_session['approved_bullets']) >= 6:
+                current_step = 'preview'
+
+            cv_progress = {
+                'session_id': cv_session['id'],
+                'current_step': current_step,
+                'has_headline': bool(cv_session.get('selected_headline')),
+                'approved_bullets_count': len(cv_session['approved_bullets']) if cv_session.get('approved_bullets') else 0,
+                'status': cv_session.get('status', 'in_progress')
+            }
+            print(f"  CV Session found: {cv_progress}")
+
+        print(f"  SUCCESS: Returning analysis data")
+        return jsonify({
+            'success': True,
+            'analysis': analysis,
+            'cv_progress': cv_progress
+        })
+
+    except Exception as e:
+        print(f"  ERROR in route: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to get analysis'}), 500
+
+
+@app.route("/delete-analysis/<int:analysis_id>", methods=["POST"])
+def delete_analysis(analysis_id):
+    """Delete an analysis"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        success = delete_analysis_by_id(analysis_id, user_id)
+
+        if not success:
+            return jsonify({'error': 'Analysis not found'}), 404
+
+        log_user_activity('analysis_delete', f'Deleted analysis ID: {analysis_id}')
+
+        return jsonify({'success': True, 'message': 'Analysis deleted'})
+
+    except Exception as e:
+        print(f"Error deleting analysis: {e}")
+        return jsonify({'error': 'Failed to delete analysis'}), 500
+
+
+@app.route("/prompt-settings", methods=["GET"])
+def prompt_settings():
+    """Display prompt settings page"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return "Database error", 500
+
+        with engine.connect() as conn:
+            # Get all available templates
+            templates_result = conn.execute(text("""
+                SELECT id, name, description, target_profile, version
+                FROM prompt_templates
+                ORDER BY is_default DESC, name ASC
+            """))
+
+            templates = []
+            for row in templates_result:
+                templates.append({
+                    'id': row[0],
+                    'name': row[1],
+                    'description': row[2],
+                    'target_profile': row[3],
+                    'version': row[4]
+                })
+
+            # Get user's current active template and prompt
+            user_pref_result = conn.execute(text("""
+                SELECT upp.template_id, upp.custom_prompt_text, pt.name, pt.prompt_text
+                FROM user_prompt_preferences upp
+                LEFT JOIN prompt_templates pt ON upp.template_id = pt.id
+                WHERE upp.user_id = :user_id AND upp.is_active = TRUE
+                ORDER BY upp.created_at DESC
+                LIMIT 1
+            """), {"user_id": user_id})
+
+            user_pref_row = user_pref_result.fetchone()
+
+            current_template_id = None
+            current_template_name = "No template selected"
+            current_prompt_text = ""
+
+            if user_pref_row:
+                current_template_id = user_pref_row[0]
+                custom_prompt = user_pref_row[1]
+                template_name = user_pref_row[2]
+                template_prompt = user_pref_row[3]
+
+                current_template_name = template_name or "Custom"
+                current_prompt_text = custom_prompt if custom_prompt else template_prompt
+
+            return render_template('prompt_settings.html',
+                                 templates=templates,
+                                 current_template_id=current_template_id,
+                                 current_template_name=current_template_name,
+                                 current_prompt_text=current_prompt_text)
+
+    except Exception as e:
+        print(f"Error loading prompt settings: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading settings", 500
+
+
+@app.route("/get-template-prompt/<int:template_id>", methods=["GET"])
+def get_template_prompt(template_id):
+    """Get full prompt text for a specific template (for preview)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT prompt_text FROM prompt_templates WHERE id = :template_id
+            """), {"template_id": template_id})
+
+            row = result.fetchone()
+            if not row:
+                return jsonify({'error': 'Template not found'}), 404
+
+            return jsonify({'prompt_text': row[0]})
+
+    except Exception as e:
+        print(f"Error getting template prompt: {e}")
+        return jsonify({'error': 'Failed to get template'}), 500
+
+
+@app.route("/switch-template", methods=["POST"])
+def switch_template():
+    """Switch user's active template"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.get_json()
+        template_id = data.get('template_id')
+
+        if not template_id:
+            return jsonify({'error': 'template_id is required'}), 400
+
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            # Deactivate all current preferences for this user
+            conn.execute(text("""
+                UPDATE user_prompt_preferences
+                SET is_active = FALSE
+                WHERE user_id = :user_id
+            """), {"user_id": user_id})
+
+            # Create new active preference with selected template
+            conn.execute(text("""
+                INSERT INTO user_prompt_preferences (user_id, template_id, is_active)
+                VALUES (:user_id, :template_id, TRUE)
+            """), {"user_id": user_id, "template_id": template_id})
+
+            conn.commit()
+
+            # Get the template name for the response
+            template_result = conn.execute(text("""
+                SELECT name FROM prompt_templates WHERE id = :template_id
+            """), {"template_id": template_id})
+
+            template_row = template_result.fetchone()
+            template_name = template_row[0] if template_row else "Unknown"
+
+            log_user_activity('prompt_template_switch', f'Switched to template: {template_name}')
+
+            return jsonify({
+                'success': True,
+                'message': f'Switched to {template_name} template',
+                'template_name': template_name
+            })
+
+    except Exception as e:
+        print(f"Error switching template: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to switch template'}), 500
+
+
+@app.route("/ai-usage-stats", methods=["GET"])
+def ai_usage_stats():
+    """Get AI usage statistics for the user"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            # Get total usage this month
+            result = conn.execute(text("""
+                SELECT
+                    COUNT(*) as total_analyses,
+                    SUM(tokens_input) as total_input_tokens,
+                    SUM(tokens_output) as total_output_tokens,
+                    SUM(estimated_cost) as total_cost
+                FROM ai_usage_tracking
+                WHERE user_id = :user_id
+                AND created_at >= DATE_TRUNC('month', CURRENT_DATE)
+            """), {"user_id": user_id})
+
+            stats = result.fetchone()
+
+            return jsonify({
+                'total_analyses': stats[0] or 0,
+                'total_input_tokens': stats[1] or 0,
+                'total_output_tokens': stats[2] or 0,
+                'total_cost': float(stats[3] or 0)
+            })
+
+    except Exception as e:
+        print(f"Error getting usage stats: {e}")
+        return jsonify({'error': 'Failed to get stats'}), 500
+
+
+@app.route("/ai-diagnostic", methods=["GET"])
+def ai_diagnostic():
+    """Diagnostic endpoint to check AI setup"""
+    import os
+    diagnostics = {}
+
+    # Check API key
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    diagnostics['api_key_set'] = api_key is not None
+    diagnostics['api_key_length'] = len(api_key) if api_key else 0
+
+    # Check Anthropic library
+    try:
+        import anthropic
+        diagnostics['anthropic_installed'] = True
+        diagnostics['anthropic_version'] = anthropic.__version__ if hasattr(anthropic, '__version__') else 'unknown'
+    except ImportError:
+        diagnostics['anthropic_installed'] = False
+        diagnostics['anthropic_version'] = None
+
+    # Check PyPDF2
+    try:
+        import PyPDF2
+        diagnostics['pypdf2_installed'] = True
+    except ImportError:
+        diagnostics['pypdf2_installed'] = False
+
+    # Check python-docx
+    try:
+        import docx
+        diagnostics['python_docx_installed'] = True
+    except ImportError:
+        diagnostics['python_docx_installed'] = False
+
+    # Check database connection
+    try:
+        engine = get_db_connection()
+        diagnostics['database_connected'] = engine is not None
+        if engine:
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT COUNT(*) FROM user_cvs"))
+                diagnostics['cv_table_accessible'] = True
+                diagnostics['total_cvs'] = result.fetchone()[0]
+    except Exception as e:
+        diagnostics['database_connected'] = False
+        diagnostics['database_error'] = str(e)
+
+    return jsonify(diagnostics)
 
 
 if __name__ == "__main__":
