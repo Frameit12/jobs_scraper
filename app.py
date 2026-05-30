@@ -5258,11 +5258,11 @@ def upload_master_template():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        # Validate file type - only .docx allowed
+        # Validate file type - .docx and .txt allowed
         file_ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
 
-        if file_ext != 'docx':
-            return jsonify({'error': 'Invalid file type. Only .docx files are allowed'}), 400
+        if file_ext not in ('docx', 'txt'):
+            return jsonify({'error': 'Invalid file type. Only .docx or .txt files are allowed'}), 400
 
         # Read file data
         file_data = file.read()
@@ -5271,8 +5271,11 @@ def upload_master_template():
         if len(file_data) > 2 * 1024 * 1024:
             return jsonify({'error': 'File too large. Maximum size is 2MB'}), 400
 
-        # Extract text from docx
-        extracted_text = extract_text_from_docx(file_data)
+        # Extract text based on file type
+        if file_ext == 'txt':
+            extracted_text = file_data.decode('utf-8', errors='replace')
+        else:
+            extracted_text = extract_text_from_docx(file_data)
 
         if not extracted_text or not extracted_text.strip():
             return jsonify({'error': 'Template appears to be empty or text extraction failed'}), 400
