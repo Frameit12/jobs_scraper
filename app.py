@@ -7209,9 +7209,14 @@ def consolidate_cvs():
             })
 
         # Build Claude consolidation prompt
+        # Cap each CV at 6000 chars to keep total input manageable and avoid timeout
+        MAX_CHARS_PER_CV = 6000
         cv_sections = ""
         for i, item in enumerate(extracted_texts, 1):
-            cv_sections += f"\n\n--- CV VERSION {i}: {item['filename']} ---\n{item['text']}\n"
+            text = item['text']
+            if len(text) > MAX_CHARS_PER_CV:
+                text = text[:MAX_CHARS_PER_CV] + "\n...[truncated for length]"
+            cv_sections += f"\n\n--- CV VERSION {i}: {item['filename']} ---\n{text}\n"
 
         consolidation_prompt = f"""You are consolidating {len(extracted_texts)} versions of the same person's CV into one comprehensive master template.
 
@@ -7237,11 +7242,11 @@ Here are the {len(extracted_texts)} CV versions to consolidate:
 
 Output the complete master template now:"""
 
-        # Call Claude API
+        # Use Haiku for speed — this task is text organisation, not analysis
         anthropic_client = get_anthropic_client()
         message = anthropic_client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=8000,
+            model="claude-haiku-4-5-20251001",
+            max_tokens=6000,
             messages=[{"role": "user", "content": consolidation_prompt}]
         )
 
