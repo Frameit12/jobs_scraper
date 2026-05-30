@@ -9,232 +9,200 @@
     <link rel="stylesheet" href="/static/theme.css">
     <style>
         [x-cloak] { display: none !important; }
-        .headline-card {
-            transition: all 0.2s ease;
-        }
-        .headline-card:hover {
-            border-color: #3b82f6;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-        .headline-card.selected {
-            border-color: #10b981;
-            background: #f0fdf4;
-        }
+        .headline-card { transition: border-color 0.15s ease; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-<div x-data="headlineSelector()" class="max-w-5xl mx-auto p-8" x-cloak>
+<div x-data="headlineSelector()" class="max-w-2xl mx-auto px-6 py-8" x-cloak>
 
     <!-- Header -->
-    <div class="mb-8">
-        <div class="flex items-center justify-between mb-4">
+    <div class="mb-6">
+        <div class="flex items-center justify-between mb-3">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900">Customize Your CV</h1>
-                <p class="text-gray-600 mt-2">
-                    For: <span class="font-semibold text-gray-900">{{ job_title }}</span>
+                <h1 class="text-2xl font-bold text-gray-900">Customize Your CV</h1>
+                <p class="text-gray-500 text-sm mt-1">
+                    For: <span class="font-semibold text-gray-800">{{ job_title }}</span>
                     {% if job_company %} at {{ job_company }}{% endif %}
                 </p>
             </div>
-            <a href="/ai-match" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</a>
+            <a href="/ai-match" class="text-gray-400 hover:text-gray-600 text-sm">Cancel</a>
         </div>
-
-        <!-- Progress -->
-        <div class="flex items-center gap-2 text-sm text-gray-600">
+        <div class="flex items-center gap-2 text-sm">
             <span class="font-semibold text-blue-600">Step 1 of 3</span>
-            <span class="text-gray-400">·</span>
-            <span>Select Headline</span>
+            <span class="text-gray-300">·</span>
+            <span class="text-gray-500">Select your headline</span>
         </div>
         <div class="h-1 bg-gray-200 rounded-full mt-2">
             <div class="h-1 bg-blue-600 rounded-full" style="width: 33%"></div>
         </div>
     </div>
 
-    <!-- AI Recommendation Card -->
+    <!-- Explainer banner -->
+    <div class="rounded-lg p-4 mb-5 flex items-start gap-3" style="background:#fffbeb; border:1px solid #fde68a;">
+        <span class="text-lg flex-shrink-0">✨</span>
+        <div>
+            <p class="text-sm font-semibold" style="color:#78350f;">
+                AI has reviewed all {{ headlines|length }} of your headlines and picked the best match for this role.
+            </p>
+            <p class="text-sm mt-0.5" style="color:#92400e;">
+                Use it as-is, customise it with AI, or browse your other headlines below.
+            </p>
+        </div>
+    </div>
+
+    <!-- AI Recommended headline -->
     {% if recommended_headline %}
-    <div class="bg-white rounded-lg border-2 border-green-500 shadow-sm p-8 mb-8">
+    <div class="bg-white rounded-xl shadow-sm mb-4" style="border:2px solid #d97706;">
 
-        <!-- Header -->
-        <div class="flex items-start justify-between mb-6">
+        <!-- Top bar -->
+        <div class="flex items-center justify-between px-5 pt-4 pb-3" style="border-bottom:1px solid #f0ece4;">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:#fef3c7; color:#92400e;">★ AI Recommended</span>
+                <span class="text-xs text-gray-400">Best match for this role</span>
+            </div>
             <div>
-                <div class="inline-flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-medium mb-3">
-                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
-                    </svg>
-                    AI Recommended
-                </div>
-                <h2 class="text-2xl font-bold text-gray-900">{{ recommended_headline.label if recommended_headline.label else 'Version ' + recommended_headline.number|string }}</h2>
-            </div>
-            <div class="text-right">
-                <div class="text-3xl font-bold text-green-600">{{ recommended_headline.match_score }}%</div>
-                <div class="text-sm text-gray-500">Match</div>
+                <span class="text-xl font-bold text-blue-600">{{ recommended_headline.match_score }}%</span>
+                <span class="text-xs text-gray-400 ml-1">match</span>
             </div>
         </div>
 
-        <!-- Headline Text -->
-        <div class="bg-gray-50 rounded-lg p-6 mb-6">
-            <p class="text-lg text-gray-900 leading-relaxed">"{{ recommended_headline.text }}"</p>
+        <!-- Headline label + text -->
+        <div class="px-5 pt-4 pb-3">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+                {{ recommended_headline.label if recommended_headline.label else 'Version ' + recommended_headline.number|string }}
+            </p>
+            <p class="text-sm text-gray-800 leading-relaxed">"{{ recommended_headline.text }}"</p>
         </div>
 
-        <!-- AI Guidance -->
-        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-            <div class="flex items-start">
-                <svg class="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+        <!-- AI note -->
+        {% if recommended_headline.suggested_adaptation %}
+        <div class="mx-5 mb-4 p-3 rounded-lg text-sm" style="background:#fafaf8; border-left:3px solid #d97706;">
+            <p class="font-semibold text-gray-700 text-xs mb-0.5">AI note</p>
+            <p class="text-gray-600 text-xs">
+                This headline needs slight tuning for this role. Click <strong>Customise with AI</strong> to refine it together, or use it as-is.
+            </p>
+        </div>
+        {% else %}
+        <div class="mx-5 mb-4 p-3 rounded-lg text-sm" style="background:#fafaf8; border-left:3px solid #d97706;">
+            <p class="font-semibold text-gray-700 text-xs mb-0.5">AI note</p>
+            <p class="text-gray-600 text-xs">This headline is strong for this role and ready to use as-is.</p>
+        </div>
+        {% endif %}
+
+        <!-- Why AI picked this (collapsible) -->
+        {% if recommended_headline.reasons %}
+        <div class="px-5 pb-4">
+            <button @click="showReasons = !showReasons"
+                    class="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-600 mb-2">
+                <svg class="w-3 h-3 transition-transform" :class="showReasons ? 'rotate-90' : ''"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                 </svg>
-                <div class="flex-1">
-                    <p class="font-semibold text-blue-900 text-sm">AI Assessment:</p>
-                    {% if recommended_headline.suggested_adaptation %}
-                    <p class="text-blue-800 text-sm mt-1">
-                        <span class="font-semibold">Needs fine-tuning.</span> {{ recommended_headline.suggested_adaptation }}
-                    </p>
-                    <p class="text-blue-700 text-xs mt-2 italic">Click "Customize with AI" below to refine this headline together.</p>
-                    {% else %}
-                    <p class="text-blue-800 text-sm mt-1">
-                        <span class="font-semibold">Ready to use as-is.</span> This headline is strong for this role and needs no changes.
-                    </p>
-                    <p class="text-blue-700 text-xs mt-2 italic">Click "Use This Headline" to proceed immediately.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Why This Works -->
-        <div class="mb-6">
-            <h3 class="text-sm font-semibold text-gray-700 mb-3">Why this maximizes your interview chances:</h3>
-            <div class="space-y-2">
+                <span x-text="showReasons ? 'Hide reasons' : 'Why AI picked this'"></span>
+            </button>
+            <div x-show="showReasons" x-transition class="space-y-1">
                 {% for reason in recommended_headline.reasons %}
-                <div class="flex items-start">
-                    <svg class="w-5 h-5 text-green-600 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                    </svg>
-                    <p class="text-sm text-gray-700">{{ reason }}</p>
+                <div class="flex items-start gap-2 text-xs text-gray-600">
+                    <span class="text-blue-600 flex-shrink-0 mt-0.5">✓</span>
+                    {{ reason }}
                 </div>
                 {% endfor %}
             </div>
         </div>
+        {% endif %}
 
-        <!-- Action Buttons -->
-        <div class="flex gap-3">
+        <!-- Action buttons -->
+        <div class="px-5 pb-5 flex gap-2">
             <button @click="selectAndContinue('{{ recommended_headline.text }}', {{ recommended_headline.match_score }})"
-                    class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition shadow-sm">
+                    class="flex-1 text-white text-sm font-semibold py-2.5 rounded-lg transition bg-blue-600 hover:bg-blue-700">
                 ✓ Use This Headline
             </button>
-            {% if recommended_headline.suggested_adaptation %}
             <button @click="openCustomizeModal('{{ recommended_headline.text }}')"
-                    class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition shadow-sm">
-                ✎ Customize with AI
-            </button>
-            {% endif %}
-            <button @click="showAllHeadlines = true; scrollToAll()"
-                    class="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition">
-                View All ({{ headlines|length }})
+                    class="flex-1 text-sm font-semibold py-2.5 rounded-lg transition"
+                    style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;"
+                    onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fef3c7'">
+                ✎ Customise with AI
             </button>
         </div>
     </div>
     {% endif %}
 
-    <!-- All Headlines Section (Initially Hidden) -->
-    <div x-show="showAllHeadlines"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         class="space-y-4"
-         id="all-headlines-section">
+    <!-- View other headlines toggle -->
+    <div class="mb-4">
+        <button @click="showAllHeadlines = !showAllHeadlines"
+                class="w-full flex items-center justify-between px-4 py-3 bg-white rounded-lg border text-sm font-medium text-gray-600 hover:border-gray-300 transition"
+                style="border-color:#e8e4dc;">
+            <span x-text="showAllHeadlines ? 'Hide other headlines' : 'View your other headlines ({{ headlines|length - 1 }})'"></span>
+            <svg class="w-4 h-4 transition-transform" :class="showAllHeadlines ? 'rotate-180' : ''"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+    </div>
 
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-bold text-gray-900">All Available Headlines</h2>
-            <button @click="showAllHeadlines = false"
-                    class="text-sm text-gray-500 hover:text-gray-700">
-                Hide
-            </button>
-        </div>
-
+    <!-- Other headlines -->
+    <div x-show="showAllHeadlines" x-transition class="space-y-3 mb-32" id="all-headlines-section">
         {% for headline in headlines %}
-        <div class="headline-card bg-white rounded-lg border-2 p-6 cursor-pointer"
-             :class="{ 'selected': selectedHeadline === '{{ headline.text }}' }"
-             @click="selectHeadline('{{ headline.text }}', {{ headline.match_score }})">
+        {% if headline.id != recommended_headline.id %}
+        <div class="headline-card bg-white rounded-xl border-2 cursor-pointer"
+             :style="selectedHeadline === '{{ headline.text }}' ? 'border-color:#d97706;' : 'border-color:#e8e4dc;'"
+             @click="expandedHeadline = (expandedHeadline === {{ loop.index }} ? null : {{ loop.index }})">
 
-            <div class="flex items-start justify-between mb-4">
-                <div class="flex-1">
-                    <div class="flex items-center gap-3 mb-2">
-                        <span class="text-sm font-bold text-gray-500">Headline #{{ headline.number }}</span>
-                        <span class="px-3 py-1 rounded-full text-sm font-semibold
-                            {% if headline.match_score >= 80 %}bg-green-100 text-green-700
-                            {% elif headline.match_score >= 70 %}bg-blue-100 text-blue-700
-                            {% elif headline.match_score >= 60 %}bg-yellow-100 text-yellow-700
-                            {% else %}bg-gray-100 text-gray-600{% endif %}">
-                            {{ headline.match_score }}%
-                        </span>
-                        {% if headline.id == recommended_headline.id %}
-                        <span class="px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-semibold">
-                            Recommended
-                        </span>
-                        {% endif %}
+            <!-- Collapsed row -->
+            <div class="p-4 flex items-start justify-between">
+                <div class="flex items-start gap-3 flex-1">
+                    <div class="mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center"
+                         :style="selectedHeadline === '{{ headline.text }}' ? 'background:#d97706; border-color:#d97706;' : 'border-color:#d1cdc4;'">
+                        <svg x-show="selectedHeadline === '{{ headline.text }}'" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
                     </div>
-                    <p class="text-base text-gray-900 leading-relaxed">"{{ headline.text }}"</p>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-semibold text-gray-600">
+                            {{ headline.label if headline.label else 'Version ' + headline.number|string }}
+                        </p>
+                        <p class="text-xs text-gray-400 mt-0.5 truncate">"{{ headline.text[:80] }}..."</p>
+                    </div>
                 </div>
+                <span class="text-sm font-bold ml-3 flex-shrink-0 text-blue-600">{{ headline.match_score }}%</span>
             </div>
 
-            <!-- Analysis Details -->
-            {% if headline.tier == 'top' and headline.reasons %}
-            <div class="bg-gray-50 rounded-lg p-4 mb-3">
-                <p class="text-xs font-semibold text-gray-700 mb-2">Why this works:</p>
-                <ul class="space-y-1 text-xs text-gray-600">
-                    {% for reason in headline.reasons %}
-                    <li class="flex items-start">
-                        <span class="text-green-600 mr-2">✓</span>
-                        <span>{{ reason }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-
-            {% if headline.suggested_adaptation %}
-            <div class="bg-blue-50 border-l-2 border-blue-400 p-3 mb-3">
-                <p class="text-xs text-blue-800">
-                    <span class="font-semibold">Suggested:</span> {{ headline.suggested_adaptation }}
-                </p>
-            </div>
-            {% endif %}
-            {% endif %}
-
-            {% if headline.tier == 'other' and headline.weakness %}
-            <div class="bg-gray-50 rounded-lg p-3">
-                <p class="text-xs text-gray-600">
-                    <span class="font-semibold text-gray-700">Note:</span> {{ headline.weakness }}
-                </p>
-            </div>
-            {% endif %}
-
-            <!-- Selection indicator -->
-            <div x-show="selectedHeadline === '{{ headline.text }}'" class="mt-4 flex items-center text-green-600">
-                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-                </svg>
-                <span class="font-semibold text-sm">Selected</span>
+            <!-- Expanded -->
+            <div x-show="expandedHeadline === {{ loop.index }}" x-transition
+                 class="px-4 pb-4 border-t" style="border-color:#f0ece4;">
+                <p class="text-sm text-gray-700 leading-relaxed mt-3">"{{ headline.text }}"</p>
+                {% if headline.tier == 'other' and headline.weakness %}
+                <p class="text-xs text-gray-400 mt-2 italic">Note: {{ headline.weakness }}</p>
+                {% endif %}
+                <button @click.stop="selectAndContinue('{{ headline.text }}', {{ headline.match_score }})"
+                        class="mt-3 text-sm font-semibold text-white px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition">
+                    ✓ Use This Headline
+                </button>
             </div>
         </div>
+        {% endif %}
         {% endfor %}
     </div>
 
-    <!-- Fixed Bottom Bar (when headline selected from "All" section) -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4"
-         x-show="selectedHeadline !== null && selectedHeadline !== '{{ recommended_headline.text if recommended_headline else '' }}'">
-        <div class="max-w-5xl mx-auto flex items-center justify-between">
-            <div class="flex-1 mr-4">
-                <p class="text-sm text-gray-600">Selected headline:</p>
-                <p class="font-semibold text-gray-900 truncate" x-text="selectedHeadline"></p>
-            </div>
-            <button @click="saveAndContinue()"
-                    :disabled="saving"
-                    class="bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400 whitespace-nowrap">
-                <span x-show="!saving">Continue →</span>
-                <span x-show="saving">Saving...</span>
-            </button>
-        </div>
-    </div>
+</div>
 
+<!-- Fixed bottom bar — shows when an "other" headline is selected -->
+<div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg p-4"
+     style="border-top:2px solid #e8e4dc;"
+     x-show="selectedHeadline !== null && selectedHeadline !== '{{ recommended_headline.text if recommended_headline else '' }}'">
+    <div class="max-w-2xl mx-auto flex items-center justify-between">
+        <div class="flex-1 mr-4 min-w-0">
+            <p class="text-xs text-gray-400">Selected headline</p>
+            <p class="text-sm font-semibold text-gray-800 truncate" x-text="selectedHeadline"></p>
+        </div>
+        <button @click="saveAndContinue()"
+                :disabled="saving"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition disabled:bg-gray-300 whitespace-nowrap">
+            <span x-show="!saving">Continue →</span>
+            <span x-show="saving">Saving...</span>
+        </button>
+    </div>
 </div>
 
 <script>
@@ -243,6 +211,8 @@ function headlineSelector() {
         selectedHeadline: null,
         selectedMatchScore: 0,
         showAllHeadlines: false,
+        showReasons: false,
+        expandedHeadline: null,
         saving: false,
 
         selectAndContinue(headline, matchScore) {
@@ -256,18 +226,9 @@ function headlineSelector() {
             this.selectedMatchScore = matchScore;
         },
 
-        scrollToAll() {
-            setTimeout(() => {
-                document.getElementById('all-headlines-section')?.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'start'
-                });
-            }, 100);
-        },
-
         openCustomizeModal(headline) {
-            // TODO: Open chat modal for customization
-            alert('Chat customization coming in next update! For now, you can select a different headline or proceed with this one.');
+            // TODO: Chat customization — coming in step 2
+            alert('Customise with AI is coming soon. For now, use this headline or choose another.');
         },
 
         async saveAndContinue() {
@@ -275,9 +236,7 @@ function headlineSelector() {
                 alert('Please select a headline first');
                 return;
             }
-
             this.saving = true;
-
             try {
                 const response = await fetch('/customize-cv/headline', {
                     method: 'POST',
@@ -287,9 +246,7 @@ function headlineSelector() {
                         match_score: this.selectedMatchScore
                     })
                 });
-
                 const result = await response.json();
-
                 if (result.success) {
                     window.location.href = result.next_step;
                 } else {
@@ -297,7 +254,6 @@ function headlineSelector() {
                     this.saving = false;
                 }
             } catch (error) {
-                console.error('Error saving headline:', error);
                 alert('Failed to save headline. Please try again.');
                 this.saving = false;
             }
