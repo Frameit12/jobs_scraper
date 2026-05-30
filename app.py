@@ -3529,8 +3529,7 @@ def root():
     if get_current_user_id():
         return redirect("/ai-match")
     else:
-        # New visitor sees landing page
-        return render_template("landing-page.html")
+        return redirect("/login")
 
 @app.route("/app", methods=["GET", "POST"])
 def index():
