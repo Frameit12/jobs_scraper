@@ -185,10 +185,8 @@
         {% endfor %}
     </div>
 
-</div>
-
-<!-- AI Chat Modal (Customise with AI) -->
-<div x-show="chatOpen" x-cloak
+    <!-- AI Chat Modal (Customise with AI) -->
+    <div x-show="chatOpen" x-cloak
      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
      @click.self="closeChatModal()">
     <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col">
@@ -247,10 +245,10 @@
             </div>
         </div>
     </div>
-</div>
+    </div>
 
-<!-- Fixed bottom bar — shows when an "other" headline is selected -->
-<div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg p-4"
+    <!-- Fixed bottom bar — shows when an "other" headline is selected -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg p-4"
      style="border-top:2px solid #e8e4dc;"
      x-show="selectedHeadline !== null && selectedHeadline !== '{{ recommended_headline.text if recommended_headline else '' }}'">
     <div class="max-w-2xl mx-auto flex items-center justify-between">
@@ -265,6 +263,8 @@
             <span x-show="saving">Saving...</span>
         </button>
     </div>
+    </div>
+
 </div>
 
 <script>
