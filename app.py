@@ -1712,7 +1712,7 @@ def parse_roles_from_template(template_text):
                 next_line = lines[j].strip()
                 if (next_line and not has_date_range(next_line) and not is_bullet_line(next_line)
                         and 'PERMANENT ROLES' not in next_line.upper()
-                        and len(next_line) < 120):
+                        and len(next_line) < 300):
                     current_role['role_titles'].append(next_line)
                     i = j  # advance past the title line
 
