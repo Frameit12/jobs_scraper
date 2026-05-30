@@ -186,80 +186,98 @@
             <div class="step-body {% if not has_custom_prompt %}open{% endif %}" id="body-1">
                 <div class="border-t border-gray-100 pt-5">
 
-                    <!-- Quick Builder -->
+                    <!-- Sub-step 1: Answer questions -->
+                    <div class="mb-6">
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
+                            <p class="text-sm font-semibold text-slate-700">Answer these three questions <span class="text-slate-400 font-normal">(select all that apply, or type your own)</span></p>
+                        </div>
+
+                        <div class="pl-8">
+                            <div class="mb-4">
+                                <p class="text-sm font-medium text-slate-600 mb-2">What roles are you targeting?</p>
+                                <div id="roles-tags">
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Technology Risk</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Programme Manager</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Business Manager</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Operational Risk</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">AI Governance</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Controls Lead</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Risk & Controls</span>
+                                </div>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <input id="roles-custom-input" type="text" placeholder="Type your own and press Enter…"
+                                           class="text-sm border border-gray-200 rounded-full px-3 py-1 focus:outline-none focus:border-amber-400 w-52"
+                                           onkeydown="if(event.key==='Enter'){event.preventDefault();builderAddCustomTag('roles-tags','roles-custom-input');}">
+                                    <button type="button" class="text-sm text-amber-600 hover:text-amber-800 font-medium" onclick="builderAddCustomTag('roles-tags','roles-custom-input')">+ Add</button>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <p class="text-sm font-medium text-slate-600 mb-2">What seniority level are you targeting?</p>
+                                <div id="seniority-tags">
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">VP</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Director</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Senior Manager</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Managing Director</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Executive Director</span>
+                                </div>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <input id="seniority-custom-input" type="text" placeholder="Type your own and press Enter…"
+                                           class="text-sm border border-gray-200 rounded-full px-3 py-1 focus:outline-none focus:border-amber-400 w-52"
+                                           onkeydown="if(event.key==='Enter'){event.preventDefault();builderAddCustomTag('seniority-tags','seniority-custom-input');}">
+                                    <button type="button" class="text-sm text-amber-600 hover:text-amber-800 font-medium" onclick="builderAddCustomTag('seniority-tags','seniority-custom-input')">+ Add</button>
+                                </div>
+                            </div>
+
+                            <div class="mb-2">
+                                <p class="text-sm font-medium text-slate-600 mb-2">What key strengths do you want to highlight?</p>
+                                <div id="strengths-tags">
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Regulatory remediation</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">AI governance</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Stakeholder management</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Data & KRI reporting</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">1LoD / 2LoD controls</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Consent order delivery</span>
+                                    <span class="builder-tag" onclick="builderToggleTag(this)">Transformation programmes</span>
+                                </div>
+                                <div class="flex items-center gap-2 mt-2">
+                                    <input id="strengths-custom-input" type="text" placeholder="Type your own and press Enter…"
+                                           class="text-sm border border-gray-200 rounded-full px-3 py-1 focus:outline-none focus:border-amber-400 w-52"
+                                           onkeydown="if(event.key==='Enter'){event.preventDefault();builderAddCustomTag('strengths-tags','strengths-custom-input');}">
+                                    <button type="button" class="text-sm text-amber-600 hover:text-amber-800 font-medium" onclick="builderAddCustomTag('strengths-tags','strengths-custom-input')">+ Add</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-step 2: Generate -->
+                    <div class="mb-6">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+                            <p class="text-sm font-semibold text-slate-700">Generate your AI prompt from your answers</p>
+                        </div>
+                        <div class="pl-8">
+                            <button class="btn-amber text-sm" onclick="builderGenerate()">✨ Generate Prompt</button>
+                        </div>
+                    </div>
+
+                    <!-- Sub-step 3: Review & Save -->
                     <div class="mb-5">
-                        <p class="section-label">Quick Builder — select to generate a prompt</p>
-
-                        <div class="mb-4">
-                            <p class="text-sm font-medium text-slate-700 mb-2">What roles are you targeting? <span class="text-slate-400 font-normal">(select all that apply)</span></p>
-                            <div id="roles-tags">
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Technology Risk</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Programme Manager</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Business Manager</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Operational Risk</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">AI Governance</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Controls Lead</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Risk & Controls</span>
-                            </div>
-                            <div class="flex items-center gap-2 mt-2">
-                                <input id="roles-custom-input" type="text" placeholder="Add your own…"
-                                       class="text-sm border border-gray-200 rounded-full px-3 py-1 focus:outline-none focus:border-amber-400 w-40"
-                                       onkeydown="if(event.key==='Enter'){event.preventDefault();builderAddCustomTag('roles-tags','roles-custom-input');}">
-                                <button type="button" class="text-sm text-amber-600 hover:text-amber-800 font-medium" onclick="builderAddCustomTag('roles-tags','roles-custom-input')">+ Add</button>
-                            </div>
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
+                            <p class="text-sm font-semibold text-slate-700">Review your prompt, edit if needed, then save</p>
                         </div>
-
-                        <div class="mb-4">
-                            <p class="text-sm font-medium text-slate-700 mb-2">Seniority level <span class="text-slate-400 font-normal">(select all that apply)</span></p>
-                            <div id="seniority-tags">
-                                <span class="builder-tag" onclick="builderToggleTag(this)">VP</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Director</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Senior Manager</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Managing Director</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Executive Director</span>
+                        <div class="pl-8">
+                            <textarea id="custom-prompt-input" rows="6" placeholder="Click Generate above to create your prompt, or write your own here…">{{ current_prompt_text }}</textarea>
+                            <p class="text-xs text-slate-400 mt-1">This is what the AI uses to evaluate your CV against each job. The more specific, the better.</p>
+                            <div class="flex gap-3 flex-wrap mt-3">
+                                <button class="btn-amber" onclick="savePromptStep()">Save Prompt →</button>
+                                <button class="btn-outline" onclick="toggleStep(1)">Collapse</button>
                             </div>
-                            <div class="flex items-center gap-2 mt-2">
-                                <input id="seniority-custom-input" type="text" placeholder="Add your own…"
-                                       class="text-sm border border-gray-200 rounded-full px-3 py-1 focus:outline-none focus:border-amber-400 w-40"
-                                       onkeydown="if(event.key==='Enter'){event.preventDefault();builderAddCustomTag('seniority-tags','seniority-custom-input');}">
-                                <button class="text-sm text-amber-600 hover:text-amber-800 font-medium" onclick="builderAddCustomTag('seniority-tags','seniority-custom-input')">+ Add</button>
-                            </div>
+                            <p id="prompt-save-msg" class="text-sm text-amber-600 mt-2 hidden"></p>
                         </div>
-
-                        <div class="mb-5">
-                            <p class="text-sm font-medium text-slate-700 mb-2">Key strengths to highlight <span class="text-slate-400 font-normal">(select all that apply)</span></p>
-                            <div id="strengths-tags">
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Regulatory remediation</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">AI governance</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Stakeholder management</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Data & KRI reporting</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">1LoD / 2LoD controls</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Consent order delivery</span>
-                                <span class="builder-tag" onclick="builderToggleTag(this)">Transformation programmes</span>
-                            </div>
-                            <div class="flex items-center gap-2 mt-2">
-                                <input id="strengths-custom-input" type="text" placeholder="Add your own…"
-                                       class="text-sm border border-gray-200 rounded-full px-3 py-1 focus:outline-none focus:border-amber-400 w-40"
-                                       onkeydown="if(event.key==='Enter'){event.preventDefault();builderAddCustomTag('strengths-tags','strengths-custom-input');}">
-                                <button class="text-sm text-amber-600 hover:text-amber-800 font-medium" onclick="builderAddCustomTag('strengths-tags','strengths-custom-input')">+ Add</button>
-                            </div>
-                        </div>
-
-                        <button class="btn-outline text-sm" onclick="builderGenerate()">✨ Generate Prompt from My Answers</button>
                     </div>
-
-                    <!-- Prompt textarea -->
-                    <div class="mb-5">
-                        <p class="section-label">Your AI Prompt <span class="text-amber-600 font-medium normal-case">(editable — this is what the AI uses to evaluate your CV)</span></p>
-                        <textarea id="custom-prompt-input" rows="6" placeholder="Select options above and click Generate, or write your own prompt here...">{{ current_prompt_text }}</textarea>
-                        <p class="text-xs text-slate-400 mt-1">This prompt tells the AI how to evaluate your CV against each job. The more specific, the better.</p>
-                    </div>
-
-                    <div class="flex gap-3 flex-wrap">
-                        <button class="btn-amber" onclick="savePromptStep()">Save Prompt</button>
-                        <button class="btn-outline" onclick="toggleStep(1)">Collapse</button>
-                    </div>
-                    <p id="prompt-save-msg" class="text-sm text-amber-600 mt-2 hidden"></p>
                 </div>
             </div>
         </div>
