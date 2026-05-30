@@ -94,6 +94,7 @@ def init_users_table():
             """))
             conn.commit()
 
+init_database()
 init_users_table()
 
 def init_files_table():
@@ -1360,11 +1361,11 @@ def parse_headlines_from_template(template_text):
 
 
 def parse_bullets_from_template(template_text):
-    """Extract all bullet points from JP Morgan section in master template
+    """Extract all bullet points from the experience bullets section in master template
 
     Template structure:
-    - Section header: "JP MORGAN CHASE BULLETS (66 Unique Variations)"
-    - Category markers: "CATEGORY: [Name]"
+    - Section header: "EXPERIENCE BULLETS" (generic) or legacy "JP MORGAN CHASE BULLETS (XX Unique Variations)"
+    - Category markers (optional): "CATEGORY: [Name]"
     - Bullets: Plain text paragraphs (no prefix markers)
     """
     import re
@@ -1375,20 +1376,24 @@ def parse_bullets_from_template(template_text):
     in_bullets_section = False
     current_category = "Uncategorized"
 
-    print(f"\n=== PARSING JP MORGAN BULLETS ===")
+    print(f"\n=== PARSING EXPERIENCE BULLETS ===")
     print(f"Total lines in template: {len(lines)}")
 
     for i, line in enumerate(lines):
         line_stripped = line.strip()
 
-        # Detect start of JP Morgan bullets section
-        # Must match the exact pattern: "JP MORGAN CHASE BULLETS (XX Unique Variations)"
-        # NOT just any line mentioning "JP Morgan" and "bullets"
-        if ('JP MORGAN' in line_stripped.upper() and
-            'BULLETS' in line_stripped.upper() and  # Note: BULLETS plural
-            'VARIATION' in line_stripped.upper()):  # And contains "Variation"
+        # Detect start of bullets section
+        # Accepts generic format: "EXPERIENCE BULLETS"
+        # Also accepts legacy format: "JP MORGAN CHASE BULLETS (XX Unique Variations)"
+        upper_stripped = line_stripped.upper()
+        is_generic_header = 'EXPERIENCE BULLETS' in upper_stripped
+        is_legacy_header = ('JP MORGAN' in upper_stripped and
+                            'BULLETS' in upper_stripped and
+                            'VARIATION' in upper_stripped)
+
+        if is_generic_header or is_legacy_header:
             in_bullets_section = True
-            print(f"✓ Found JP MORGAN BULLETS section at line {i}: '{line_stripped}'")
+            print(f"✓ Found BULLETS section at line {i}: '{line_stripped}'")
             continue
 
         # Only process if we're in the bullets section
@@ -1434,7 +1439,6 @@ def parse_bullets_from_template(template_text):
             print(f"  ⚠ Line {i}: Skipped (too short, {len(line_stripped)} chars): '{line_stripped}'")
 
     print(f"\n=== TOTAL BULLETS FOUND: {len(bullets)} ===")
-    print(f"Expected: 66 bullets")
 
     if len(bullets) > 0:
         # Show category breakdown
@@ -1749,19 +1753,27 @@ def analyze_bullets_with_ai(bullets, job_description, user_id):
     client = get_anthropic_client()
     system_prompt = get_user_system_prompt(user_id)
 
-    # Group bullets by category for better context
-    bullets_by_category = {}
-    for bullet in bullets:
-        cat = bullet['category']
-        if cat not in bullets_by_category:
-            bullets_by_category[cat] = []
-        bullets_by_category[cat].append(bullet)
+    # Group bullets by category if categories exist, otherwise use flat list
+    has_categories = any(bullet['category'] != 'Uncategorized' for bullet in bullets)
 
-    # Build bullets text organized by category
-    bullets_text = ""
-    for category, cat_bullets in bullets_by_category.items():
-        bullets_text += f"\n**{category}:**\n"
-        for bullet in cat_bullets:
+    if has_categories:
+        bullets_by_category = {}
+        for bullet in bullets:
+            cat = bullet['category']
+            if cat not in bullets_by_category:
+                bullets_by_category[cat] = []
+            bullets_by_category[cat].append(bullet)
+
+        # Build bullets text organized by category
+        bullets_text = ""
+        for category, cat_bullets in bullets_by_category.items():
+            bullets_text += f"\n**{category}:**\n"
+            for bullet in cat_bullets:
+                bullets_text += f"{bullet['number']}. {bullet['text']}\n"
+    else:
+        # No categories — flat numbered list
+        bullets_text = "\n"
+        for bullet in bullets:
             bullets_text += f"{bullet['number']}. {bullet['text']}\n"
 
     try:
@@ -1784,7 +1796,7 @@ def analyze_bullets_with_ai(bullets, job_description, user_id):
 **JOB DESCRIPTION:**
 {job_description}
 
-**AVAILABLE BULLETS (66 total, organized by category):**
+**AVAILABLE BULLETS ({len(bullets)} total{', organized by category' if has_categories else ''}):**
 {bullets_text}
 
 **YOUR TASK:**
@@ -1792,7 +1804,7 @@ def analyze_bullets_with_ai(bullets, job_description, user_id):
 2. **Select top 8-10 bullets** that:
    - Best demonstrate required skills/experience
    - Show quantifiable impact matching JD priorities
-   - Cover diverse aspects of the role (not all from one category)
+   - {'Cover diverse aspects of the role (not all from one category)' if has_categories else 'Cover diverse aspects of the role (vary the skills and experience shown)'}
    - Tell a compelling story about candidate's fit
 
 3. **CRITICAL: Order bullets by priority** - Return bullets in descending order by match_score (highest first)
@@ -2722,7 +2734,7 @@ def get_real_ip():
     forwarded_for = request.headers.get('X-Forwarded-For', '')
     if forwarded_for:
         return forwarded_for.split(',')[0].strip()
-    return request.remote_address
+    return request.remote_addr
 
 limiter = Limiter(
     get_real_ip,
@@ -2783,7 +2795,6 @@ def load_config():
         return json.load(f)
 
 config = load_config()
-init_database()
 
 def load_saved_searches():
     engine = get_db_connection()
@@ -6715,6 +6726,14 @@ def delete_analysis(analysis_id):
         return jsonify({'error': 'Failed to delete analysis'}), 500
 
 
+@app.route("/user-guide", methods=["GET"])
+def user_guide():
+    """User guide page"""
+    if 'user_id' not in session:
+        return redirect('/login')
+    return render_template('user_guide.html')
+
+
 @app.route("/prompt-settings", methods=["GET"])
 def prompt_settings():
     """Display prompt settings page"""
@@ -6771,11 +6790,14 @@ def prompt_settings():
                 current_template_name = template_name or "Custom"
                 current_prompt_text = custom_prompt if custom_prompt else template_prompt
 
+            has_custom_prompt = bool(user_pref_row and user_pref_row[1])
+
             return render_template('prompt_settings.html',
                                  templates=templates,
                                  current_template_id=current_template_id,
                                  current_template_name=current_template_name,
-                                 current_prompt_text=current_prompt_text)
+                                 current_prompt_text=current_prompt_text,
+                                 has_custom_prompt=has_custom_prompt)
 
     except Exception as e:
         print(f"Error loading prompt settings: {e}")
@@ -6869,6 +6891,92 @@ def switch_template():
         return jsonify({'error': 'Failed to switch template'}), 500
 
 
+@app.route("/save-custom-prompt", methods=["POST"])
+def save_custom_prompt():
+    """Save a custom prompt text for the user"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.get_json()
+        custom_prompt = data.get('custom_prompt', '').strip()
+
+        if not custom_prompt:
+            return jsonify({'error': 'Prompt text cannot be empty'}), 400
+
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            # Check if user already has an active preference
+            result = conn.execute(text("""
+                SELECT id FROM user_prompt_preferences
+                WHERE user_id = :user_id AND is_active = TRUE
+                LIMIT 1
+            """), {"user_id": user_id})
+
+            existing = result.fetchone()
+
+            if existing:
+                # Update existing preference with custom prompt
+                conn.execute(text("""
+                    UPDATE user_prompt_preferences
+                    SET custom_prompt_text = :custom_prompt
+                    WHERE id = :pref_id
+                """), {"custom_prompt": custom_prompt, "pref_id": existing[0]})
+            else:
+                # Create new preference with just custom prompt (no template)
+                conn.execute(text("""
+                    INSERT INTO user_prompt_preferences (user_id, custom_prompt_text, is_active)
+                    VALUES (:user_id, :custom_prompt, TRUE)
+                """), {"user_id": user_id, "custom_prompt": custom_prompt})
+
+            conn.commit()
+
+        log_user_activity('custom_prompt_saved', 'User saved a custom prompt')
+
+        return jsonify({'success': True, 'message': 'Custom prompt saved successfully'})
+
+    except Exception as e:
+        print(f"Error saving custom prompt: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to save custom prompt'}), 500
+
+
+@app.route("/clear-custom-prompt", methods=["POST"])
+def clear_custom_prompt():
+    """Clear user's custom prompt and revert to selected template"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        engine = get_db_connection()
+        if not engine:
+            return jsonify({'error': 'Database error'}), 500
+
+        with engine.connect() as conn:
+            conn.execute(text("""
+                UPDATE user_prompt_preferences
+                SET custom_prompt_text = NULL
+                WHERE user_id = :user_id AND is_active = TRUE
+            """), {"user_id": user_id})
+            conn.commit()
+
+        log_user_activity('custom_prompt_cleared', 'User reset to template prompt')
+
+        return jsonify({'success': True, 'message': 'Reset to template prompt'})
+
+    except Exception as e:
+        print(f"Error clearing custom prompt: {e}")
+        return jsonify({'error': 'Failed to reset prompt'}), 500
+
+
 @app.route("/ai-usage-stats", methods=["GET"])
 def ai_usage_stats():
     """Get AI usage statistics for the user"""
@@ -6960,7 +7068,8 @@ def ai_diagnostic():
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8080, debug=False)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=False)
 
 
 

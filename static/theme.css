@@ -1,0 +1,227 @@
+/* ══════════════════════════════════════════════════════════
+   Find Me A Job — Claude Warm Theme
+   Single source of truth for all colours and typography.
+   Import Inter, then override Tailwind utilities globally.
+   ══════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Base ────────────────────────────────────────────────── */
+html, body {
+    font-family: 'Inter', 'Open Sans', 'Segoe UI', Arial, sans-serif !important;
+}
+body {
+    background-color: #f7f5f0 !important;
+    background-image: none !important;
+}
+
+/* Strip Tailwind gradients used as body bg */
+.bg-gradient-to-br { background-image: none !important; background-color: #f7f5f0 !important; }
+.from-slate-50    { --tw-gradient-from: #f7f5f0 !important; }
+.to-blue-50       { --tw-gradient-to:   #f7f5f0 !important; }
+.bg-gray-50       { background-color: #f7f5f0 !important; }
+.bg-gray-100      { background-color: #f0ece4 !important; }
+
+/* ── Nav topbar ──────────────────────────────────────────── */
+.bg-slate-800               { background-color: #2b2b2b !important; }
+.hover\:bg-slate-800:hover  { background-color: #1a1a1a !important; }
+.bg-slate-700               { background-color: #2b2b2b !important; }
+.hover\:bg-slate-700:hover  { background-color: #1a1a1a !important; }
+.bg-slate-600               { background-color: #3a3a3a !important; }
+.hover\:bg-slate-600:hover  { background-color: #2b2b2b !important; }
+.hover\:bg-slate-500:hover  { background-color: #3a3a3a !important; }
+
+/* ── Active tab indicator ────────────────────────────────── */
+.tab.active           { border-bottom-color: #d97706 !important; }
+.border-emerald-400   { border-color: #d97706 !important; }
+
+/* ── Blue → Amber (buttons, links, accents) ──────────────── */
+.bg-blue-600               { background-color: #d97706 !important; }
+.bg-blue-700               { background-color: #b45309 !important; }
+.hover\:bg-blue-700:hover  { background-color: #b45309 !important; }
+.hover\:bg-blue-600:hover  { background-color: #d97706 !important; }
+.text-blue-600             { color: #d97706 !important; }
+.text-blue-500             { color: #d97706 !important; }
+.hover\:text-blue-800:hover { color: #92400e !important; }
+.bg-blue-50                { background-color: #fffbeb !important; }
+.border-blue-500           { border-color: #d97706 !important; }
+.border-blue-300           { border-color: #fcd34d !important; }
+.text-blue-800             { color: #92400e !important; }
+.text-blue-900             { color: #78350f !important; }
+.ring-blue-500             { --tw-ring-color: rgba(217,119,6,0.35) !important; }
+.focus\:ring-blue-500:focus {
+    --tw-ring-color: rgba(217,119,6,0.35) !important;
+    box-shadow: 0 0 0 3px rgba(217,119,6,0.15) !important;
+}
+.focus\:ring-2:focus { --tw-ring-color: rgba(217,119,6,0.35) !important; }
+.focus\:border-transparent:focus { border-color: #d97706 !important; }
+
+/* ── Indigo (Guided Prompt Builder) → Amber ─────────────── */
+.bg-indigo-600               { background-color: #d97706 !important; }
+.hover\:bg-indigo-700:hover  { background-color: #b45309 !important; }
+.bg-indigo-100               { background-color: #fef3c7 !important; }
+.text-indigo-600             { color: #d97706 !important; }
+.text-indigo-700             { color: #92400e !important; }
+.border-indigo-100           { border-color: #fde68a !important; }
+.focus\:ring-indigo-400:focus {
+    --tw-ring-color: rgba(217,119,6,0.35) !important;
+    box-shadow: 0 0 0 3px rgba(217,119,6,0.15) !important;
+}
+
+/* ── Prompt builder tags ─────────────────────────────────── */
+.builder-tag:hover   { background: #f59e0b !important; border-color: #f59e0b !important; color: white !important; }
+.builder-tag.selected { background: #d97706 !important; border-color: #d97706 !important; color: white !important; }
+
+/* ── CV selection cards ──────────────────────────────────── */
+.headline-card:hover  { border-color: #d97706 !important; box-shadow: 0 4px 12px rgba(217,119,6,0.12) !important; }
+.headline-card.selected { border-color: #d97706 !important; background: #fffbeb !important; }
+.bullet-card.approved   { border-color: #d97706 !important; background: #fffbeb !important; }
+.cv-card.selected       { border-color: #d97706 !important; background: #fffbeb !important; }
+
+/* ── Prompt template cards ───────────────────────────────── */
+.template-card:hover   { border-color: #d97706 !important; box-shadow: 0 4px 12px rgba(217,119,6,0.12) !important; }
+.template-card.selected { border-color: #d97706 !important; background: #fffbeb !important; }
+
+/* ── Card borders ────────────────────────────────────────── */
+.border-gray-200 { border-color: #e8e4dc !important; }
+.border-gray-300 { border-color: #e0dbd2 !important; }
+
+/* ── Progress bars ───────────────────────────────────────── */
+.bg-blue-600.rounded-full { background-color: #d97706 !important; }
+
+/* ── Hover card borders (interview prep) ─────────────────── */
+.hover\:border-blue-300:hover { border-color: #fcd34d !important; }
+
+/* ══════════════════════════════════════════════════════════
+   AUTH PAGES — Claude Warm standalone design
+   (login, signup, forgot_password, reset_password)
+   ══════════════════════════════════════════════════════════ */
+.cw-auth-page {
+    min-height: 100vh;
+    background: #f7f5f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    font-family: 'Inter', sans-serif;
+}
+.cw-auth-brand {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1a1a;
+    letter-spacing: -0.4px;
+    margin-bottom: 6px;
+    text-align: center;
+}
+.cw-auth-tagline {
+    font-size: 13px;
+    color: #7a7570;
+    margin-bottom: 32px;
+    text-align: center;
+}
+.cw-auth-card {
+    background: #ffffff;
+    border: 1px solid #e8e4dc;
+    border-radius: 14px;
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.cw-auth-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+}
+.cw-auth-subtitle {
+    font-size: 13px;
+    color: #7a7570;
+    margin-bottom: 28px;
+    line-height: 1.5;
+}
+.cw-form-group { margin-bottom: 18px; }
+.cw-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #3a3530;
+    margin-bottom: 6px;
+}
+.cw-hint {
+    font-size: 11px;
+    color: #9a9590;
+    margin-top: 4px;
+}
+.cw-input {
+    width: 100%;
+    border: 1px solid #ddd9d1;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    color: #1a1a1a;
+    background: #faf9f6;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+}
+.cw-input:focus {
+    border-color: #d97706;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(217,119,6,0.12);
+}
+.cw-btn {
+    width: 100%;
+    background: #d97706;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 0;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-top: 6px;
+}
+.cw-btn:hover { background: #b45309; }
+.cw-btn-dark {
+    background: #2b2b2b;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 0;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: background 0.15s;
+    width: 100%;
+    margin-top: 6px;
+}
+.cw-btn-dark:hover { background: #1a1a1a; }
+.cw-auth-footer {
+    text-align: center;
+    font-size: 13px;
+    color: #7a7570;
+    margin-top: 20px;
+}
+.cw-auth-footer a { color: #d97706; font-weight: 500; text-decoration: none; }
+.cw-auth-footer a:hover { color: #b45309; }
+.cw-divider {
+    border: none;
+    border-top: 1px solid #e8e4dc;
+    margin: 20px 0;
+}
+.cw-alert {
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+.cw-alert-error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.cw-alert-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }

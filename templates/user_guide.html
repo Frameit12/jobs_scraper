@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>User Guide — Find Me A Job</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/theme.css">
+    <style>
+        .tab {
+            position: relative;
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 3px solid transparent;
+            text-decoration: none;
+            display: inline-block;
+            color: #999;
+        }
+        .tab:hover { background: rgba(255,255,255,0.08); color: #e8e5df; }
+        .tab.active { border-bottom-color: #d97706; color: #f7f5f0; font-weight: 600; }
+
+        .accordion-body { display: none; }
+        .accordion-body.open { display: block; }
+        .accordion-arrow { transition: transform 0.2s; display: inline-block; }
+        .accordion-arrow.open { transform: rotate(180deg); }
+
+        .step-card {
+            background: #faf9f6;
+            border: 1px solid #e8e4dc;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .step-card a { color: #d97706; font-size: 13px; font-weight: 500; text-decoration: none; }
+        .step-card a:hover { color: #b45309; text-decoration: underline; }
+
+        .accordion-btn {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+            transition: background 0.15s;
+            border-radius: 12px;
+        }
+        .accordion-btn:hover { background: #faf9f6; }
+
+        .tip-box {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #78350f;
+            margin-top: 16px;
+            line-height: 1.6;
+        }
+        .note-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #991b1b;
+            margin-top: 12px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Header -->
+    <div class="bg-slate-800 text-white p-6 mb-8">
+        <div class="max-w-5xl mx-auto">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h1 class="text-3xl font-bold">Find Me A Job</h1>
+                    <p class="text-slate-300 mt-1">Your AI-powered career companion</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <a href="/my-resume-template" class="text-slate-300 hover:text-white transition-colors text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Resume
+                    </a>
+                    <a href="/prompt-settings" class="text-slate-300 hover:text-white transition-colors text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                        AI Prompt
+                    </a>
+                    <a href="/settings" class="text-slate-300 hover:text-white transition-colors text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        Settings
+                    </a>
+                    <a href="/logout" class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        Logout
+                    </a>
+                </div>
+            </div>
+
+            <!-- Tab Nav -->
+            <div class="flex border-b border-slate-600" style="border-color: #3a3a3a;">
+                <a href="/ai-match" class="tab">
+                    <svg class="w-5 h-5 inline-block mr-2 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                    AI Match Tool
+                </a>
+                <a href="/interview-prep" class="tab">
+                    <svg class="w-5 h-5 inline-block mr-2 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    Interview Prep
+                </a>
+                <div class="tab active">
+                    <svg class="w-5 h-5 inline-block mr-2 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    User Guide
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Content -->
+    <div class="max-w-5xl mx-auto px-6 pb-16">
+
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold" style="color:#1a1a1a; letter-spacing:-0.4px;">User Guide</h2>
+            <p style="color:#7a7570; font-size:14px; margin-top:6px;">Everything you need to get started and make the most of this tool.</p>
+        </div>
+
+        <!-- ── PART 1: Quick Start ── -->
+        <div class="bg-white rounded-xl p-8 mb-6" style="border:1px solid #e8e4dc; box-shadow:0 1px 4px rgba(0,0,0,0.05);">
+            <div class="flex items-center gap-3 mb-6">
+                <span style="font-size:22px;">🚀</span>
+                <h3 class="text-lg font-bold" style="color:#1a1a1a;">Quick Start — be ready in 4 steps</h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Step 1 -->
+                <div class="step-card">
+                    <div style="font-size:24px; margin-bottom:10px;">1️⃣</div>
+                    <h4 class="font-semibold mb-2" style="color:#1a1a1a; font-size:14px;">Upload your resume template</h4>
+                    <p style="font-size:13px; color:#7a7570; line-height:1.6; margin-bottom:10px;">Go to <strong>Resume</strong> in the top nav. Upload your master .docx file with your headline variations and experience bullets.</p>
+                    <a href="#section-resume" onclick="openSection('section-resume')">See format guide →</a>
+                </div>
+                <!-- Step 2 -->
+                <div class="step-card">
+                    <div style="font-size:24px; margin-bottom:10px;">2️⃣</div>
+                    <h4 class="font-semibold mb-2" style="color:#1a1a1a; font-size:14px;">Set up your AI prompt</h4>
+                    <p style="font-size:13px; color:#7a7570; line-height:1.6; margin-bottom:10px;">Go to <strong>AI Prompt</strong> in the top nav. Use the default, or use the Guided Builder to create a personalised prompt.</p>
+                    <a href="#section-prompt" onclick="openSection('section-prompt')">Learn more →</a>
+                </div>
+                <!-- Step 3 -->
+                <div class="step-card">
+                    <div style="font-size:24px; margin-bottom:10px;">3️⃣</div>
+                    <h4 class="font-semibold mb-2" style="color:#1a1a1a; font-size:14px;">Analyse a job</h4>
+                    <p style="font-size:13px; color:#7a7570; line-height:1.6; margin-bottom:10px;">Go to <strong>AI Match Tool</strong>. Paste a job description and click <em>Analyse Job</em>. Get a match score and bullet recommendations.</p>
+                    <a href="#section-aimatch" onclick="openSection('section-aimatch')">Learn more →</a>
+                </div>
+                <!-- Step 4 -->
+                <div class="step-card">
+                    <div style="font-size:24px; margin-bottom:10px;">4️⃣</div>
+                    <h4 class="font-semibold mb-2" style="color:#1a1a1a; font-size:14px;">Download your tailored CV</h4>
+                    <p style="font-size:13px; color:#7a7570; line-height:1.6; margin-bottom:10px;">Click <em>Customise CV for this role</em>, review the AI-selected bullets, then download your ready-to-send .docx file.</p>
+                    <a href="#section-customise" onclick="openSection('section-customise')">Learn more →</a>
+                </div>
+            </div>
+
+            <div class="tip-box">
+                💡 <strong>Tip:</strong> You only need to upload your resume template once. After that, every job analysis and CV customisation will use it automatically.
+            </div>
+        </div>
+
+        <!-- ── PART 2: Full Reference ── -->
+        <div class="mb-4">
+            <h3 class="font-bold" style="color:#1a1a1a; font-size:16px;">Full Feature Reference</h3>
+            <p style="font-size:13px; color:#7a7570; margin-top:4px;">Click any section to expand it.</p>
+        </div>
+
+        <!-- Resume Template -->
+        <div id="section-resume" class="bg-white rounded-xl mb-3" style="border:1px solid #e8e4dc;">
+            <button class="accordion-btn" onclick="toggleSection('section-resume')">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:18px;">📄</span>
+                    <span class="font-semibold" style="color:#1a1a1a; font-size:15px;">My Resume Template</span>
+                </div>
+                <svg id="arrow-section-resume" class="accordion-arrow w-5 h-5" style="color:#9a9590;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div id="body-section-resume" class="accordion-body px-6 pb-6">
+                <hr style="border:none; border-top:1px solid #e8e4dc; margin-bottom:20px;">
+                <p style="font-size:13.5px; color:#4a4540; line-height:1.7; margin-bottom:16px;">Your resume template is the master file the AI draws from when customising your CV for each job. You upload it once and it stays on your profile.</p>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">What you need to upload</h5>
+                <ul style="font-size:13.5px; color:#4a4540; line-height:1.8; padding-left:20px; margin-bottom:16px;">
+                    <li>A <strong>.docx</strong> (Word) file — PDFs are not supported</li>
+                    <li>Must contain a <strong>HEADLINE VARIATIONS</strong> section and an <strong>EXPERIENCE BULLETS</strong> section using those exact headings</li>
+                    <li>Each bullet must be on its own line, at least 80 characters long</li>
+                    <li>Optionally group bullets under category sub-headings (e.g. <em>Risk Management</em>, <em>Leadership</em>) to improve AI selection accuracy</li>
+                </ul>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">How to update it</h5>
+                <p style="font-size:13.5px; color:#4a4540; line-height:1.7;">Go to <strong>Resume</strong> in the top nav → upload a new file at any time to replace the existing one. The page also shows the required format so you always know what's expected.</p>
+            </div>
+        </div>
+
+        <!-- AI Prompt -->
+        <div id="section-prompt" class="bg-white rounded-xl mb-3" style="border:1px solid #e8e4dc;">
+            <button class="accordion-btn" onclick="toggleSection('section-prompt')">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:18px;">🤖</span>
+                    <span class="font-semibold" style="color:#1a1a1a; font-size:15px;">AI Prompt Settings</span>
+                </div>
+                <svg id="arrow-section-prompt" class="accordion-arrow w-5 h-5" style="color:#9a9590;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div id="body-section-prompt" class="accordion-body px-6 pb-6">
+                <hr style="border:none; border-top:1px solid #e8e4dc; margin-bottom:20px;">
+                <p style="font-size:13.5px; color:#4a4540; line-height:1.7; margin-bottom:16px;">The AI prompt controls <em>how</em> the AI selects and scores your CV bullets. It runs every time you click <strong>Customise CV for this role</strong>.</p>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">Default template vs custom prompt</h5>
+                <ul style="font-size:13.5px; color:#4a4540; line-height:1.8; padding-left:20px; margin-bottom:16px;">
+                    <li><strong>Default template:</strong> A pre-written prompt that works well for most finance roles. No setup needed.</li>
+                    <li><strong>Custom prompt:</strong> Personalise the AI instructions. Use the <strong>Guided Builder</strong> — answer a few quick questions and it writes the prompt for you automatically.</li>
+                </ul>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">How to use the Guided Builder</h5>
+                <p style="font-size:13.5px; color:#4a4540; line-height:1.7; margin-bottom:8px;">Go to <strong>AI Prompt</strong> → fill in the target role, seniority, industry, and strengths → click <strong>Generate My Prompt</strong> → review the result → click <strong>Save Custom Prompt</strong>.</p>
+
+                <div class="tip-box">
+                    💡 If you're new, start with the default prompt. Only customise once you've run a few analyses and know what you'd like to change.
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Match -->
+        <div id="section-aimatch" class="bg-white rounded-xl mb-3" style="border:1px solid #e8e4dc;">
+            <button class="accordion-btn" onclick="toggleSection('section-aimatch')">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:18px;">🎯</span>
+                    <span class="font-semibold" style="color:#1a1a1a; font-size:15px;">Job Match Analysis</span>
+                </div>
+                <svg id="arrow-section-aimatch" class="accordion-arrow w-5 h-5" style="color:#9a9590;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div id="body-section-aimatch" class="accordion-body px-6 pb-6">
+                <hr style="border:none; border-top:1px solid #e8e4dc; margin-bottom:20px;">
+                <p style="font-size:13.5px; color:#4a4540; line-height:1.7; margin-bottom:16px;">This is the core feature. Paste any job description and the AI compares it against your resume bullets to find the best fit.</p>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">Step by step</h5>
+                <ol style="font-size:13.5px; color:#4a4540; line-height:1.8; padding-left:20px; margin-bottom:16px;">
+                    <li>Go to the <strong>AI Match Tool</strong> tab</li>
+                    <li>Paste the full job description into the text box</li>
+                    <li>Click <strong>Analyse Job</strong> — this usually takes 10–30 seconds</li>
+                    <li>Review your match score and the recommended bullets</li>
+                    <li>Click <strong>Customise CV for this role</strong> when ready</li>
+                </ol>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">What the score means</h5>
+                <ul style="font-size:13.5px; color:#4a4540; line-height:1.8; padding-left:20px; margin-bottom:8px;">
+                    <li><strong>80–100%</strong> — Strong match, high chance of shortlist</li>
+                    <li><strong>60–79%</strong> — Good match, worth applying</li>
+                    <li><strong>Below 60%</strong> — Weaker overlap; consider whether to apply</li>
+                </ul>
+
+                <div class="tip-box">
+                    💡 Paste the entire job posting, not just the requirements section. The more context the AI has, the better its analysis.
+                </div>
+            </div>
+        </div>
+
+        <!-- Customise CV -->
+        <div id="section-customise" class="bg-white rounded-xl mb-3" style="border:1px solid #e8e4dc;">
+            <button class="accordion-btn" onclick="toggleSection('section-customise')">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:18px;">✏️</span>
+                    <span class="font-semibold" style="color:#1a1a1a; font-size:15px;">Customise CV for This Role</span>
+                </div>
+                <svg id="arrow-section-customise" class="accordion-arrow w-5 h-5" style="color:#9a9590;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div id="body-section-customise" class="accordion-body px-6 pb-6">
+                <hr style="border:none; border-top:1px solid #e8e4dc; margin-bottom:20px;">
+                <p style="font-size:13.5px; color:#4a4540; line-height:1.7; margin-bottom:16px;">After running a job analysis, this step lets you review and tweak the AI's bullet selection before generating your tailored CV.</p>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">What you can do here</h5>
+                <ul style="font-size:13.5px; color:#4a4540; line-height:1.8; padding-left:20px; margin-bottom:16px;">
+                    <li>See which bullets the AI selected and why</li>
+                    <li>Tick or untick individual bullets to include or exclude them</li>
+                    <li>Choose your preferred headline variation</li>
+                    <li>Click <strong>Generate CV</strong> to create the tailored document</li>
+                </ul>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">Downloading your CV</h5>
+                <p style="font-size:13.5px; color:#4a4540; line-height:1.7;">After generating, you'll land on the <strong>CV Preview</strong> page where you can review the final layout and download the .docx file.</p>
+            </div>
+        </div>
+
+        <!-- CV Preview -->
+        <div id="section-preview" class="bg-white rounded-xl mb-3" style="border:1px solid #e8e4dc;">
+            <button class="accordion-btn" onclick="toggleSection('section-preview')">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:18px;">👁️</span>
+                    <span class="font-semibold" style="color:#1a1a1a; font-size:15px;">CV Preview & Download</span>
+                </div>
+                <svg id="arrow-section-preview" class="accordion-arrow w-5 h-5" style="color:#9a9590;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div id="body-section-preview" class="accordion-body px-6 pb-6">
+                <hr style="border:none; border-top:1px solid #e8e4dc; margin-bottom:20px;">
+                <p style="font-size:13.5px; color:#4a4540; line-height:1.7; margin-bottom:16px;">After customising your CV, you land here automatically. This page shows the final assembled document before you download it.</p>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">What you'll see</h5>
+                <ul style="font-size:13.5px; color:#4a4540; line-height:1.8; padding-left:20px; margin-bottom:8px;">
+                    <li>Your selected headline at the top</li>
+                    <li>All chosen bullets in the order they'll appear in the document</li>
+                    <li>A <strong>Download .docx</strong> button to save the final file</li>
+                </ul>
+
+                <div class="tip-box">
+                    ✅ The downloaded file matches the formatting of your original template — just open in Word and it's ready to send.
+                </div>
+            </div>
+        </div>
+
+        <!-- Interview Prep -->
+        <div id="section-interview" class="bg-white rounded-xl mb-3" style="border:1px solid #e8e4dc;">
+            <button class="accordion-btn" onclick="toggleSection('section-interview')">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:18px;">🎤</span>
+                    <span class="font-semibold" style="color:#1a1a1a; font-size:15px;">Interview Prep</span>
+                </div>
+                <svg id="arrow-section-interview" class="accordion-arrow w-5 h-5" style="color:#9a9590;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div id="body-section-interview" class="accordion-body px-6 pb-6">
+                <hr style="border:none; border-top:1px solid #e8e4dc; margin-bottom:20px;">
+                <p style="font-size:13.5px; color:#4a4540; line-height:1.7; margin-bottom:16px;">Got an interview? This feature generates tailored practice questions based on the job description and your resume bullets.</p>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">How to use it</h5>
+                <ol style="font-size:13.5px; color:#4a4540; line-height:1.8; padding-left:20px; margin-bottom:16px;">
+                    <li>Go to the <strong>Interview Prep</strong> tab</li>
+                    <li>Select a role you've already customised your CV for</li>
+                    <li>Work through 8 AI-generated questions one at a time</li>
+                    <li>Submit each answer for instant AI feedback</li>
+                    <li>Review your overall performance summary at the end</li>
+                </ol>
+
+                <h5 class="font-semibold mb-2" style="color:#1a1a1a; font-size:13px;">What you get</h5>
+                <ul style="font-size:13.5px; color:#4a4540; line-height:1.8; padding-left:20px;">
+                    <li>Role-specific competency and behavioural questions</li>
+                    <li>AI feedback on each answer you submit</li>
+                    <li>A score and summary at the end of the session</li>
+                </ul>
+            </div>
+        </div>
+
+    </div><!-- /max-w -->
+
+    <script>
+        function toggleSection(id) {
+            const body  = document.getElementById('body-' + id);
+            const arrow = document.getElementById('arrow-' + id);
+            const isOpen = body.classList.contains('open');
+            body.classList.toggle('open');
+            arrow.classList.toggle('open');
+            if (!isOpen) {
+                setTimeout(() => {
+                    document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
+            }
+        }
+
+        function openSection(id) {
+            const body  = document.getElementById('body-' + id);
+            const arrow = document.getElementById('arrow-' + id);
+            body.classList.add('open');
+            arrow.classList.add('open');
+            setTimeout(() => {
+                document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+            return false;
+        }
+    </script>
+</body>
+</html>

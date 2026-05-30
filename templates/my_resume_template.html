@@ -13,7 +13,7 @@
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/theme.css">
     <style>
         body {
             font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
@@ -98,17 +98,17 @@
                     </svg>
                     AI Match Tool
                 </a>
-                <a href="/app" class="tab">
-                    <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                    </svg>
-                    Job Search
-                </a>
                 <a href="/interview-prep" class="tab">
                     <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                     </svg>
                     Interview Prep
+                </a>
+                <a href="/user-guide" class="tab">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    User Guide
                 </a>
                 <div class="tab active">
                     <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,15 +208,63 @@
         </div>
 
         <!-- Formatting Guide -->
-        <div class="bg-blue-50 rounded-lg p-6 border border-blue-200">
-            <h3 class="text-lg font-bold text-blue-900 mb-3">📋 Formatting Tips</h3>
-            <ul class="text-sm text-blue-800 space-y-2">
-                <li><strong>Use headings</strong> for sections (e.g., "Professional Summary", "Experience", "Education")</li>
-                <li><strong>Use bullet points</strong> for multiple variations of headlines and accomplishments</li>
-                <li><strong>Include ALL variations</strong> - Add 10-15 headline options, 30-40 bullet point variations for current role</li>
-                <li><strong>Keep structure clear</strong> - Headings, bullets, and paragraph breaks will be preserved</li>
-                <li><strong>Static content</strong> - Include previous roles, education, certifications that don't change</li>
-            </ul>
+        <div class="bg-blue-50 rounded-lg p-6 border border-blue-200 mb-6">
+            <h3 class="text-lg font-bold text-blue-900 mb-1">📋 Required Template Format</h3>
+            <p class="text-sm text-blue-700 mb-4">Your .docx file must follow this exact structure for the AI to read it correctly.</p>
+
+            <!-- Headlines Section -->
+            <div class="mb-6">
+                <h4 class="text-sm font-bold text-blue-900 mb-2">1. Headlines Section <span class="font-normal text-blue-700">(required)</span></h4>
+                <div class="bg-white rounded-lg border border-blue-200 p-4 font-mono text-sm text-slate-700 whitespace-pre-wrap">HEADLINE VARIATIONS (5 options)
+1. Your first professional headline here — must be longer than 30 characters
+2. Your second headline variation here
+3. Your third headline variation here
+___________________________</div>
+                <ul class="text-xs text-blue-700 mt-2 space-y-1">
+                    <li>• The header line must contain the words <strong>HEADLINE</strong> and either <strong>VARIATION</strong> or <strong>(</strong></li>
+                    <li>• Each headline must be longer than 30 characters</li>
+                    <li>• End the section with a line of underscores <strong>___</strong></li>
+                </ul>
+            </div>
+
+            <!-- Bullets Section -->
+            <div class="mb-6">
+                <h4 class="text-sm font-bold text-blue-900 mb-2">2. Experience Bullets Section <span class="font-normal text-blue-700">(required)</span></h4>
+                <div class="bg-white rounded-lg border border-blue-200 p-4 font-mono text-sm text-slate-700 whitespace-pre-wrap">EXPERIENCE BULLETS
+Your first bullet point describing an achievement with impact and metrics here
+Your second bullet point describing another accomplishment here
+Your third bullet point here — each bullet must be longer than 40 characters
+___________________________</div>
+                <ul class="text-xs text-blue-700 mt-2 space-y-1">
+                    <li>• The header line must contain the words <strong>EXPERIENCE BULLETS</strong></li>
+                    <li>• Each bullet must be longer than 40 characters</li>
+                    <li>• End the section with a line of underscores <strong>___</strong></li>
+                    <li>• Aim for 20–40 bullet variations so the AI has enough to choose from</li>
+                </ul>
+            </div>
+
+            <!-- Categories (Optional) -->
+            <div class="mb-4">
+                <h4 class="text-sm font-bold text-blue-900 mb-2">3. Categories <span class="font-normal text-blue-700">(optional — improves AI selection quality)</span></h4>
+                <div class="bg-white rounded-lg border border-blue-200 p-4 font-mono text-sm text-slate-700 whitespace-pre-wrap">EXPERIENCE BULLETS
+CATEGORY: Leadership
+Led cross-functional team of 12 across 3 business units to deliver AI governance framework
+Managed stakeholder alignment across technology and risk divisions for regulatory compliance
+
+CATEGORY: Technical Skills
+Designed and implemented end-to-end model validation pipeline reducing review time by 40%
+Built automated monitoring system for 50+ production ML models across enterprise platforms
+___________________________</div>
+                <ul class="text-xs text-blue-700 mt-2 space-y-1">
+                    <li>• Add <strong>CATEGORY: Name</strong> lines to group your bullets by skill area</li>
+                    <li>• Categories help the AI diversify its bullet selection across different skill areas</li>
+                    <li>• If you skip categories, the AI still works — it just selects based on content alone</li>
+                </ul>
+            </div>
+
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p class="text-xs text-yellow-800"><strong>💡 Tip:</strong> The more bullet variations you include, the better the AI can tailor your CV to each specific job. We recommend at least 20 bullets covering different aspects of your experience.</p>
+            </div>
         </div>
     </div>
 

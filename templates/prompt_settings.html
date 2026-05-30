@@ -13,7 +13,7 @@
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/theme.css">
     <style>
         body {
             font-family: 'Open Sans', 'Segoe UI', Arial, sans-serif;
@@ -60,6 +60,22 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+
+        .builder-tag {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #3730a3;
+            border-radius: 999px;
+            padding: 3px 12px;
+            font-size: 12px;
+            margin: 2px;
+            cursor: pointer;
+            border: 1px solid #c7d2fe;
+            transition: all 0.15s;
+            user-select: none;
+        }
+        .builder-tag:hover { background: #818cf8; color: white; border-color: #818cf8; }
+        .builder-tag.selected { background: #4f46e5; color: white; border-color: #4f46e5; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
@@ -94,17 +110,17 @@
                     </svg>
                     AI Match Tool
                 </a>
-                <a href="/app" class="tab">
-                    <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                    </svg>
-                    Job Search
-                </a>
                 <a href="/interview-prep" class="tab">
                     <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                     </svg>
                     Interview Prep
+                </a>
+                <a href="/user-guide" class="tab">
+                    <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    User Guide
                 </a>
                 <div class="tab active">
                     <svg class="w-5 h-5 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -183,19 +199,165 @@
             </div>
         </div>
 
-        <!-- Future Features Notice -->
-        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-            <div class="flex">
-                <svg class="w-5 h-5 text-yellow-600 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
-                <div>
-                    <p class="text-sm font-semibold text-yellow-800">Coming Soon</p>
-                    <p class="text-sm text-yellow-700 mt-1">
-                        Custom prompt editing, A/B testing, and template versioning features will be added in future updates.
-                    </p>
-                </div>
+        <!-- Guided Prompt Builder -->
+        <div class="bg-white rounded-lg shadow-lg p-8 mb-6 border border-indigo-100">
+            <div class="flex items-center gap-3 mb-1">
+                <h2 class="text-2xl font-bold text-slate-800">✨ Guided Prompt Builder</h2>
+                <span class="bg-indigo-100 text-indigo-700 text-xs font-semibold px-3 py-1 rounded-full">New</span>
             </div>
+            <p class="text-slate-600 mb-6">
+                Not sure what to write? Answer a few quick questions and we'll generate a custom prompt for you.
+                Select as many options as you like, or type your own. Then click <strong>Generate My Prompt</strong> — it will fill in the editor below, ready to save.
+            </p>
+
+            <div class="space-y-6">
+
+                <!-- Q1: Role type — multi-select -->
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">
+                        What type of roles are you targeting?
+                        <span class="text-slate-400 font-normal ml-1">— select all that apply, or type your own</span>
+                    </label>
+                    <div class="flex flex-wrap gap-1 mb-2" id="builder-role-tags">
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Risk Management</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Compliance</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Finance Operations</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Investment Banking</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Asset Management</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Data / Quant</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Audit</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Treasury</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">AI / ML Governance</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Product Management</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Strategy</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Technology</span>
+                    </div>
+                    <input id="builder-role-input" type="text" placeholder="Or type additional roles…"
+                           class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    <!-- Q2: Seniority — multi-select -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">
+                            What seniority level are you targeting?
+                            <span class="text-slate-400 font-normal ml-1">— select all that apply</span>
+                        </label>
+                        <div class="flex flex-wrap gap-1 mb-2" id="builder-seniority-tags">
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Analyst</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Associate</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">AVP / Senior</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">VP</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Director</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">MD / Head of</span>
+                        </div>
+                        <input id="builder-seniority-input" type="text" placeholder="Or type your own…"
+                               class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                    </div>
+
+                    <!-- Q3: Industry — multi-select -->
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">
+                            Which industry are you targeting?
+                            <span class="text-slate-400 font-normal ml-1">— select all that apply</span>
+                        </label>
+                        <div class="flex flex-wrap gap-1 mb-2" id="builder-industry-tags">
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Tier-1 Investment Bank</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Regional / Commercial Bank</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Asset Manager</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Fintech</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Insurance</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Consulting</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Big Tech</span>
+                            <span class="builder-tag" onclick="builderToggleTag(this)">Open to all</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">💡 Affects how the AI weights industry fit in your match score</p>
+                    </div>
+
+                </div>
+
+                <!-- Q4: Key Strengths — multi-select -->
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">
+                        What are your key strengths?
+                        <span class="text-slate-400 font-normal ml-1">— select all that apply, or type your own</span>
+                    </label>
+                    <div class="flex flex-wrap gap-1 mb-2" id="builder-strengths-tags">
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Stakeholder management</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Regulatory reporting</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Team leadership</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Process improvement</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Risk frameworks</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Data analysis</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Client relationships</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Strategic planning</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Change management</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Model validation</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Budget / P&amp;L ownership</span>
+                        <span class="builder-tag" onclick="builderToggleTag(this)">Cross-functional leadership</span>
+                    </div>
+                    <input id="builder-strengths-input" type="text" placeholder="Or describe your own strengths…"
+                           class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                </div>
+
+                <!-- Q5: Extra instructions -->
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">
+                        Anything specific to prioritise or avoid?
+                        <span class="text-slate-400 font-normal ml-1">(optional)</span>
+                    </label>
+                    <textarea id="builder-extra-input" rows="3"
+                              placeholder="e.g. I'm transitioning from banking to fintech, so emphasise adaptability and innovation. Avoid bullets that focus on legacy infrastructure."
+                              class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
+                </div>
+
+            </div>
+
+            <div class="flex items-center gap-4 mt-6">
+                <button onclick="builderGenerate()"
+                        class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow transition-colors flex items-center gap-2">
+                    ✨ Generate My Prompt
+                </button>
+                <span id="builder-status" class="text-sm hidden"></span>
+            </div>
+        </div>
+
+        <!-- Custom Prompt Editor -->
+        <div class="bg-white rounded-lg shadow-lg p-8">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-2xl font-bold text-slate-800">Custom Prompt</h2>
+                {% if has_custom_prompt %}
+                <span class="bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">✓ Custom Prompt Active</span>
+                {% else %}
+                <span class="bg-slate-100 text-slate-600 text-xs font-semibold px-3 py-1 rounded-full">Using Template</span>
+                {% endif %}
+            </div>
+            <p class="text-slate-600 mb-6">
+                Write your own prompt to personalise how the AI evaluates your CV. This overrides the selected template and is saved to your profile.
+            </p>
+
+            <textarea id="custom-prompt-input"
+                      rows="20"
+                      class="w-full p-4 border border-slate-300 rounded-lg font-mono text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                      placeholder="Write your custom prompt here...">{{ current_prompt_text }}</textarea>
+
+            <div class="flex items-center gap-3 mt-4">
+                <button onclick="saveCustomPrompt()"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
+                    Save Custom Prompt
+                </button>
+                {% if has_custom_prompt %}
+                <button onclick="resetToTemplate()"
+                        class="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg font-semibold hover:bg-slate-300 transition">
+                    Reset to Template
+                </button>
+                {% endif %}
+            </div>
+
+            <p class="text-xs text-slate-500 mt-3">
+                💡 Tip: Use one of the templates above as a starting point — click "View Full Prompt" to copy it into the editor, then customise it to match your background.
+            </p>
         </div>
     </div>
 
@@ -253,8 +415,11 @@
                     if (data.prompt_text) {
                         // Update the prompt display area
                         document.querySelector('.prompt-display').textContent = data.prompt_text;
+                        // Also load into the custom prompt editor as a starting point
+                        document.getElementById('custom-prompt-input').value = data.prompt_text;
                         // Scroll to prompt display
                         document.querySelector('.border-t.pt-8').scrollIntoView({ behavior: 'smooth' });
+                        showToast('Template loaded into editor — edit and save to use as your custom prompt', 'success');
                     } else {
                         showToast('Failed to load template preview', 'error');
                     }
@@ -264,6 +429,151 @@
                     showToast('Failed to load template preview', 'error');
                 });
         }
+
+        function saveCustomPrompt() {
+            const promptText = document.getElementById('custom-prompt-input').value.trim();
+            if (!promptText) {
+                showToast('Prompt cannot be empty', 'error');
+                return;
+            }
+
+            fetch('/save-custom-prompt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ custom_prompt: promptText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    setTimeout(() => { location.reload(); }, 1000);
+                } else {
+                    showToast('Failed to save: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Failed to save prompt. Please try again.', 'error');
+            });
+        }
+
+        function resetToTemplate() {
+            if (!confirm('Reset to template prompt? Your custom prompt will be cleared.')) return;
+
+            fetch('/clear-custom-prompt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    setTimeout(() => { location.reload(); }, 1000);
+                } else {
+                    showToast('Failed to reset: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Failed to reset prompt. Please try again.', 'error');
+            });
+        }
+
+        // ── Guided Prompt Builder ─────────────────────────────────────
+        function builderToggleTag(el) {
+            el.classList.toggle('selected');
+        }
+
+        function builderGetSelected(groupId) {
+            return Array.from(document.querySelectorAll('#' + groupId + ' .builder-tag.selected'))
+                        .map(t => t.textContent.trim());
+        }
+
+        function builderGenerate() {
+            const roles     = builderGetSelected('builder-role-tags');
+            const roleTyped = document.getElementById('builder-role-input').value.trim();
+            if (roleTyped) roles.push(roleTyped);
+
+            const seniorities    = builderGetSelected('builder-seniority-tags');
+            const seniorityTyped = document.getElementById('builder-seniority-input').value.trim();
+            if (seniorityTyped) seniorities.push(seniorityTyped);
+
+            const industries = builderGetSelected('builder-industry-tags');
+            const strengths  = builderGetSelected('builder-strengths-tags');
+            const strengthsTyped = document.getElementById('builder-strengths-input').value.trim();
+            if (strengthsTyped) strengths.push(strengthsTyped);
+
+            const extra = document.getElementById('builder-extra-input').value.trim();
+
+            if (roles.length === 0 && seniorities.length === 0 && strengths.length === 0 && industries.length === 0) {
+                showToast('Please fill in at least one field before generating.', 'error');
+                return;
+            }
+
+            const status = document.getElementById('builder-status');
+            status.classList.remove('hidden');
+            status.className = 'text-sm text-slate-400';
+            status.textContent = 'Generating…';
+
+            setTimeout(() => {
+                const prompt = builderBuildPrompt(roles, seniorities, industries, strengths, extra);
+                document.getElementById('custom-prompt-input').value = prompt;
+                status.className = 'text-sm text-green-600 font-semibold';
+                status.textContent = '✅ Done — review the prompt below, then click Save Custom Prompt.';
+                document.getElementById('custom-prompt-input').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 600);
+        }
+
+        function builderBuildPrompt(roles, seniorities, industries, strengths, extra) {
+            const roleStr      = roles.length > 0 ? roles.join(', ') : 'finance professional';
+            const seniorityStr = seniorities.length > 0 ? seniorities.join(', ') : 'mid-to-senior level';
+            const industryStr  = industries.includes('Open to all') || industries.length === 0
+                ? 'across financial services (open to all institution types)'
+                : industries.join(', ');
+            const strengthStr  = strengths.length > 0
+                ? strengths.join(', ')
+                : 'relevant technical and leadership skills';
+
+            let prompt = `You are an expert career coach and recruiter with 15+ years of experience placing ${seniorityStr} candidates in financial services. Your goal is to provide honest, accurate assessments of how well a candidate's background matches a specific job opportunity.
+
+**YOUR TASK:**
+Analyze the candidate's CV against the job description and provide a comprehensive match assessment.
+
+**CANDIDATE CONTEXT:**
+- Targeting: ${seniorityStr} positions in ${roleStr}
+- Preferred industries: ${industryStr}
+- Key strengths to highlight: ${strengthStr}
+
+**EVALUATION CRITERIA:**
+1. **Relevant Experience (40%):** How closely does their work history align with the role's requirements? Prioritise experience in ${roleStr}.
+2. **Skills Match (30%):** Do they possess the technical and soft skills needed? Pay special attention to: ${strengthStr}.
+3. **Industry Fit (20%):** Does their background suit ${industryStr}? Weight this accordingly.
+4. **Seniority Match (10%):** Does their career level align with ${seniorityStr} expectations?
+
+**SCORING GUIDELINES:**
+- **90-100%:** Exceptional match - candidate exceeds most requirements
+- **75-89%:** Strong match - candidate meets most key requirements with minor gaps
+- **60-74%:** Good match - candidate meets many requirements but has notable gaps
+- **50-59%:** Fair match - candidate has transferable skills but significant gaps
+- **Below 50%:** Poor match - major gaps in experience or skills
+
+**DIVERSITY RULE:**
+Select bullets from a range of skill areas. Do not cluster all selections around one theme — aim for a well-rounded picture of the candidate.`;
+
+            if (extra) {
+                prompt += `\n\n**ADDITIONAL INSTRUCTIONS:**\n${extra}`;
+            }
+
+            prompt += `\n\n**OUTPUT REQUIREMENTS:**
+Respond with valid JSON containing:
+- match_score (0-100)
+- skills_match: Array of matched skills with evidence
+- skills_missing: Array of skills needed but not demonstrated
+- recommendations: Array of specific suggestions for the candidate`;
+
+            return prompt;
+        }
+        // ── End Guided Prompt Builder ─────────────────────────────────
 
         function showToast(message, type = 'success') {
             const toast = document.getElementById('toast');
