@@ -1597,10 +1597,8 @@ def parse_roles_from_template(template_text):
     roles = []
 
     # ── Try legacy === format first ──────────────────────────────────────────
-    has_legacy = any(
-        l.strip().startswith('=') and len(l.strip()) >= 20 and 'EMPLOYMENT' in l.upper()
-        for l in lines
-    )
+    # True legacy format has explicit ROLE TITLES: and BULLETS: section markers inside roles
+    has_legacy = 'ROLE TITLES:' in template_text and 'BULLETS:' in template_text
     if has_legacy:
         # Original === parser (unchanged)
         in_employment = False
