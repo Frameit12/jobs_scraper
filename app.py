@@ -6072,16 +6072,6 @@ def customize_cv_resume(cv_session_id):
         return redirect('/ai-match?error=resume_failed')
 
 
-@app.route("/test-headline-modal")
-def test_headline_modal():
-    """Dev-only test page for the headline modal — no auth required"""
-    class FakeHeadline(dict):
-        def __getattr__(self, k): return self[k]
-    rec = FakeHeadline(id=0, text="Senior Programme Manager with 20 years' experience leading complex, regulatory-driven transformation programmes across Tier 1 global financial institutions.", match_score=35, number=1, label="SENIOR PROGRAMME MANAGER", reasons=["Strong governance focus", "Financial services background"], suggested_adaptation=True, tier="top", weakness=None)
-    other = FakeHeadline(id=1, text="Technology Director with 15 years' AI/ML experience.", match_score=72, number=2, label="TECHNOLOGY DIRECTOR", reasons=[], suggested_adaptation=False, tier="other", weakness="Less relevant title")
-    return render_template('customize_cv_headline.html', job_title="Applied AI ML-Vice President", job_company="JPMorganChase", headlines=[rec, other], recommended_headline=rec, analysis_id="test")
-
-
 @app.route("/customize-cv/headline", methods=["GET", "POST"])
 def customize_cv_headline():
     """Step 1: Headline selection with AI recommendations"""
