@@ -896,18 +896,14 @@ We're looking for a Senior VP to lead our AI Risk team...
                     let ctaMessage, ctaSubtext;
                     if (score >= 70) {
                         ctaMessage = '🎯 Strong match — tailor your CV to maximise your chances';
-                        ctaSubtext = 'AI will select the best headlines and bullets from your master template for this role.';
                     } else if (score >= 40) {
                         ctaMessage = '📝 Want to apply? Tailor your CV to improve your chances';
-                        ctaSubtext = 'AI will pick your strongest relevant bullets and adapt your CV to better match this role.';
                     } else {
                         ctaMessage = '📝 Want to apply anyway? Let AI tailor your CV for this role';
-                        ctaSubtext = 'AI will find the best-fit content from your master template and adapt your CV for this opportunity.';
                     }
                     customizeButton = `
                         <div class="mt-8 mx-auto max-w-md text-center">
-                            <p class="text-sm font-semibold text-slate-700 mb-1">${ctaMessage}</p>
-                            <p class="text-xs text-slate-500 mb-4">${ctaSubtext}</p>
+                            <p class="text-sm font-semibold text-slate-700 mb-4">${ctaMessage}</p>
                             <a href="/customize-cv/start/${analysisId}"
                                class="inline-flex items-center justify-center w-full px-6 py-3 text-white font-semibold rounded-lg shadow transition"
                                style="background:#d97706;" onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#d97706'">
