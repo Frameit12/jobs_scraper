@@ -7171,8 +7171,6 @@ def consolidate_cvs():
         files = request.files.getlist('cv_files')
         if not files or len(files) == 0:
             return jsonify({'error': 'No files uploaded'}), 400
-        if len(files) > 5:
-            return jsonify({'error': 'Maximum 5 files allowed'}), 400
 
         allowed_extensions = {'pdf', 'docx', 'doc', 'txt'}
         extracted_texts = []
