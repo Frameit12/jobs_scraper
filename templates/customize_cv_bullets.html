@@ -81,6 +81,41 @@
         <p class="text-sm text-gray-700">{{ selected_headline }}</p>
     </div>
 
+    {% if loading %}
+    <!-- Loading state: AI analysis running async -->
+    <div id="loading-overlay" class="flex flex-col items-center justify-center py-24">
+        <div class="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-6"></div>
+        <p class="text-lg font-semibold text-gray-800 mb-1">AI is analysing your bullets…</p>
+        <p class="text-sm text-gray-500">This usually takes 10–20 seconds.</p>
+    </div>
+    <script>
+    (function pollAnalysis() {
+        const roleIndex = {{ role_index }};
+        let attempts = 0;
+        const maxAttempts = 60;
+        function check() {
+            attempts++;
+            fetch('/api/analyze-bullets-for-role?role=' + roleIndex)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        window.location.reload();
+                    } else if (attempts < maxAttempts) {
+                        setTimeout(check, 2000);
+                    } else {
+                        document.getElementById('loading-overlay').innerHTML =
+                            '<p class="text-red-600 font-semibold">Analysis timed out. <a href="" class="underline">Retry</a></p>';
+                    }
+                })
+                .catch(function() {
+                    if (attempts < maxAttempts) setTimeout(check, 2000);
+                });
+        }
+        setTimeout(check, 1500);
+    })();
+    </script>
+    {% else %}
+
     <!-- AI note -->
     <div class="p-4 mb-5 rounded-lg bg-white border border-gray-200" style="border-left: 3px solid #d97706;">
         <p class="text-sm text-gray-700">
@@ -199,6 +234,8 @@
         {% endfor %}
     </div>
 
+    {% endif %}{# end loading/else #}
+
     <!-- AI Chat Modal (Refine with AI) -->
     <div x-show="chatOpen" x-cloak
          class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
@@ -267,7 +304,7 @@
     </div>
 
     <!-- Fixed bottom bar -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white border-t-2 shadow-lg p-4">
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t-2 shadow-lg p-4" {% if loading %}style="display:none"{% endif %}>
         <div class="max-w-5xl mx-auto flex items-center justify-between">
             <div>
                 <p class="text-sm text-gray-700">
