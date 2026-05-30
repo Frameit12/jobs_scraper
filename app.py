@@ -6398,23 +6398,19 @@ def customize_cv_bullets():
         if not analysis:
             return "Analysis not found", 404
 
-        # Use cached analysis if available
+        # Use cached analysis if available — otherwise render loading page
         cached = (cv_session.get('bullet_analysis_by_role') or {}).get(role_key)
-        if cached:
-            print(f"✓ Using cached bullet analysis for {role_key}")
-            ai_analysis = cached
-        else:
-            print(f"⚙ Running AI bullet analysis for {role_key}...")
-            ai_analysis = analyze_bullets_for_role_with_ai(
-                current_role, analysis['job_description'], user_id
-            )
-            if not ai_analysis:
-                return "Failed to analyse bullets", 500
-            update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, ai_analysis)
 
         # Previously approved bullets for this role
         all_approved = cv_session.get('approved_bullets') or []
         role_approved = [b for b in all_approved if b.get('role_company') == role_key]
+
+        if cached:
+            recommended_bullets = cached.get('recommended_bullets', [])
+            loading = False
+        else:
+            recommended_bullets = []
+            loading = True
 
         return render_template('customize_cv_bullets.html',
                                job_title=cv_session['job_title'],
@@ -6424,15 +6420,61 @@ def customize_cv_bullets():
                                role_index=role_index,
                                total_roles=len(selected_roles),
                                all_roles=selected_roles,
-                               recommended_bullets=ai_analysis.get('recommended_bullets', []),
+                               recommended_bullets=recommended_bullets,
                                approved_bullets_data=role_approved,
-                               analysis_id=cv_session['analysis_id'])
+                               analysis_id=cv_session['analysis_id'],
+                               loading=loading)
 
     except Exception as e:
         print(f"Error in bullet selection: {e}")
         import traceback
         traceback.print_exc()
         return "Error loading bullet selection", 500
+
+
+@app.route("/api/analyze-bullets-for-role", methods=["GET"])
+def api_analyze_bullets_for_role():
+    """Run AI bullet analysis for one role and cache the result. Called async from the bullets page."""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+    role_index = int(request.args.get('role', 0))
+
+    try:
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return jsonify({'error': 'Session not found'}), 404
+
+        selected_roles = cv_session.get('selected_roles', [])
+        if role_index >= len(selected_roles):
+            return jsonify({'error': 'Invalid role index'}), 400
+
+        current_role = selected_roles[role_index]
+        role_key = current_role['company']
+
+        # Return from cache if already done
+        cached = (cv_session.get('bullet_analysis_by_role') or {}).get(role_key)
+        if cached:
+            return jsonify({'success': True, 'analysis': cached})
+
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return jsonify({'error': 'Analysis not found'}), 404
+
+        ai_analysis = analyze_bullets_for_role_with_ai(current_role, analysis['job_description'], user_id)
+        if not ai_analysis:
+            return jsonify({'error': 'Failed to analyse bullets'}), 500
+
+        update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, ai_analysis)
+        return jsonify({'success': True, 'analysis': ai_analysis})
+
+    except Exception as e:
+        print(f"Error in async bullet analysis: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route("/customize-cv/preview", methods=["GET"])
