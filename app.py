@@ -7238,7 +7238,7 @@ Here are the {len(extracted_texts)} CV versions to consolidate:
 Output the complete master template now:"""
 
         # Call Claude API
-        anthropic_client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
+        anthropic_client = get_anthropic_client()
         message = anthropic_client.messages.create(
             model="claude-sonnet-4-5-20250929",
             max_tokens=8000,
