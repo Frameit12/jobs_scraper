@@ -175,7 +175,7 @@
                         {% if has_custom_prompt %}
                         <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Saved ✓</span>
                         {% else %}
-                        <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">Pending</span>
+                        <span id="step1-badge" class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">Pending</span>
                         {% endif %}
                     </div>
                     <p class="text-sm text-slate-500 mt-0.5">Tell the AI what kind of roles you're targeting and what to prioritise.</p>
@@ -523,8 +523,9 @@
                 document.getElementById('num-1').innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>`;
                 document.getElementById('card-1').classList.add('completed');
                 document.getElementById('conn-1').classList.add('done');
-                // Update badge
-                const badge = document.querySelector('.tab.active span[style*="ef4444"]');
+                // Update step 1 badge
+                const step1Badge = document.getElementById('step1-badge');
+                if (step1Badge) { step1Badge.textContent = 'Saved ✓'; step1Badge.className = 'text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium'; }
                 // Collapse step 1
                 document.getElementById('body-1').classList.remove('open');
                 document.getElementById('chevron-1').style.transform = '';
@@ -647,7 +648,10 @@
         selectedFiles.forEach(file => formData.append('cv_files', file));
 
         fetch('/consolidate-cvs', { method: 'POST', body: formData })
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) return r.text().then(t => { throw new Error(`Server error ${r.status}: ${t.substring(0, 200)}`); });
+            return r.json();
+        })
         .then(data => {
             steps.forEach(id => {
                 const el = document.getElementById(id);
@@ -668,13 +672,13 @@
                 const errEl = document.getElementById('consolidate-error');
                 errEl.textContent = data.error || 'Consolidation failed. Please try again.';
                 errEl.classList.remove('hidden');
-                setTimeout(() => errEl.classList.add('hidden'), 6000);
+                setTimeout(() => errEl.classList.add('hidden'), 8000);
             }
         })
         .catch(err => {
             showState('upload');
             const errEl = document.getElementById('consolidate-error');
-            errEl.textContent = 'Network error. Please try again.';
+            errEl.textContent = err.message || 'Request failed. Please try again.';
             errEl.classList.remove('hidden');
         });
     }
