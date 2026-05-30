@@ -6733,7 +6733,155 @@ def user_guide():
     """User guide page"""
     if 'user_id' not in session:
         return redirect('/login')
-    return render_template('user_guide.html')
+    user_id = session['user_id']
+    master_template = get_user_master_template(user_id)
+    return render_template('user_guide.html', has_master_template=master_template is not None)
+
+
+@app.route("/get-started", methods=["GET"])
+def get_started():
+    """Get Started onboarding page"""
+    if 'user_id' not in session:
+        return redirect('/login')
+
+    user_id = session['user_id']
+    username = session.get('username', 'User')
+
+    # Get master template status
+    master_template = get_user_master_template(user_id)
+    has_master_template = master_template is not None
+
+    # Get prompt status
+    has_custom_prompt = False
+    current_prompt_text = ""
+    try:
+        engine = get_db_connection()
+        if engine:
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT upp.custom_prompt_text, pt.prompt_text
+                    FROM user_prompt_preferences upp
+                    LEFT JOIN prompt_templates pt ON upp.template_id = pt.id
+                    WHERE upp.user_id = :user_id AND upp.is_active = TRUE
+                    ORDER BY upp.created_at DESC LIMIT 1
+                """), {"user_id": user_id})
+                row = result.fetchone()
+                if row:
+                    has_custom_prompt = bool(row[0])
+                    current_prompt_text = row[0] if row[0] else (row[1] or "")
+    except Exception as e:
+        print(f"Error getting prompt for get-started: {e}")
+
+    return render_template('get_started.html',
+                           username=username,
+                           has_master_template=has_master_template,
+                           master_template=master_template,
+                           has_custom_prompt=has_custom_prompt,
+                           current_prompt_text=current_prompt_text)
+
+
+@app.route("/consolidate-cvs", methods=["POST"])
+def consolidate_cvs():
+    """Accept multiple CV files, extract text, and use Claude to consolidate into master template"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        files = request.files.getlist('cv_files')
+        if not files or len(files) == 0:
+            return jsonify({'error': 'No files uploaded'}), 400
+        if len(files) > 5:
+            return jsonify({'error': 'Maximum 5 files allowed'}), 400
+
+        allowed_extensions = {'pdf', 'docx', 'doc', 'txt'}
+        extracted_texts = []
+
+        for file in files:
+            if not file or file.filename == '':
+                continue
+            ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+            if ext not in allowed_extensions:
+                return jsonify({'error': f'File "{file.filename}" is not a supported format. Use PDF, DOCX or TXT.'}), 400
+
+            file_data = file.read()
+            if len(file_data) > 5 * 1024 * 1024:
+                return jsonify({'error': f'File "{file.filename}" exceeds 5MB limit'}), 400
+
+            # Extract text
+            if ext == 'pdf':
+                text_content = extract_text_from_pdf(file_data)
+            elif ext in ('docx', 'doc'):
+                text_content = extract_text_from_docx(file_data)
+            else:
+                text_content = file_data.decode('utf-8', errors='replace')
+
+            if text_content and text_content.strip():
+                extracted_texts.append({'filename': file.filename, 'text': text_content})
+
+        if not extracted_texts:
+            return jsonify({'error': 'Could not extract text from any of the uploaded files'}), 400
+
+        # If only one file, no consolidation needed — use it directly
+        if len(extracted_texts) == 1:
+            return jsonify({
+                'success': True,
+                'consolidated_text': extracted_texts[0]['text'],
+                'stats': {'files_processed': 1, 'note': 'Single file uploaded — used directly as master template'}
+            })
+
+        # Build Claude consolidation prompt
+        cv_sections = ""
+        for i, item in enumerate(extracted_texts, 1):
+            cv_sections += f"\n\n--- CV VERSION {i}: {item['filename']} ---\n{item['text']}\n"
+
+        consolidation_prompt = f"""You are consolidating {len(extracted_texts)} versions of the same person's CV into one comprehensive master template.
+
+RULES — follow these exactly:
+1. Keep ALL unique bullet points and phrases VERBATIM — do not rewrite, paraphrase, or improve any wording
+2. Remove ONLY true word-for-word duplicate sentences/bullets (where text is identical or near-identical)
+3. Keep ALL career summary variations as separate clearly labeled sections: [VERSION 1 — focus], [VERSION 2 — focus], etc.
+4. Keep ALL job title variations for each role (list them on one line separated by " / ")
+5. Keep ALL unique context/intro lines for each role
+6. Organise the output in this structure:
+   - CAREER SUMMARY (all versions labeled)
+   - CORE EXPERTISE (all unique skills from all CVs)
+   - EMPLOYMENT HISTORY (reverse chronological, with all unique bullets per role)
+   - PERMANENT ROLES SUMMARISED
+   - EDUCATION
+   - CERTIFICATIONS
+   - TECHNOLOGY & TOOLS (if present)
+7. Use plain text formatting with ===== section dividers
+8. Do NOT add any commentary, explanations or notes — output only the master template text
+
+Here are the {len(extracted_texts)} CV versions to consolidate:
+{cv_sections}
+
+Output the complete master template now:"""
+
+        # Call Claude API
+        anthropic_client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY'))
+        message = anthropic_client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=8000,
+            messages=[{"role": "user", "content": consolidation_prompt}]
+        )
+
+        consolidated_text = message.content[0].text
+
+        log_user_activity('cv_consolidation', f'Consolidated {len(extracted_texts)} CV files into master template')
+
+        return jsonify({
+            'success': True,
+            'consolidated_text': consolidated_text,
+            'stats': {
+                'files_processed': len(extracted_texts),
+                'filenames': [item['filename'] for item in extracted_texts]
+            }
+        })
+
+    except Exception as e:
+        print(f"Error consolidating CVs: {e}")
+        return jsonify({'error': f'Consolidation failed: {str(e)}'}), 500
 
 
 @app.route("/prompt-settings", methods=["GET"])

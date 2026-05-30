@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Get Started - Find Me A Job</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/theme.css">
+    <style>
+        body { font-family: 'Inter', 'Open Sans', 'Segoe UI', Arial, sans-serif; }
+
+        .tab {
+            position: relative;
+            padding: 12px 24px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 3px solid transparent;
+            color: #94a3b8;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 14px;
+        }
+        .tab:hover { background: rgba(255,255,255,0.08); color: white; }
+        .tab.active { border-bottom-color: #d97706; color: white; font-weight: 600; background: rgba(255,255,255,0.05); }
+
+        /* Step cards */
+        .step-card { background: white; border: 1px solid #e8e4dc; border-radius: 14px; overflow: hidden; transition: border-color 0.3s; }
+        .step-card.completed { border-color: #d97706; }
+        .step-card.locked { opacity: 0.45; pointer-events: none; }
+
+        .step-header { display: flex; align-items: center; padding: 20px 24px; cursor: pointer; gap: 16px; }
+        .step-body { padding: 0 24px 24px 76px; display: none; }
+        .step-body.open { display: block; }
+
+        .step-number {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #f0ece4; color: #7a7570;
+            font-weight: 700; font-size: 15px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; border: 2px solid #e0dbd2;
+        }
+        .step-number.active { background: #d97706; color: white; border-color: #d97706; }
+        .step-number.done { background: #d97706; color: white; border-color: #d97706; }
+
+        .connector { width: 2px; height: 20px; background: #e8e4dc; margin-left: 42px; }
+        .connector.done { background: #d97706; }
+
+        /* Builder tags */
+        .builder-tag {
+            display: inline-block; padding: 5px 14px;
+            border: 1.5px solid #e0dbd2; border-radius: 999px;
+            font-size: 13px; cursor: pointer; transition: all 0.15s;
+            background: white; color: #3a3530; margin: 3px;
+        }
+        .builder-tag:hover { border-color: #d97706; color: #d97706; }
+        .builder-tag.selected { background: #d97706; border-color: #d97706; color: white; }
+
+        /* Upload */
+        .upload-zone {
+            border: 2px dashed #d1c9bc; border-radius: 10px;
+            padding: 28px; text-align: center; cursor: pointer;
+            transition: all 0.2s; background: #faf9f6;
+        }
+        .upload-zone:hover { border-color: #d97706; background: #fffbeb; }
+        .upload-zone.has-files { border-color: #d97706; background: #fffbeb; }
+
+        .file-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: #faf9f6; border: 1px solid #e8e4dc; border-radius: 8px; margin-bottom: 6px; }
+
+        /* States */
+        .state { display: none; }
+        .state.active { display: block; }
+
+        /* Spinner */
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spin { animation: spin 0.9s linear infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .pulse { animation: pulse 1.5s ease infinite; }
+        @keyframes popIn { 0%{transform:scale(0.5);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+        .pop-in { animation: popIn 0.35s ease forwards; }
+
+        /* Inputs */
+        textarea, input[type=text] {
+            width: 100%; border: 1px solid #ddd9d1; border-radius: 8px;
+            padding: 10px 14px; font-size: 13px; font-family: 'Inter', sans-serif;
+            color: #1a1a1a; background: #faf9f6; outline: none; resize: vertical; box-sizing: border-box;
+        }
+        textarea:focus, input[type=text]:focus { border-color: #d97706; box-shadow: 0 0 0 3px rgba(217,119,6,0.1); }
+
+        .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #9a9590; margin-bottom: 8px; }
+
+        /* Buttons */
+        .btn-amber { background: #d97706; color: white; border: none; border-radius: 8px; padding: 10px 22px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+        .btn-amber:hover { background: #b45309; }
+        .btn-amber:disabled { background: #e0dbd2; color: #9a9590; cursor: not-allowed; }
+        .btn-dark { background: #2b2b2b; color: white; border: none; border-radius: 8px; padding: 12px 32px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+        .btn-dark:hover { background: #1a1a1a; }
+        .btn-outline { background: transparent; color: #7a7570; border: 1.5px solid #e0dbd2; border-radius: 8px; padding: 9px 20px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+        .btn-outline:hover { border-color: #d97706; color: #d97706; }
+        .btn-ghost { background: transparent; color: #9a9590; border: none; font-size: 12px; cursor: pointer; padding: 3px 8px; border-radius: 6px; transition: all 0.15s; }
+        .btn-ghost:hover { color: #ef4444; background: #fef2f2; }
+
+        .ready-card { background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 2px solid #d97706; border-radius: 14px; padding: 36px; text-align: center; }
+
+        .stat-chip { display: inline-flex; align-items: center; gap: 5px; background: #f0ece4; border-radius: 999px; padding: 4px 12px; font-size: 12px; color: #3a3530; font-weight: 500; margin: 3px; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+    <!-- ═══════════════════════════════════════════
+         HEADER
+    ═══════════════════════════════════════════ -->
+    <div class="bg-slate-800 text-white p-6 mb-8">
+        <div class="max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h1 class="text-3xl font-bold">Find Me A Job</h1>
+                    <p class="text-slate-300 mt-1">Your AI-powered career companion</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-slate-300 text-sm">Welcome, <strong class="text-white">{{ username }}</strong></span>
+                    <a href="/settings" class="text-slate-300 hover:text-white transition-colors text-sm flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Settings
+                    </a>
+                    <a href="/logout" class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded-md text-sm font-medium transition-colors">Logout</a>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="flex border-b border-slate-600">
+                <div class="tab active">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Get Started
+                    {% if not has_master_template or not has_custom_prompt %}
+                    <span style="background:#ef4444;color:white;font-size:10px;font-weight:700;border-radius:999px;padding:1px 7px;line-height:16px;">!</span>
+                    {% endif %}
+                </div>
+                <a href="/ai-match" class="tab">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                    AI Match Tool
+                </a>
+                <a href="/interview-prep" class="tab">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                    Interview Prep
+                </a>
+                <a href="/user-guide" class="tab">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    User Guide
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         PAGE BODY
+    ═══════════════════════════════════════════ -->
+    <div class="max-w-4xl mx-auto px-6 pb-16">
+
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-slate-800">Welcome, {{ username }} 👋</h2>
+            <p class="text-slate-500 mt-1">Complete 2 quick steps to unlock the AI Match Tool.</p>
+        </div>
+
+        <!-- ═══ STEP 1 ═══ -->
+        <div class="step-card {% if has_custom_prompt %}completed{% endif %}" id="card-1">
+            <div class="step-header" onclick="toggleStep(1)">
+                <div class="step-number {% if has_custom_prompt %}done{% else %}active{% endif %}" id="num-1">
+                    {% if has_custom_prompt %}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                    {% else %}1{% endif %}
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-semibold text-slate-800">Step 1 — Configure Your AI Prompt</span>
+                        {% if has_custom_prompt %}
+                        <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Saved ✓</span>
+                        {% else %}
+                        <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">Pending</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-sm text-slate-500 mt-0.5">Tell the AI what kind of roles you're targeting and what to prioritise.</p>
+                </div>
+                <svg id="chevron-1" class="w-5 h-5 text-slate-400 transition-transform {% if not has_custom_prompt %}rotate-180{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+
+            <div class="step-body {% if not has_custom_prompt %}open{% endif %}" id="body-1">
+                <div class="border-t border-gray-100 pt-5">
+
+                    <!-- Quick Builder -->
+                    <div class="mb-5">
+                        <p class="section-label">Quick Builder — select to generate a prompt</p>
+
+                        <div class="mb-4">
+                            <p class="text-sm font-medium text-slate-700 mb-2">What roles are you targeting? <span class="text-slate-400 font-normal">(select all that apply)</span></p>
+                            <div id="roles-tags">
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Technology Risk</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Programme Manager</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Business Manager</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Operational Risk</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">AI Governance</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Controls Lead</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Risk & Controls</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <p class="text-sm font-medium text-slate-700 mb-2">Seniority level <span class="text-slate-400 font-normal">(select all that apply)</span></p>
+                            <div id="seniority-tags">
+                                <span class="builder-tag" onclick="builderToggleTag(this)">VP</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Director</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Senior Manager</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Managing Director</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Executive Director</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-5">
+                            <p class="text-sm font-medium text-slate-700 mb-2">Key strengths to highlight <span class="text-slate-400 font-normal">(select all that apply)</span></p>
+                            <div id="strengths-tags">
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Regulatory remediation</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">AI governance</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Stakeholder management</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Data & KRI reporting</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">1LoD / 2LoD controls</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Consent order delivery</span>
+                                <span class="builder-tag" onclick="builderToggleTag(this)">Transformation programmes</span>
+                            </div>
+                        </div>
+
+                        <button class="btn-outline text-sm" onclick="builderGenerate()">✨ Generate Prompt from My Answers</button>
+                    </div>
+
+                    <!-- Prompt textarea -->
+                    <div class="mb-5">
+                        <p class="section-label">Your AI Prompt <span class="text-amber-600 font-medium normal-case">(editable — this is what the AI uses to evaluate your CV)</span></p>
+                        <textarea id="custom-prompt-input" rows="6" placeholder="Select options above and click Generate, or write your own prompt here...">{{ current_prompt_text }}</textarea>
+                        <p class="text-xs text-slate-400 mt-1">This prompt tells the AI how to evaluate your CV against each job. The more specific, the better.</p>
+                    </div>
+
+                    <div class="flex gap-3 flex-wrap">
+                        <button class="btn-amber" onclick="savePromptStep()">Save Prompt</button>
+                        <button class="btn-outline" onclick="toggleStep(1)">Collapse</button>
+                    </div>
+                    <p id="prompt-save-msg" class="text-sm text-amber-600 mt-2 hidden"></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="connector {% if has_custom_prompt %}done{% endif %}" id="conn-1"></div>
+
+        <!-- ═══ STEP 2 ═══ -->
+        <div class="step-card {% if has_master_template %}completed{% endif %} {% if not has_custom_prompt %}locked{% endif %}" id="card-2">
+            <div class="step-header" onclick="if(!document.getElementById('card-2').classList.contains('locked')) toggleStep(2)">
+                <div class="step-number {% if has_master_template %}done{% elif has_custom_prompt %}active{% endif %}" id="num-2">
+                    {% if has_master_template %}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                    {% else %}2{% endif %}
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-semibold text-slate-800">Step 2 — Build Your Master CV</span>
+                        {% if has_master_template %}
+                        <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium" id="step2-badge">Saved ✓</span>
+                        {% elif not has_custom_prompt %}
+                        <span class="text-xs bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full font-medium" id="step2-badge">🔒 Complete step 1 first</span>
+                        {% else %}
+                        <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium" id="step2-badge">Pending</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-sm text-slate-500 mt-0.5" id="step2-sub">Upload your CV variations and let AI consolidate them into one master template.</p>
+                </div>
+                <svg id="chevron-2" class="w-5 h-5 text-slate-400 transition-transform {% if has_custom_prompt and not has_master_template %}rotate-180{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+
+            <div class="step-body {% if has_custom_prompt and not has_master_template %}open{% endif %}" id="body-2">
+                <div class="border-t border-gray-100 pt-6">
+
+                    <!-- ── STATE: UPLOAD ── -->
+                    <div class="state active" id="state-upload">
+                        <div class="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5">
+                            <span class="text-lg flex-shrink-0">💡</span>
+                            <div>
+                                <p class="text-sm font-semibold text-amber-800 mb-1">How this works</p>
+                                <p class="text-sm text-amber-700">Upload 1–5 versions of your CV (PDF or Word). The AI reads all of them, removes duplicates, and combines every unique bullet point and headline into a single master template — preserving your exact wording throughout.</p>
+                            </div>
+                        </div>
+
+                        <div class="upload-zone mb-4" id="upload-zone" onclick="triggerFileInput()">
+                            <input type="file" id="cv-file-input" class="hidden" multiple accept=".pdf,.docx,.doc,.txt" onchange="handleFileSelect(event)">
+                            <svg class="w-10 h-10 text-slate-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                            <p class="text-sm font-semibold text-slate-600 mb-1">Click to browse or drag & drop</p>
+                            <p class="text-xs text-slate-400">PDF or Word (.docx) · Up to 5 files · Max 5MB each</p>
+                        </div>
+
+                        <div id="file-list" class="mb-5 hidden">
+                            <p class="section-label mb-2">Files ready to consolidate</p>
+                            <div id="files-container"></div>
+                            <button class="btn-ghost text-xs mt-1" onclick="triggerFileInput()">+ Add another file</button>
+                        </div>
+
+                        <div class="flex gap-3 items-center flex-wrap">
+                            <button class="btn-amber" id="consolidate-btn" onclick="startConsolidation()" disabled>✨ Consolidate with AI</button>
+                            <p class="text-xs text-slate-400" id="file-count-hint">Add at least 1 file to continue</p>
+                        </div>
+                        <p id="consolidate-error" class="text-sm text-red-600 mt-2 hidden"></p>
+                    </div>
+
+                    <!-- ── STATE: PROCESSING ── -->
+                    <div class="state" id="state-processing">
+                        <div class="text-center py-10">
+                            <div class="relative inline-flex items-center justify-center w-16 h-16 mb-5">
+                                <div class="spin" style="width:64px;height:64px;border:3px solid #fcd34d;border-top-color:#d97706;border-radius:50%;position:absolute;"></div>
+                                <span style="font-size:22px;">🤖</span>
+                            </div>
+                            <h3 class="text-lg font-semibold text-slate-800 mb-3">AI is consolidating your CVs…</h3>
+                            <div class="text-sm text-slate-500 space-y-2 mb-6">
+                                <p id="ps-1" class="pulse">📄 Extracting text from your files…</p>
+                                <p id="ps-2" class="text-slate-300">🔍 Identifying unique bullets and headlines…</p>
+                                <p id="ps-3" class="text-slate-300">🧩 Removing duplicate content…</p>
+                                <p id="ps-4" class="text-slate-300">✍️ Building your master template…</p>
+                            </div>
+                            <p class="text-xs text-slate-400">This usually takes 15–30 seconds</p>
+                        </div>
+                    </div>
+
+                    <!-- ── STATE: REVIEW ── -->
+                    <div class="state" id="state-review">
+                        <div class="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4 mb-5">
+                            <div class="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 pop-in">
+                                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-amber-800">Consolidation complete — review before saving</p>
+                                <p class="text-xs text-amber-600 mt-0.5" id="review-subtitle">You can edit the text below before saving.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="section-label mb-0">Master template <span class="text-amber-600 normal-case font-medium">(editable)</span></p>
+                            <button class="btn-ghost text-xs" onclick="resetUpload()">← Re-upload files</button>
+                        </div>
+                        <textarea id="consolidated-textarea" rows="14" style="font-size:12px;line-height:1.7;" class="mb-2"></textarea>
+                        <p class="text-xs text-slate-400 mb-5">Any edits you make here will be saved as-is. The AI uses this text when analysing job matches.</p>
+
+                        <div class="flex gap-3 flex-wrap">
+                            <button class="btn-amber" onclick="saveConsolidatedTemplate()">Save as Master Template →</button>
+                            <button class="btn-outline" onclick="resetUpload()">Re-upload files</button>
+                        </div>
+                        <p id="save-template-error" class="text-sm text-red-600 mt-2 hidden"></p>
+                    </div>
+
+                    <!-- ── STATE: SAVED ── -->
+                    <div class="state" id="state-saved">
+                        <div class="flex items-center gap-4 bg-amber-50 border border-amber-300 rounded-xl p-5">
+                            <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0 pop-in">
+                                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-semibold text-amber-800">Master template saved successfully</p>
+                                <p class="text-sm text-amber-600 mt-0.5" id="saved-stats">Your CV is ready for AI matching.</p>
+                            </div>
+                            <button class="btn-outline text-xs" onclick="resetUpload()">Replace</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div class="connector" id="conn-2"></div>
+
+        <!-- ═══ STEP 3 ═══ -->
+        <div class="step-card {% if has_master_template %}completed{% else %}locked{% endif %}" id="card-3">
+            <div class="step-header">
+                <div class="step-number {% if has_master_template %}done{% endif %}" id="num-3">
+                    {% if has_master_template %}
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                    {% else %}3{% endif %}
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-semibold text-slate-800">Step 3 — You're Ready to Analyse Jobs</span>
+                        {% if has_master_template %}
+                        <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">Ready ✓</span>
+                        {% else %}
+                        <span class="text-xs bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full font-medium" id="step3-badge">🔒 Complete steps 1 & 2 first</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-sm text-slate-400 mt-0.5">Paste any job description and get instant AI analysis of your match, skill gaps, and tailored CV.</p>
+                </div>
+            </div>
+            {% if has_master_template %}
+            <div class="step-body open" id="body-3">
+                <div class="border-t border-gray-100 pt-5">
+                    <div class="ready-card">
+                        <div class="w-16 h-16 bg-amber-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </div>
+                        <h3 class="text-xl font-bold text-amber-900 mb-2">You're all set!</h3>
+                        <p class="text-amber-700 text-sm mb-6 max-w-sm mx-auto">Your AI prompt is configured and your master CV is ready. Paste any job posting to get your match score, skill gaps, and a tailored CV in seconds.</p>
+                        <a href="/ai-match"><button class="btn-dark">Go to AI Match Tool →</button></a>
+                        <p class="text-xs text-amber-600 mt-3">You can update your prompt or CV anytime by returning to this page</p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="step-body" id="body-3"></div>
+            {% endif %}
+        </div>
+
+        <p class="text-center text-xs text-slate-400 mt-8">Need help? Visit the <a href="/user-guide" class="text-amber-600 hover:text-amber-700 font-medium">User Guide →</a></p>
+    </div>
+
+<script>
+    // ── Track files selected ──
+    let selectedFiles = [];
+
+    // ── Toggle step expand/collapse ──
+    function toggleStep(n) {
+        const body = document.getElementById(`body-${n}`);
+        const chevron = document.getElementById(`chevron-${n}`);
+        if (!body) return;
+        const isOpen = body.classList.contains('open');
+        body.classList.toggle('open', !isOpen);
+        if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+    }
+
+    // ── Builder: toggle tag ──
+    function builderToggleTag(el) { el.classList.toggle('selected'); }
+
+    function builderGetSelected(containerId) {
+        return Array.from(document.querySelectorAll(`#${containerId} .builder-tag.selected`)).map(t => t.textContent.trim());
+    }
+
+    // ── Generate prompt from builder ──
+    function builderGenerate() {
+        const roles = builderGetSelected('roles-tags');
+        const seniorities = builderGetSelected('seniority-tags');
+        const strengths = builderGetSelected('strengths-tags');
+
+        if (roles.length === 0 && seniorities.length === 0 && strengths.length === 0) {
+            alert('Please select at least one option above before generating.');
+            return;
+        }
+
+        let prompt = `You are an expert CV analyst specialising in Tier-1 financial services.\n\n`;
+        if (roles.length > 0) prompt += `Evaluate candidates targeting ${roles.join(', ')} roles`;
+        if (seniorities.length > 0) prompt += ` at ${seniorities.join(' / ')} level`;
+        prompt += `.\n\n`;
+        if (strengths.length > 0) prompt += `Prioritise these strengths: ${strengths.join(', ')}.\n\n`;
+        prompt += `Scoring criteria:\n- Skills & experience match: 40%\n- Relevance to role requirements: 30%\n- Seniority & seniority fit: 20%\n- Sector & industry alignment: 10%\n\n`;
+        prompt += `Be honest and objective. Highlight genuine strengths and real gaps. Do not inflate match scores.`;
+
+        document.getElementById('custom-prompt-input').value = prompt;
+    }
+
+    // ── Save prompt ──
+    function savePromptStep() {
+        const promptText = document.getElementById('custom-prompt-input').value.trim();
+        if (!promptText) {
+            showPromptMsg('Please enter a prompt before saving.', 'error');
+            return;
+        }
+
+        fetch('/save-custom-prompt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ custom_prompt: promptText })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                // Mark step 1 done
+                document.getElementById('num-1').classList.add('done');
+                document.getElementById('num-1').innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>`;
+                document.getElementById('card-1').classList.add('completed');
+                document.getElementById('conn-1').classList.add('done');
+                // Update badge
+                const badge = document.querySelector('.tab.active span[style*="ef4444"]');
+                // Collapse step 1
+                document.getElementById('body-1').classList.remove('open');
+                document.getElementById('chevron-1').style.transform = '';
+                // Unlock step 2
+                const card2 = document.getElementById('card-2');
+                card2.classList.remove('locked');
+                document.getElementById('num-2').classList.add('active');
+                document.getElementById('step2-badge').textContent = 'Pending';
+                document.getElementById('step2-badge').className = 'text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium';
+                // Open step 2
+                document.getElementById('body-2').classList.add('open');
+                document.getElementById('chevron-2').style.transform = 'rotate(180deg)';
+                document.getElementById('card-2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                showPromptMsg(data.error || 'Failed to save prompt.', 'error');
+            }
+        })
+        .catch(() => showPromptMsg('Network error. Please try again.', 'error'));
+    }
+
+    function showPromptMsg(msg, type) {
+        const el = document.getElementById('prompt-save-msg');
+        el.textContent = msg;
+        el.className = `text-sm mt-2 ${type === 'error' ? 'text-red-600' : 'text-amber-600'}`;
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), 4000);
+    }
+
+    // ── File input trigger ──
+    function triggerFileInput() {
+        document.getElementById('cv-file-input').click();
+    }
+
+    // ── Handle file selection ──
+    function handleFileSelect(event) {
+        const newFiles = Array.from(event.target.files);
+        const allowed = ['pdf', 'docx', 'doc', 'txt'];
+
+        newFiles.forEach(file => {
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (!allowed.includes(ext)) {
+                alert(`"${file.name}" is not supported. Please use PDF, Word (.docx), or .txt files.`);
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                alert(`"${file.name}" is too large. Maximum file size is 5MB.`);
+                return;
+            }
+            if (selectedFiles.length >= 5) {
+                alert('Maximum of 5 files allowed.');
+                return;
+            }
+            // Avoid exact duplicates
+            if (!selectedFiles.find(f => f.name === file.name && f.size === file.size)) {
+                selectedFiles.push(file);
+            }
+        });
+
+        renderFileList();
+        event.target.value = ''; // reset so same file can be re-added if removed
+    }
+
+    function renderFileList() {
+        const container = document.getElementById('files-container');
+        container.innerHTML = '';
+        selectedFiles.forEach((file, idx) => {
+            const sizeStr = file.size > 1024 * 1024 ? (file.size / 1024 / 1024).toFixed(1) + ' MB' : Math.round(file.size / 1024) + ' KB';
+            const item = document.createElement('div');
+            item.className = 'file-item';
+            item.innerHTML = `
+                <span style="font-size:18px;flex-shrink:0">${file.name.endsWith('.pdf') ? '📄' : '📝'}</span>
+                <span style="flex:1;font-size:13px;font-weight:500;color:#3a3530;">${file.name}</span>
+                <span style="font-size:12px;color:#9a9590;">${sizeStr}</span>
+                <button class="btn-ghost" onclick="removeFile(${idx})" title="Remove">✕</button>
+            `;
+            container.appendChild(item);
+        });
+
+        if (selectedFiles.length > 0) {
+            document.getElementById('file-list').classList.remove('hidden');
+            document.getElementById('upload-zone').classList.add('has-files');
+            document.getElementById('consolidate-btn').disabled = false;
+            document.getElementById('file-count-hint').textContent = `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} ready`;
+        } else {
+            document.getElementById('file-list').classList.add('hidden');
+            document.getElementById('upload-zone').classList.remove('has-files');
+            document.getElementById('consolidate-btn').disabled = true;
+            document.getElementById('file-count-hint').textContent = 'Add at least 1 file to continue';
+        }
+    }
+
+    function removeFile(idx) {
+        selectedFiles.splice(idx, 1);
+        renderFileList();
+    }
+
+    // ── Start consolidation ──
+    function startConsolidation() {
+        if (selectedFiles.length === 0) return;
+
+        showState('processing');
+
+        // Animate processing steps
+        const steps = ['ps-1','ps-2','ps-3','ps-4'];
+        steps.forEach((id, i) => {
+            setTimeout(() => {
+                if (i > 0) {
+                    const prev = document.getElementById(steps[i-1]);
+                    prev.classList.remove('pulse');
+                    prev.style.color = '#6b7280';
+                }
+                const el = document.getElementById(id);
+                el.style.color = '#3a3530';
+                el.classList.add('pulse');
+            }, i * 2000);
+        });
+
+        // Build FormData and POST to /consolidate-cvs
+        const formData = new FormData();
+        selectedFiles.forEach(file => formData.append('cv_files', file));
+
+        fetch('/consolidate-cvs', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            steps.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('pulse');
+                el.style.color = '#6b7280';
+            });
+
+            if (data.success) {
+                document.getElementById('consolidated-textarea').value = data.consolidated_text;
+                const stats = data.stats;
+                document.getElementById('review-subtitle').textContent =
+                    stats.files_processed > 1
+                    ? `${stats.files_processed} files consolidated. Review and edit below before saving.`
+                    : `1 file extracted. Review and edit below before saving.`;
+                showState('review');
+            } else {
+                showState('upload');
+                const errEl = document.getElementById('consolidate-error');
+                errEl.textContent = data.error || 'Consolidation failed. Please try again.';
+                errEl.classList.remove('hidden');
+                setTimeout(() => errEl.classList.add('hidden'), 6000);
+            }
+        })
+        .catch(err => {
+            showState('upload');
+            const errEl = document.getElementById('consolidate-error');
+            errEl.textContent = 'Network error. Please try again.';
+            errEl.classList.remove('hidden');
+        });
+    }
+
+    // ── Save consolidated template ──
+    function saveConsolidatedTemplate() {
+        const text = document.getElementById('consolidated-textarea').value.trim();
+        if (!text) {
+            document.getElementById('save-template-error').textContent = 'Template is empty.';
+            document.getElementById('save-template-error').classList.remove('hidden');
+            return;
+        }
+
+        // Use the existing upload-master-template endpoint with a text blob
+        const blob = new Blob([text], { type: 'text/plain' });
+        const formData = new FormData();
+        formData.append('template_file', blob, 'master_template.txt');
+
+        fetch('/upload-master-template', { method: 'POST', body: formData })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('saved-stats').textContent =
+                    `${selectedFiles.length > 1 ? selectedFiles.length + ' CVs consolidated · ' : ''}Ready for AI matching.`;
+                showState('saved');
+                markStep2Done();
+            } else {
+                document.getElementById('save-template-error').textContent = data.error || 'Failed to save template.';
+                document.getElementById('save-template-error').classList.remove('hidden');
+            }
+        })
+        .catch(() => {
+            document.getElementById('save-template-error').textContent = 'Network error. Please try again.';
+            document.getElementById('save-template-error').classList.remove('hidden');
+        });
+    }
+
+    // ── Mark step 2 done and unlock step 3 ──
+    function markStep2Done() {
+        // Update step 2 header
+        const num2 = document.getElementById('num-2');
+        num2.className = 'step-number done';
+        num2.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>`;
+        document.getElementById('card-2').classList.add('completed');
+        document.getElementById('step2-badge').textContent = 'Saved ✓';
+        document.getElementById('step2-badge').className = 'text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium';
+        document.getElementById('conn-2').classList.add('done');
+
+        // Remove the ! badge from Get Started tab
+        const tabBadge = document.querySelector('.tab.active span[style*="ef4444"]');
+        if (tabBadge) tabBadge.remove();
+
+        // Unlock step 3
+        const card3 = document.getElementById('card-3');
+        card3.classList.remove('locked');
+        card3.classList.add('completed');
+        const num3 = document.getElementById('num-3');
+        num3.className = 'step-number done';
+        num3.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>`;
+        if (document.getElementById('step3-badge'))
+            document.getElementById('step3-badge').textContent = 'Ready ✓';
+
+        // Show step 3 ready body
+        const body3 = document.getElementById('body-3');
+        body3.classList.add('open');
+        body3.innerHTML = `
+            <div class="border-t border-gray-100 pt-5">
+                <div class="ready-card">
+                    <div class="w-16 h-16 bg-amber-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
+                    <h3 class="text-xl font-bold text-amber-900 mb-2">You're all set!</h3>
+                    <p class="text-amber-700 text-sm mb-6 max-w-sm mx-auto">Your AI prompt is configured and your master CV is ready. Paste any job posting to get your match score, skill gaps, and a tailored CV in seconds.</p>
+                    <a href="/ai-match"><button class="btn-dark">Go to AI Match Tool →</button></a>
+                    <p class="text-xs text-amber-600 mt-3">You can update your prompt or CV anytime by returning to this page</p>
+                </div>
+            </div>`;
+
+        // Collapse step 2 and scroll to step 3
+        document.getElementById('body-2').classList.remove('open');
+        document.getElementById('chevron-2').style.transform = '';
+        setTimeout(() => card3.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+    }
+
+    // ── Reset upload to start over ──
+    function resetUpload() {
+        selectedFiles = [];
+        renderFileList();
+        ['ps-1','ps-2','ps-3','ps-4'].forEach((id, i) => {
+            const el = document.getElementById(id);
+            if (el) { el.style.color = ''; el.classList.toggle('pulse', i === 0); el.classList.toggle('text-slate-300', i > 0); }
+        });
+        showState('upload');
+    }
+
+    // ── Show a state panel ──
+    function showState(name) {
+        ['upload','processing','review','saved'].forEach(s => {
+            document.getElementById(`state-${s}`).classList.toggle('active', s === name);
+        });
+    }
+
+    // ── Drag and drop ──
+    const uploadZone = document.getElementById('upload-zone');
+    if (uploadZone) {
+        uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.style.borderColor = '#d97706'; uploadZone.style.background = '#fffbeb'; });
+        uploadZone.addEventListener('dragleave', () => { uploadZone.style.borderColor = ''; uploadZone.style.background = ''; });
+        uploadZone.addEventListener('drop', e => {
+            e.preventDefault();
+            uploadZone.style.borderColor = ''; uploadZone.style.background = '';
+            const dt = e.dataTransfer;
+            if (dt.files.length) {
+                const fakeEvent = { target: { files: dt.files, value: '' } };
+                handleFileSelect(fakeEvent);
+            }
+        });
+    }
+</script>
+</body>
+</html>
