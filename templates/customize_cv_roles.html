@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customize CV - Select Roles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="/static/theme.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        .role-card { transition: border-color 0.15s ease; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<div x-data="roleSelector()" x-cloak class="max-w-5xl mx-auto p-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Customize Your CV</h1>
+                <p class="text-gray-600 mt-2">
+                    For: <span class="font-semibold text-gray-900">{{ job_title }}</span>
+                    {% if job_company %} at {{ job_company }}{% endif %}
+                </p>
+            </div>
+            <a href="/customize-cv/headline" class="text-gray-500 hover:text-gray-700 text-sm">← Back</a>
+        </div>
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+            <span class="font-semibold text-blue-600">Step 2 of 3</span>
+            <span class="text-gray-400">·</span>
+            <span>Select Roles to Tailor</span>
+        </div>
+        <div class="h-1 bg-gray-200 rounded-full mt-2">
+            <div class="h-1 bg-blue-600 rounded-full" style="width: 66%"></div>
+        </div>
+    </div>
+
+    <!-- Selected headline summary -->
+    <div class="bg-white rounded-lg border shadow-sm p-4 mb-6 flex items-center gap-3">
+        <svg class="w-5 h-5 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <div>
+            <p class="text-xs text-gray-500 font-semibold uppercase tracking-wide">Selected Career Summary</p>
+            <p class="text-sm font-semibold text-gray-900">{{ selected_headline }}</p>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="p-4 mb-6 rounded-lg border border-gray-200 border-l-4 border-l-blue-600 bg-white">
+        <p class="text-sm font-semibold text-gray-800">Choose which roles AI should tailor bullets for.</p>
+        <p class="text-sm text-gray-600 mt-1">For each selected role, AI will analyse your bullets against the job description and recommend the strongest ones. You then review and approve.</p>
+        <p class="text-sm text-gray-500 mt-1 italic">Tip: Select your most recent and most relevant roles. Older or less relevant roles can be skipped.</p>
+    </div>
+
+    <!-- Role Cards -->
+    <div class="space-y-3 mb-32">
+        {% for role in roles %}
+        <div class="role-card bg-white rounded-lg border-2 p-5 cursor-pointer"
+             :class="selectedIds.includes({{ role.id }}) ? 'border-blue-600' : 'border-gray-200 hover:border-gray-300'"
+             @click="toggle({{ role.id }})">
+
+            <div class="flex items-start justify-between">
+                <div class="flex items-start gap-4 flex-1">
+                    <!-- Checkbox -->
+                    <div class="mt-0.5 w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition"
+                         :class="selectedIds.includes({{ role.id }}) ? 'bg-blue-600 border-blue-600' : 'border-gray-300'">
+                        <svg x-show="selectedIds.includes({{ role.id }})" class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 flex-wrap mb-1">
+                            <h3 class="font-bold text-gray-900">{{ role.company }}</h3>
+                            <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-medium">{{ role.dates }}</span>
+                            {% if role.relevance_score >= 85 %}
+                            <span class="text-xs px-2 py-0.5 rounded font-semibold" style="background:#fef3c7; color:#92400e;">High relevance</span>
+                            {% elif role.relevance_score >= 70 %}
+                            <span class="text-xs px-2 py-0.5 rounded font-semibold bg-gray-100 text-gray-600">Good relevance</span>
+                            {% else %}
+                            <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded font-semibold">Lower relevance</span>
+                            {% endif %}
+                        </div>
+                        {% if role.role_titles %}
+                        <p class="text-sm text-gray-600">{{ role.role_titles[0] }}</p>
+                        {% endif %}
+                        <p class="text-xs text-gray-400 mt-1">{{ role.bullets|length }} bullets available</p>
+                    </div>
+                </div>
+
+                <!-- Score -->
+                <div class="text-right ml-4 flex-shrink-0">
+                    <div class="text-2xl font-bold text-blue-600">{{ role.relevance_score }}%</div>
+                    <div class="text-xs text-gray-400">relevance</div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Fixed bottom bar -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4">
+        <div class="max-w-5xl mx-auto flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-700">
+                    <span class="font-bold text-blue-600" x-text="selectedIds.length"></span>
+                    roles selected
+                    <template x-if="selectedIds.length === 0">
+                        <span class="font-semibold" style="color:#b45309;"> — select at least 1 to continue</span>
+                    </template>
+                </p>
+                <p class="text-xs text-gray-500 mt-0.5" x-text="totalBullets() + ' bullets to review across selected roles'"></p>
+            </div>
+            <button @click="saveAndContinue()"
+                    :disabled="selectedIds.length === 0 || saving"
+                    :class="selectedIds.length > 0 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'"
+                    class="text-white px-8 py-3 rounded-lg font-semibold transition whitespace-nowrap">
+                <span x-show="!saving">Continue →</span>
+                <span x-show="saving">Saving...</span>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const ROLE_DATA = {{ roles | tojson }};
+
+function roleSelector() {
+    return {
+        selectedIds: {{ roles | selectattr('relevance_score', 'ge', 75) | map(attribute='id') | list | tojson }},
+        saving: false,
+
+        toggle(id) {
+            const idx = this.selectedIds.indexOf(id);
+            if (idx > -1) {
+                this.selectedIds.splice(idx, 1);
+            } else {
+                this.selectedIds.push(id);
+            }
+        },
+
+        totalBullets() {
+            return ROLE_DATA
+                .filter(r => this.selectedIds.includes(r.id))
+                .reduce((sum, r) => sum + (r.bullets ? r.bullets.length : 0), 0);
+        },
+
+        async saveAndContinue() {
+            if (this.selectedIds.length === 0) return;
+            this.saving = true;
+            try {
+                const response = await fetch('/customize-cv/roles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ selected_role_ids: this.selectedIds })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    window.location.href = result.next_step;
+                } else {
+                    alert('Error: ' + result.error);
+                    this.saving = false;
+                }
+            } catch (e) {
+                alert('Failed to save. Please try again.');
+                this.saving = false;
+            }
+        }
+    };
+}
+</script>
+
+</body>
+</html>

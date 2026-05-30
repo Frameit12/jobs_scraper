@@ -396,6 +396,16 @@ def init_cv_customization_sessions_table():
             """))
 
             conn.execute(text("""
+                ALTER TABLE cv_customization_sessions
+                ADD COLUMN IF NOT EXISTS selected_roles JSONB
+            """))
+
+            conn.execute(text("""
+                ALTER TABLE cv_customization_sessions
+                ADD COLUMN IF NOT EXISTS bullet_analysis_by_role JSONB
+            """))
+
+            conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_cv_sessions_user
                 ON cv_customization_sessions(user_id, status)
             """))
@@ -1441,18 +1451,193 @@ def parse_bullets_from_template(template_text):
     print(f"\n=== TOTAL BULLETS FOUND: {len(bullets)} ===")
 
     if len(bullets) > 0:
-        # Show category breakdown
         category_counts = {}
         for bullet in bullets:
             cat = bullet['category']
             category_counts[cat] = category_counts.get(cat, 0) + 1
-
         print("\n=== CATEGORY BREAKDOWN ===")
         for cat, count in category_counts.items():
             print(f"  {cat}: {count} bullets")
     print()
 
     return bullets
+
+
+def parse_career_summaries_from_template(template_text):
+    """Parse [VERSION N — Label] blocks from CAREER SUMMARY section."""
+    import re
+    lines = template_text.split('\n')
+    summaries = []
+    in_summary = False
+    current_version = None
+    current_text = []
+
+    for line in lines:
+        stripped = line.strip()
+
+        if not in_summary:
+            if 'CAREER SUMMARY' in stripped.upper() and '=' not in stripped:
+                in_summary = True
+            continue
+
+        # End of section
+        if stripped.startswith('=') and len(stripped) >= 10:
+            if current_version and current_text:
+                summaries.append({**current_version, 'text': ' '.join(current_text).strip()})
+            break
+
+        version_match = re.match(r'\[VERSION\s+(\d+)\s*[—–-]\s*(.+?)\]', stripped)
+        if version_match:
+            if current_version and current_text:
+                summaries.append({**current_version, 'text': ' '.join(current_text).strip()})
+            n = int(version_match.group(1))
+            current_version = {'id': n - 1, 'number': n, 'label': version_match.group(2).strip()}
+            current_text = []
+        elif current_version and stripped:
+            current_text.append(stripped)
+
+    if current_version and current_text:
+        summaries.append({**current_version, 'text': ' '.join(current_text).strip()})
+
+    print(f"=== CAREER SUMMARIES FOUND: {len(summaries)} ===")
+    return summaries
+
+
+def parse_roles_from_template(template_text):
+    """Parse role sections from employment history.
+    Each role block is delimited by === lines and contains
+    ROLE TITLES, CONTEXT LINES, BULLETS, KEY ACHIEVEMENTS.
+    """
+    import re
+    lines = template_text.split('\n')
+    roles = []
+    in_employment = False
+    i = 0
+
+    while i < len(lines):
+        stripped = lines[i].strip()
+
+        if not in_employment:
+            if 'EMPLOYMENT HISTORY' in stripped.upper() and stripped.startswith('='):
+                in_employment = True
+            i += 1
+            continue
+
+        if 'PERMANENT ROLES' in stripped.upper():
+            break
+
+        # Detect opening === block
+        if stripped.startswith('=') and len(stripped) >= 20:
+            # Next non-empty line is the header
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+
+            if j >= len(lines):
+                i += 1
+                continue
+
+            header = lines[j].strip()
+
+            # Skip pure separators and known non-role headers
+            if (not header or header.startswith('=') or
+                    'EMPLOYMENT HISTORY' in header.upper() or
+                    'PERMANENT ROLES' in header.upper() or
+                    'CONTRACTING ASSIGNMENTS' in header.upper()):
+                i += 1
+                continue
+
+            # Extract company and dates
+            date_match = re.search(
+                r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}|'
+                r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})\s*[–—-]\s*'
+                r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}|Present)',
+                header
+            )
+            company = header
+            dates = ''
+            if date_match:
+                dates = header[date_match.start():date_match.end()].strip()
+                company = header[:date_match.start()].strip()
+
+            role = {
+                'id': len(roles),
+                'company': company,
+                'dates': dates,
+                'role_titles': [],
+                'context_lines': [],
+                'bullets': [],
+                'key_achievements': []
+            }
+
+            # Skip past the closing === line
+            i = j + 1
+            while i < len(lines) and (not lines[i].strip() or lines[i].strip().startswith('=')):
+                i += 1
+
+            # Parse sections
+            current_section = None
+            while i < len(lines):
+                sec_line = lines[i].strip()
+
+                if sec_line.startswith('=') and len(sec_line) >= 20:
+                    break
+                if 'PERMANENT ROLES' in sec_line.upper():
+                    break
+
+                if sec_line == 'ROLE TITLES:':
+                    current_section = 'role_titles'
+                elif sec_line == 'CONTEXT LINES:':
+                    current_section = 'context_lines'
+                elif sec_line == 'BULLETS:':
+                    current_section = 'bullets'
+                elif sec_line == 'KEY ACHIEVEMENTS:':
+                    current_section = 'key_achievements'
+                elif current_section and sec_line.startswith('- '):
+                    content = sec_line[2:].strip()
+                    if content and len(content) > 10:
+                        role[current_section].append(content)
+
+                i += 1
+
+            if role['bullets']:
+                roles.append(role)
+                print(f"  ✓ Role: {role['company']} ({len(role['bullets'])} bullets)")
+            continue
+
+        i += 1
+
+    print(f"=== ROLES FOUND: {len(roles)} ===")
+    return roles
+
+
+def score_roles_relevance(roles, job_description):
+    """Fast keyword-based relevance scoring — no API call needed."""
+    import re
+    jd_lower = job_description.lower()
+    scored = []
+
+    for role in roles:
+        all_text = ' '.join(role['bullets'] + role['role_titles'] + role['context_lines']).lower()
+        words = set(re.sub(r'[^\w\s]', ' ', all_text).split())
+        jd_words = set(re.sub(r'[^\w\s]', ' ', jd_lower).split())
+
+        # Remove stop words
+        stops = {'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'for', 'with',
+                 'on', 'at', 'by', 'as', 'is', 'was', 'are', 'were', 'be', 'been',
+                 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+                 'should', 'may', 'might', 'this', 'that', 'these', 'those', 'it'}
+        words -= stops
+        jd_words -= stops
+
+        overlap = words & jd_words
+        score = min(99, int((len(overlap) / max(len(jd_words), 1)) * 250))
+        score = max(30, score)
+
+        scored.append({**role, 'relevance_score': score})
+
+    scored.sort(key=lambda r: r['relevance_score'], reverse=True)
+    return scored
 
 
 def create_cv_customization_session(user_id, analysis_id, job_title, job_company):
@@ -1645,6 +1830,52 @@ def update_cv_session_approved_bullets(session_id, approved_bullets):
 
     except Exception as e:
         print(f"Error updating approved bullets: {e}")
+        return False
+
+
+def update_cv_session_selected_roles(session_id, selected_roles):
+    """Save user's chosen roles for bullet tailoring."""
+    engine = get_db_connection()
+    if not engine:
+        return False
+    try:
+        with engine.connect() as conn:
+            import json
+            conn.execute(text("""
+                UPDATE cv_customization_sessions
+                SET selected_roles = :roles, updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """), {"session_id": session_id, "roles": json.dumps(selected_roles)})
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Error saving selected roles: {e}")
+        return False
+
+
+def update_cv_session_bullet_analysis_by_role(session_id, role_key, analysis):
+    """Save per-role bullet analysis to avoid re-running AI."""
+    engine = get_db_connection()
+    if not engine:
+        return False
+    try:
+        with engine.connect() as conn:
+            import json
+            conn.execute(text("""
+                UPDATE cv_customization_sessions
+                SET bullet_analysis_by_role = COALESCE(bullet_analysis_by_role, '{}'::jsonb)
+                    || jsonb_build_object(:role_key, :analysis::jsonb),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = :session_id
+            """), {
+                "session_id": session_id,
+                "role_key": role_key,
+                "analysis": json.dumps(analysis)
+            })
+            conn.commit()
+            return True
+    except Exception as e:
+        print(f"Error saving role bullet analysis: {e}")
         return False
 
 
@@ -1907,6 +2138,88 @@ def analyze_bullets_with_ai(bullets, job_description, user_id):
 
     except Exception as e:
         print(f"Error analyzing bullets with AI: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def analyze_bullets_for_role_with_ai(role, job_description, user_id):
+    """Rank and analyse bullets for a single role against the JD."""
+    client = get_anthropic_client()
+    system_prompt = get_user_system_prompt(user_id)
+
+    bullets_text = '\n'.join(
+        f"{i+1}. {b}" for i, b in enumerate(role['bullets'])
+    )
+    role_context = f"{role['company']} ({role['dates']})"
+    best_title = role['role_titles'][0] if role['role_titles'] else ''
+
+    try:
+        message = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=3000,
+            temperature=0.3,
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
+            messages=[{
+                "role": "user",
+                "content": f"""You are helping a job seeker select the best bullets from a specific role on their CV.
+
+**ROLE:** {role_context}
+**TITLE:** {best_title}
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**AVAILABLE BULLETS FOR THIS ROLE ({len(role['bullets'])} total):**
+{bullets_text}
+
+**YOUR TASK:**
+Score every bullet (0–100) against the JD. Select the top bullets (aim for 4–6, minimum 3).
+Return them ordered highest score first.
+
+For each selected bullet determine:
+- ready_to_use: strong as-is
+- needs_rewriting: relevant but needs adaptation — provide a specific rewrite
+
+Return JSON:
+{{
+    "recommended_bullets": [
+        {{
+            "bullet_index": 0,
+            "original_text": "...",
+            "match_score": 92,
+            "status": "ready_to_use",
+            "reasons": ["Directly addresses JD requirement for...", "Shows measurable impact..."],
+            "rewrite_suggestion": null
+        }},
+        {{
+            "bullet_index": 2,
+            "original_text": "...",
+            "match_score": 78,
+            "status": "needs_rewriting",
+            "reasons": ["Relevant but lacks JD keywords..."],
+            "rewrite_suggestion": "Revised bullet text here..."
+        }}
+    ]
+}}"""
+            }]
+        )
+
+        response_text = message.content[0].text
+        if "```json" in response_text:
+            s = response_text.find("```json") + 7
+            response_text = response_text[s:response_text.find("```", s)].strip()
+        elif "```" in response_text:
+            s = response_text.find("```") + 3
+            response_text = response_text[s:response_text.find("```", s)].strip()
+
+        analysis = json.loads(response_text)
+        if 'recommended_bullets' in analysis:
+            analysis['recommended_bullets'].sort(key=lambda x: x.get('match_score', 0), reverse=True)
+        return analysis
+
+    except Exception as e:
+        print(f"Error analysing bullets for role {role['company']}: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -3807,9 +4120,6 @@ def signup():
         if not username or not email or not password:
             return render_template("signup.html", error="Please fill in all fields")
         
-        if len(password) < 6:
-            return render_template("signup.html", error="Password must be at least 6 characters")
-        
         if create_user(username, email, password):
             return render_template("login.html", success="Account created! Please log in.")
         else:
@@ -3949,10 +4259,6 @@ def reset_password(token):
                     return render_template("reset_password.html", 
                         error="Passwords do not match", token=token, username=username)
                 
-                if len(new_password) < 6:
-                    return render_template("reset_password.html", 
-                        error="Password must be at least 6 characters", token=token, username=username)
-                
                 # Update password and mark token as used
                 try:
                     password_hash = generate_password_hash(new_password)
@@ -4065,11 +4371,6 @@ def settings():
                 return render_template("settings.html", 
                     username=current_username, email=current_email,
                     error="New passwords don't match")
-            
-            if len(new_password) < 6:
-                return render_template("settings.html", 
-                    username=current_username, email=current_email,
-                    error="Password must be at least 6 characters")
             
             # Verify current password
             if not verify_user(current_username, current_password):
@@ -5716,13 +6017,12 @@ def customize_cv_resume(cv_session_id):
 
         # Determine which step to resume
         if not cv_session.get('selected_headline'):
-            # No headline selected yet - go to headline step
             return redirect('/customize-cv/headline')
-        elif not cv_session.get('approved_bullets') or len(cv_session.get('approved_bullets', [])) < 6:
-            # Headline selected but bullets incomplete - go to bullets step
-            return redirect('/customize-cv/bullets')
+        elif not cv_session.get('selected_roles'):
+            return redirect('/customize-cv/roles')
+        elif not cv_session.get('approved_bullets') or len(cv_session.get('approved_bullets', [])) < 3:
+            return redirect('/customize-cv/bullets?role=0')
         else:
-            # Everything done - go to preview
             return redirect('/customize-cv/preview')
 
     except Exception as e:
@@ -5747,7 +6047,7 @@ def customize_cv_headline():
         selected_headline = data.get('headline')
 
         if update_cv_session_headline(cv_session_id, selected_headline):
-            return jsonify({'success': True, 'next_step': '/customize-cv/bullets'})
+            return jsonify({'success': True, 'next_step': '/customize-cv/roles'})
         else:
             return jsonify({'error': 'Failed to save headline'}), 500
 
@@ -5768,8 +6068,10 @@ def customize_cv_headline():
         if not master_template:
             return "Master template not found", 404
 
-        # Parse headlines from template
-        headlines = parse_headlines_from_template(master_template['template_text'])
+        # Try new career summary format first, fall back to legacy headline format
+        headlines = parse_career_summaries_from_template(master_template['template_text'])
+        if not headlines:
+            headlines = parse_headlines_from_template(master_template['template_text'])
 
         if not headlines:
             return "No headlines found in master template", 400
@@ -5839,9 +6141,9 @@ def customize_cv_headline():
         return "Error loading headline selection", 500
 
 
-@app.route("/customize-cv/bullets", methods=["GET", "POST"])
-def customize_cv_bullets():
-    """Step 2: Bullet point selection with AI recommendations"""
+@app.route("/customize-cv/roles", methods=["GET", "POST"])
+def customize_cv_roles():
+    """Step 2: User selects which roles AI should tailor bullets for."""
     if 'user_id' not in session or 'cv_session_id' not in session:
         return redirect('/ai-match')
 
@@ -5849,66 +6151,146 @@ def customize_cv_bullets():
     cv_session_id = session['cv_session_id']
 
     if request.method == "POST":
-        # Save approved bullets and proceed
-        # TODO: Implement bullet saving
-        return jsonify({'success': True, 'next_step': '/customize-cv/preview'})
+        data = request.json
+        selected_role_ids = data.get('selected_role_ids', [])
 
-    # GET request - show bullet selection page
+        cv_session = get_cv_session(cv_session_id)
+        master_template = get_user_master_template(user_id)
+        if not cv_session or not master_template:
+            return jsonify({'error': 'Session or template not found'}), 404
+
+        all_roles = parse_roles_from_template(master_template['template_text'])
+        selected = [r for r in all_roles if r['id'] in selected_role_ids]
+
+        if not selected:
+            return jsonify({'error': 'No roles selected'}), 400
+
+        if update_cv_session_selected_roles(cv_session_id, selected):
+            return jsonify({'success': True, 'next_step': '/customize-cv/bullets?role=0'})
+        return jsonify({'error': 'Failed to save roles'}), 500
+
+    # GET — show role selection
     try:
-        # Get CV session data
         cv_session = get_cv_session(cv_session_id)
         if not cv_session:
             return "Session not found", 404
 
-        # Get analysis for job description
         analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
         if not analysis:
             return "Analysis not found", 404
 
-        # Get master template
         master_template = get_user_master_template(user_id)
         if not master_template:
             return "Master template not found", 404
 
-        # Parse bullets from template
-        bullets = parse_bullets_from_template(master_template['template_text'])
+        roles = parse_roles_from_template(master_template['template_text'])
+        if not roles:
+            return "No roles found in master template", 400
 
-        if not bullets:
-            return "No bullets found in master template", 400
+        scored_roles = score_roles_relevance(roles, analysis['job_description'])
 
-        # Check if we already have bullet analysis (to avoid re-running AI)
-        if cv_session.get('bullet_analysis'):
-            print("✓ Using saved bullet analysis (not re-running AI)")
-            ai_analysis = cv_session['bullet_analysis']
+        return render_template('customize_cv_roles.html',
+                               job_title=cv_session['job_title'],
+                               job_company=cv_session['job_company'],
+                               selected_headline=cv_session['selected_headline'],
+                               roles=scored_roles)
+
+    except Exception as e:
+        print(f"Error in role selection: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error loading role selection", 500
+
+
+@app.route("/customize-cv/bullets", methods=["GET", "POST"])
+def customize_cv_bullets():
+    """Step 2b: Per-role bullet selection. ?role=N selects which role to tailor."""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return redirect('/ai-match')
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+
+    if request.method == "POST":
+        data = request.json
+        role_index = int(data.get('role_index', 0))
+        approved_bullets = data.get('approved_bullets', [])
+        approved_texts = data.get('approved_texts', {})
+
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return jsonify({'error': 'Session not found'}), 404
+
+        selected_roles = cv_session.get('selected_roles', [])
+
+        # Merge new approvals into flat approved_bullets list
+        existing = cv_session.get('approved_bullets') or []
+        role_company = selected_roles[role_index]['company'] if role_index < len(selected_roles) else ''
+        # Remove any prior entries for this role, then add new ones
+        existing = [b for b in existing if b.get('role_company') != role_company]
+        for bullet_idx in approved_bullets:
+            text = approved_texts.get(str(bullet_idx), '')
+            if text:
+                existing.append({'role_company': role_company, 'bullet_index': bullet_idx, 'approved_text': text})
+
+        update_cv_session_approved_bullets(cv_session_id, existing)
+
+        next_index = role_index + 1
+        if next_index < len(selected_roles):
+            return jsonify({'success': True, 'next_step': f'/customize-cv/bullets?role={next_index}'})
+        return jsonify({'success': True, 'next_step': '/customize-cv/preview'})
+
+    # GET request
+    try:
+        role_index = int(request.args.get('role', 0))
+
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return "Session not found", 404
+
+        selected_roles = cv_session.get('selected_roles', [])
+        if not selected_roles:
+            return redirect('/customize-cv/roles')
+
+        if role_index >= len(selected_roles):
+            return redirect('/customize-cv/preview')
+
+        current_role = selected_roles[role_index]
+        role_key = current_role['company']
+
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return "Analysis not found", 404
+
+        # Use cached analysis if available
+        cached = (cv_session.get('bullet_analysis_by_role') or {}).get(role_key)
+        if cached:
+            print(f"✓ Using cached bullet analysis for {role_key}")
+            ai_analysis = cached
         else:
-            print("⚙ Running AI bullet analysis...")
-            # Analyze bullets with AI
-            ai_analysis = analyze_bullets_with_ai(
-                bullets,
-                analysis['job_description'],
-                user_id
+            print(f"⚙ Running AI bullet analysis for {role_key}...")
+            ai_analysis = analyze_bullets_for_role_with_ai(
+                current_role, analysis['job_description'], user_id
             )
-
             if not ai_analysis:
-                return "Failed to analyze bullets", 500
+                return "Failed to analyse bullets", 500
+            update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, ai_analysis)
 
-            # Save analysis to avoid re-running
-            update_cv_session_bullet_analysis(cv_session_id, ai_analysis)
-            print("✓ Saved bullet analysis to database")
+        # Previously approved bullets for this role
+        all_approved = cv_session.get('approved_bullets') or []
+        role_approved = [b for b in all_approved if b.get('role_company') == role_key]
 
-        # Get previously approved bullets (if any)
-        approved_bullets_data = cv_session.get('approved_bullets', [])
-
-        # Render bullet selection template
         return render_template('customize_cv_bullets.html',
-                             job_title=cv_session['job_title'],
-                             job_company=cv_session['job_company'],
-                             selected_headline=cv_session['selected_headline'],
-                             recommended_bullets=ai_analysis.get('recommended_bullets', []),
-                             gaps=ai_analysis.get('gaps', []),
-                             suggested_new_bullets=ai_analysis.get('suggested_new_bullets', []),
-                             approved_bullets_data=approved_bullets_data,
-                             analysis_id=cv_session['analysis_id'])
+                               job_title=cv_session['job_title'],
+                               job_company=cv_session['job_company'],
+                               selected_headline=cv_session['selected_headline'],
+                               current_role=current_role,
+                               role_index=role_index,
+                               total_roles=len(selected_roles),
+                               all_roles=selected_roles,
+                               recommended_bullets=ai_analysis.get('recommended_bullets', []),
+                               approved_bullets_data=role_approved,
+                               analysis_id=cv_session['analysis_id'])
 
     except Exception as e:
         print(f"Error in bullet selection: {e}")
@@ -5935,9 +6317,8 @@ def customize_cv_preview():
         # Get approved bullets
         approved_bullets_data = cv_session.get('approved_bullets', [])
 
-        if not approved_bullets_data or len(approved_bullets_data) < 6:
-            flash('Please select at least 6 bullets before previewing.', 'warning')
-            return redirect('/customize-cv/bullets')
+        if not approved_bullets_data or len(approved_bullets_data) < 3:
+            return redirect('/customize-cv/bullets?role=0')
 
         # Render preview template
         return render_template('customize_cv_preview.html',

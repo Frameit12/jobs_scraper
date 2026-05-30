@@ -9,21 +9,12 @@
     <link rel="stylesheet" href="/static/theme.css">
     <style>
         [x-cloak] { display: none !important; }
-        .bullet-card {
-            transition: all 0.2s ease;
-        }
-        .bullet-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-        .bullet-card.approved {
-            border-color: #10b981;
-            background: #f0fdf4;
-        }
+        .bullet-card { transition: border-color 0.15s ease; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-<div x-data="bulletSelector()" x-init="init()" class="max-w-6xl mx-auto p-8" x-cloak>
+<div x-data="bulletSelector()" x-init="init()" class="max-w-5xl mx-auto p-8" x-cloak>
 
     <!-- Header -->
     <div class="mb-8">
@@ -35,265 +26,239 @@
                     {% if job_company %} at {{ job_company }}{% endif %}
                 </p>
             </div>
-            <a href="/ai-match" class="text-gray-500 hover:text-gray-700 text-sm">Cancel</a>
+            <a href="/customize-cv/roles" class="text-gray-500 hover:text-gray-700 text-sm">← Back to roles</a>
         </div>
 
-        <!-- Progress -->
+        <!-- Step indicator -->
         <div class="flex items-center gap-2 text-sm text-gray-600">
             <span class="font-semibold text-blue-600">Step 2 of 3</span>
             <span class="text-gray-400">·</span>
-            <span>Select Bullets</span>
+            <span>Role {{ role_index + 1 }} of {{ total_roles }}: <strong class="text-gray-800">{{ current_role.company }}</strong></span>
         </div>
         <div class="h-1 bg-gray-200 rounded-full mt-2">
-            <div class="h-1 bg-blue-600 rounded-full" style="width: 66%"></div>
+            <div class="h-1 bg-blue-600 rounded-full transition-all"
+                 style="width: {{ 66 + ((role_index / total_roles) * 20) | int }}%"></div>
+        </div>
+
+        <!-- Role progress dots -->
+        <div class="flex items-center gap-3 mt-3 flex-wrap">
+            {% for r in all_roles %}
+            <div class="flex items-center gap-1">
+                <div class="w-2 h-2 rounded-full
+                    {% if loop.index0 < role_index %}bg-blue-600
+                    {% elif loop.index0 == role_index %}bg-blue-600
+                    {% else %}bg-gray-300{% endif %}"></div>
+                <span class="text-xs {% if loop.index0 == role_index %}font-semibold text-gray-800{% else %}text-gray-400{% endif %}">
+                    {{ r.company.split('–')[0].strip() }}
+                </span>
+            </div>
+            {% endfor %}
         </div>
     </div>
 
-    <!-- Selected Headline Summary -->
-    <div class="bg-white rounded-lg border shadow-sm p-6 mb-6">
-        <h3 class="text-sm font-semibold text-gray-700 mb-2">✓ Your Selected Headline:</h3>
-        <p class="text-base text-gray-900">"{{ selected_headline }}"</p>
+    <!-- Role context card -->
+    <div class="bg-white rounded-lg border shadow-sm p-5 mb-5">
+        <div class="flex items-start justify-between">
+            <div>
+                <h2 class="text-xl font-bold text-gray-900">{{ current_role.company }}</h2>
+                {% if current_role.role_titles %}
+                <p class="text-sm text-gray-600 mt-1">{{ current_role.role_titles[0] }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-400 mt-0.5">{{ current_role.dates }}</p>
+            </div>
+            <div class="text-right">
+                <div class="text-2xl font-bold text-blue-600">{{ current_role.relevance_score }}%</div>
+                <div class="text-xs text-gray-400">relevance</div>
+            </div>
+        </div>
     </div>
 
-    <!-- AI Recommendations Header -->
-    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
-        <p class="text-sm text-blue-900">
-            <span class="font-semibold">AI has analyzed all 66 bullets</span> and selected the top {{ recommended_bullets|length }} that best match this role.
-        </p>
-        <p class="text-sm text-blue-800 mt-2">
-            <span class="font-semibold">📊 Prioritized by relevance:</span> The highest-scoring bullets appear first to catch recruiters' eyes.
+    <!-- Selected headline -->
+    <div class="bg-white rounded-lg border shadow-sm p-4 mb-5 flex items-center gap-3">
+        <svg class="w-4 h-4 flex-shrink-0 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+        </svg>
+        <p class="text-sm text-gray-700">{{ selected_headline }}</p>
+    </div>
+
+    <!-- AI note -->
+    <div class="p-4 mb-5 rounded-lg bg-white border border-gray-200" style="border-left: 3px solid #d97706;">
+        <p class="text-sm text-gray-700">
+            <span class="font-semibold">AI has ranked {{ recommended_bullets|length }} bullets by relevance to the job.</span>
+            Approve the ones you want included. Minimum 3 per role.
         </p>
     </div>
 
-    <!-- Recommended Bullets -->
-    <div class="space-y-4 mb-8">
-        <h2 class="text-xl font-bold text-gray-900">Recommended Bullets ({{recommended_bullets|length}})</h2>
-
+    <!-- Bullets -->
+    <div class="space-y-4 mb-32">
         {% for bullet in recommended_bullets %}
-        <div class="bullet-card bg-white rounded-lg border-2 p-6"
-             :class="{ 'approved': approvedBullets.includes({{ bullet.bullet_number }}) }">
+        <div class="bullet-card bg-white rounded-lg border-2 p-5"
+             :class="approvedIndices.includes({{ loop.index0 }}) ? 'border-blue-600' : 'border-gray-200'">
 
-            <!-- Header Row -->
-            <div class="flex items-start justify-between mb-4">
+            <div class="flex items-start gap-4">
+                <!-- Rank badge -->
+                <div class="flex-shrink-0">
+                    {% if loop.index <= 3 %}
+                    <div class="w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center" style="background:#d97706;">
+                        #{{ loop.index }}
+                    </div>
+                    {% else %}
+                    <div class="w-8 h-8 rounded-full bg-gray-200 text-gray-600 text-xs font-bold flex items-center justify-center">
+                        #{{ loop.index }}
+                    </div>
+                    {% endif %}
+                </div>
+
                 <div class="flex-1">
-                    <div class="flex items-center gap-2 mb-2">
-                        <!-- Priority Badge (Top 3 get special highlighting) -->
-                        {% if loop.index <= 3 %}
-                        <span class="px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full text-xs font-bold shadow-sm">
-                            🎯 Priority #{{ loop.index }}
+                    <!-- Badges -->
+                    <div class="flex flex-wrap items-center gap-2 mb-2">
+                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold
+                            {% if bullet.match_score >= 90 %}bg-blue-100 text-blue-700
+                            {% elif bullet.match_score >= 80 %}bg-gray-100 text-gray-600
+                            {% else %}bg-gray-100 text-gray-500{% endif %}">
+                            {{ bullet.match_score }}% match
                         </span>
-                        {% else %}
-                        <span class="px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs font-semibold">
-                            #{{ loop.index }}
-                        </span>
-                        {% endif %}
-
-                        <!-- Bullet Number -->
-                        <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-bold">
-                            Bullet #{{ bullet.bullet_number }}
-                        </span>
-
-                        <!-- Category Badge -->
-                        <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-semibold">
-                            {{ bullet.category }}
-                        </span>
-
-                        <!-- Match Score -->
-                        <span class="px-3 py-1 rounded-full text-sm font-semibold
-                            {% if bullet.match_score >= 90 %}bg-green-100 text-green-700
-                            {% elif bullet.match_score >= 80 %}bg-blue-100 text-blue-700
-                            {% else %}bg-yellow-100 text-yellow-700{% endif %}">
-                            {{ bullet.match_score }}% Match
-                        </span>
-
-                        <!-- Status Badge -->
                         {% if bullet.status == 'ready_to_use' %}
-                        <span class="px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-semibold">
-                            ✓ Ready to use
-                        </span>
+                        <span class="px-2 py-0.5 rounded text-xs font-semibold" style="background:#fef3c7; color:#92400e;">✓ Ready to use</span>
                         {% else %}
-                        <span class="px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs font-semibold">
-                            ⚠ Needs rewriting
-                        </span>
+                        <span class="px-2 py-0.5 bg-orange-50 text-orange-700 rounded text-xs font-semibold">⚠ Suggested rewrite</span>
                         {% endif %}
+                    </div>
+
+                    <!-- Bullet text -->
+                    <p class="text-sm text-gray-900 leading-relaxed">{{ bullet.original_text }}</p>
+
+                    <!-- Why it works -->
+                    {% if bullet.reasons %}
+                    <div class="bg-gray-50 rounded-lg p-3 mt-3">
+                        <p class="text-xs font-semibold text-gray-600 mb-1">Why this matches:</p>
+                        <ul class="space-y-0.5">
+                            {% for reason in bullet.reasons %}
+                            <li class="text-xs text-gray-600 flex items-start gap-1">
+                                <span class="text-blue-600 flex-shrink-0">✓</span>
+                                {{ reason }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <!-- Rewrite suggestion -->
+                    {% if bullet.rewrite_suggestion %}
+                    <div class="mt-3 p-3 rounded-lg bg-gray-50" style="border-left: 3px solid #d97706;">
+                        <p class="text-xs font-semibold text-gray-700 mb-1">AI suggested rewrite:</p>
+                        <textarea x-model="editedRewrites[{{ loop.index0 }}]"
+                                  x-init="editedRewrites[{{ loop.index0 }}] = `{{ bullet.rewrite_suggestion | replace('`', '\\`') | replace('\n', ' ') }}`"
+                                  rows="3"
+                                  class="w-full p-2 text-xs text-gray-800 bg-white border border-gray-200 rounded focus:outline-none resize-none"
+                                  style="focus:border-color:#d97706;"></textarea>
+                        <p class="text-xs text-gray-400 mt-1 italic">Edit directly, then click "Approve Edited Version" below.</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Customised version display -->
+                    <div x-show="customisedTexts[{{ loop.index0 }}]" class="mt-3 p-3 rounded-lg" style="background:#fffbeb; border-left:3px solid #d97706;">
+                        <p class="text-xs font-semibold mb-1" style="color:#92400e;">✓ Your customised version:</p>
+                        <p class="text-xs text-gray-800 leading-relaxed" x-text="customisedTexts[{{ loop.index0 }}]"></p>
                     </div>
                 </div>
             </div>
 
-            <!-- Original Bullet Text -->
-            <div class="mb-4">
-                <p class="text-base text-gray-900 leading-relaxed">{{ bullet.original_text }}</p>
-            </div>
-
-            <!-- Show Customized Version if exists -->
-            <div x-show="customizedBullets[{{ bullet.bullet_number }}]" class="mb-4">
-                <div class="bg-green-50 border-l-4 border-green-500 rounded-lg p-4">
-                    <p class="text-xs font-semibold text-green-800 mb-2">✓ Your Customized Version:</p>
-                    <p class="text-base text-green-900 leading-relaxed" x-text="customizedBullets[{{ bullet.bullet_number }}]"></p>
-                </div>
-            </div>
-
-            <!-- Why This Works -->
-            <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                <p class="text-xs font-semibold text-gray-700 mb-2">Why this maximizes interview chances:</p>
-                <ul class="space-y-1">
-                    {% for reason in bullet.reasons %}
-                    <li class="flex items-start text-sm text-gray-700">
-                        <span class="text-green-600 mr-2 flex-shrink-0">✓</span>
-                        <span>{{ reason }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-
-            <!-- Rewrite Suggestion (if needed) -->
-            {% if bullet.rewrite_suggestion %}
-            <div class="bg-orange-50 border-l-4 border-orange-400 p-4 mb-4">
-                <p class="text-xs font-semibold text-orange-900 mb-2">AI Suggested Rewrite (editable):</p>
-                <textarea x-model="editedRewrites[{{ bullet.bullet_number }}]"
-                          x-init="editedRewrites[{{ bullet.bullet_number }}] = `{{ bullet.rewrite_suggestion|replace('`', '\\`')|replace('\n', ' ') }}`"
-                          rows="3"
-                          class="w-full p-3 text-sm text-orange-900 bg-white border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"></textarea>
-                <p class="text-xs text-orange-600 mt-2 italic">Edit this directly and click "Approve Edited Version" below, or click "Customize with AI" for interactive refinement.</p>
-            </div>
-            {% endif %}
-
-            <!-- Action Buttons -->
-            <div class="flex gap-2">
-                <template x-if="!approvedBullets.includes({{ bullet.bullet_number }})">
-                    <button @click="approveBullet({{ bullet.bullet_number }}, '{{ bullet.original_text }}')"
-                            class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition text-sm">
-                        ✓ Approve Original
+            <!-- Action buttons -->
+            <div class="flex gap-2 mt-4 pl-12">
+                <template x-if="!approvedIndices.includes({{ loop.index0 }})">
+                    <button @click="approveBullet({{ loop.index0 }}, '{{ bullet.original_text | replace("'", "\\'") }}')"
+                            class="flex-1 text-white px-4 py-2 rounded-lg text-sm font-semibold transition bg-blue-600 hover:bg-blue-700">
+                        ✓ Approve
                     </button>
                 </template>
-                <template x-if="approvedBullets.includes({{ bullet.bullet_number }})">
-                    <button @click="removeBullet({{ bullet.bullet_number }})"
-                            class="flex-1 bg-gray-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-gray-700 transition text-sm">
-                        ✗ Remove from Selection
+                <template x-if="approvedIndices.includes({{ loop.index0 }})">
+                    <button @click="removeBullet({{ loop.index0 }})"
+                            class="flex-1 bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-600 transition">
+                        ✗ Remove
                     </button>
                 </template>
 
                 {% if bullet.rewrite_suggestion %}
-                <!-- Approve Edited Version -->
-                <template x-if="!approvedBullets.includes({{ bullet.bullet_number }})">
-                    <button @click="approveEditedRewrite({{ bullet.bullet_number }})"
-                            class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-purple-700 transition text-sm">
-                        ✓ Approve Edited Version
+                <template x-if="!approvedIndices.includes({{ loop.index0 }})">
+                    <button @click="approveEdited({{ loop.index0 }})"
+                            class="flex-1 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+                            style="background:#d97706;">
+                        ✓ Approve Edited
                     </button>
                 </template>
-
-                <!-- Customize with AI -->
-                <button @click="customizeBullet({{ bullet.bullet_number }}, '{{ bullet.original_text }}', `{{ bullet.rewrite_suggestion|replace('`', '\\`')|replace('\n', ' ') }}`)"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition text-sm">
-                    ✎ Customize with AI
-                </button>
                 {% endif %}
+
+                <button @click="customiseWithAI({{ loop.index0 }}, '{{ bullet.original_text | replace("'", "\\'") }}')"
+                        class="px-4 py-2 rounded-lg text-sm font-semibold transition"
+                        style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+                    ✎ Refine with AI
+                </button>
             </div>
         </div>
         {% endfor %}
     </div>
 
-    <!-- Gap Analysis (Info Only) -->
-    {% if gaps and gaps|length > 0 %}
-    <div class="bg-blue-50 border-l-4 border-blue-400 rounded-lg p-6 mb-6">
-        <h3 class="text-lg font-bold text-blue-900 mb-3">💡 Additional JD Emphasis Areas</h3>
-        <p class="text-sm text-blue-800 mb-3">The job description also emphasizes these areas. Consider refining bullets to highlight relevant experience:</p>
-        <ul class="space-y-2">
-            {% for gap in gaps %}
-            <li class="flex items-start text-sm text-blue-900">
-                <span class="mr-2">•</span>
-                <span>{{ gap }}</span>
-            </li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-
-    <!-- Chat Modal -->
-    <div x-show="chatOpen"
-         x-cloak
+    <!-- AI Chat Modal (Refine with AI) -->
+    <div x-show="chatOpen" x-cloak
          class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
          @click.self="closeChatModal()">
-
-        <div class="bg-white rounded-lg shadow-2xl max-w-5xl w-full max-h-[85vh] flex flex-col">
-            <!-- Modal Header -->
-            <div class="p-6 border-b">
-                <div class="flex items-start justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-900 mb-2">Customize Bullet with AI</h2>
-                        <p class="text-sm text-gray-600">Refine this bullet to better match the job requirements</p>
-                    </div>
-                    <button @click="closeChatModal()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
+        <div class="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col">
+            <div class="p-5 border-b flex items-start justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">Refine Bullet with AI</h2>
+                    <p class="text-sm text-gray-500 mt-1">Tell AI how to improve this bullet for the job.</p>
                 </div>
+                <button @click="closeChatModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
-
-            <!-- Chat Messages Area -->
-            <div class="flex-1 overflow-y-auto p-6 space-y-4" x-ref="chatMessages">
-                <!-- Original Bullet -->
-                <div class="bg-gray-50 rounded-lg p-4 border-l-4 border-gray-400">
-                    <p class="text-xs font-semibold text-gray-600 mb-2">Original Bullet:</p>
-                    <p class="text-base text-gray-900 leading-relaxed" x-text="originalBulletText"></p>
+            <div class="flex-1 overflow-y-auto p-5 space-y-3" x-ref="chatMessages">
+                <div class="bg-gray-50 rounded-lg p-4 border-l-4 border-gray-300">
+                    <p class="text-xs font-semibold text-gray-500 mb-1">Original:</p>
+                    <p class="text-sm text-gray-900" x-text="chatOriginalText"></p>
                 </div>
-
-                <!-- AI Suggested Rewrite (if exists) -->
-                <div x-show="aiSuggestedRewrite" class="bg-orange-50 rounded-lg p-4 border-l-4 border-orange-400">
-                    <p class="text-xs font-semibold text-orange-800 mb-2">AI's Initial Suggested Rewrite:</p>
-                    <p class="text-base text-orange-900 leading-relaxed" x-text="aiSuggestedRewrite"></p>
+                <div class="rounded-lg p-4" style="background:#fffbeb; border-left:3px solid #d97706;">
+                    <p class="text-xs font-semibold mb-1" style="color:#92400e;">Current version:</p>
+                    <p class="text-sm text-gray-900" x-text="chatCurrentText"></p>
                 </div>
-
-                <!-- Current Working Version -->
-                <div class="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
-                    <p class="text-xs font-semibold text-blue-800 mb-2">Current Working Version:</p>
-                    <p class="text-base text-blue-900 leading-relaxed" x-text="currentBulletText"></p>
-                </div>
-
-                <!-- Chat Messages -->
-                <template x-for="(msg, index) in chatMessages" :key="index">
+                <template x-for="(msg, i) in chatMessages" :key="i">
                     <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
-                        <div :class="msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'"
-                             class="max-w-[80%] rounded-lg p-4">
+                        <div :class="msg.role === 'user' ? 'text-white rounded-lg p-3 max-w-xs' : 'bg-gray-100 text-gray-900 rounded-lg p-3 max-w-md'"
+                             :style="msg.role === 'user' ? 'background:#d97706;' : ''">
                             <p class="text-sm whitespace-pre-wrap" x-text="msg.content"></p>
                         </div>
                     </div>
                 </template>
-
-                <!-- Loading Indicator -->
                 <div x-show="chatLoading" class="flex justify-start">
-                    <div class="bg-gray-100 rounded-lg p-4">
-                        <div class="flex items-center space-x-2">
+                    <div class="bg-gray-100 rounded-lg p-3">
+                        <div class="flex items-center gap-1">
                             <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0.1s"></div>
+                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0.2s"></div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Chat Input Area -->
-            <div class="p-6 border-t">
-                <div class="flex gap-2">
-                    <input type="text"
-                           x-model="userMessage"
-                           @keyup.enter="sendChatMessage()"
-                           placeholder="Type your message to refine this bullet..."
-                           class="flex-1 px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button @click="sendChatMessage()"
-                            :disabled="!userMessage.trim() || chatLoading"
-                            class="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition">
+            <div class="p-5 border-t">
+                <div class="flex gap-2 mb-3">
+                    <input type="text" x-model="userMessage" @keyup.enter="sendChatMessage()"
+                           placeholder="e.g. Make it more quantified, add the AI governance angle..."
+                           class="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none"
+                           style="focus:border-color:#d97706;">
+                    <button @click="sendChatMessage()" :disabled="!userMessage.trim() || chatLoading"
+                            class="px-5 py-2 text-white rounded-lg text-sm font-semibold disabled:bg-gray-300 transition"
+                            style="background:#d97706;">
                         Send
                     </button>
                 </div>
-                <div class="mt-3 flex gap-2">
-                    <button @click="approveChatBullet()"
-                            class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition text-sm">
-                        ✓ Approve Latest Version
+                <div class="flex gap-2">
+                    <button @click="approveChatVersion()"
+                            class="flex-1 text-white px-4 py-2 rounded-lg text-sm font-semibold transition bg-blue-600 hover:bg-blue-700">
+                        ✓ Approve This Version
                     </button>
                     <button @click="closeChatModal()"
-                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition text-sm">
+                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition">
                         Cancel
                     </button>
                 </div>
@@ -301,22 +266,30 @@
         </div>
     </div>
 
-    <!-- Fixed Bottom Bar -->
+    <!-- Fixed bottom bar -->
     <div class="fixed bottom-0 left-0 right-0 bg-white border-t-2 shadow-lg p-4">
-        <div class="max-w-6xl mx-auto flex items-center justify-between">
-            <div class="flex-1">
-                <p class="text-sm text-gray-600">
-                    <span x-text="approvedBullets.length"></span> bullets approved
-                    <template x-if="approvedBullets.length < 8">
-                        <span class="text-orange-600 font-semibold">(recommend at least 8)</span>
+        <div class="max-w-5xl mx-auto flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-700">
+                    <span class="font-bold text-blue-600" x-text="approvedIndices.length"></span>
+                    bullets approved for {{ current_role.company.split('–')[0].strip() }}
+                    <template x-if="approvedIndices.length < 3">
+                        <span class="text-orange-600 font-semibold"> — need at least 3</span>
                     </template>
+                </p>
+                <p class="text-xs text-gray-400 mt-0.5">
+                    {% if role_index + 1 < total_roles %}
+                    Next: {{ all_roles[role_index + 1].company.split('–')[0].strip() }}
+                    {% else %}
+                    Last role — then preview
+                    {% endif %}
                 </p>
             </div>
             <button @click="saveAndContinue()"
-                    :disabled="saving || approvedBullets.length < 6"
-                    :class="approvedBullets.length >= 6 ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'"
+                    :disabled="approvedIndices.length < 3 || saving"
+                    :class="approvedIndices.length >= 3 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-300 cursor-not-allowed'"
                     class="text-white px-8 py-3 rounded-lg font-semibold transition whitespace-nowrap">
-                <span x-show="!saving">Continue to Preview →</span>
+                <span x-show="!saving">{{ 'Next Role →' if role_index + 1 < total_roles else 'Continue to Preview →' }}</span>
                 <span x-show="saving">Saving...</span>
             </button>
         </div>
@@ -327,246 +300,138 @@
 <script>
 function bulletSelector() {
     return {
-        approvedBullets: [],  // Array of bullet numbers
-        approvedTexts: {},    // Map of bullet_number -> text (final approved text)
-        customizedBullets: {}, // Map of bullet_number -> customized text (to show in UI)
-        editedRewrites: {},   // Map of bullet_number -> edited rewrite text
+        approvedIndices: [],
+        approvedTexts: {},
+        editedRewrites: {},
+        customisedTexts: {},
         saving: false,
 
-        // Chat modal state
         chatOpen: false,
-        currentBulletNumber: null,
-        originalBulletText: '',  // The original bullet (never changes)
-        aiSuggestedRewrite: '',  // AI's initial suggestion (never changes)
-        currentBulletText: '',   // Working version (updates as chat progresses)
+        chatBulletIndex: null,
+        chatOriginalText: '',
+        chatCurrentText: '',
         chatMessages: [],
         userMessage: '',
         chatLoading: false,
 
         init() {
-            // Load saved progress from backend
-            const savedBullets = {{ approved_bullets_data | tojson }};
-
-            if (savedBullets && savedBullets.length > 0) {
-                console.log('Loading saved progress:', savedBullets);
-
-                for (const bullet of savedBullets) {
-                    this.approvedBullets.push(bullet.bullet_number);
-                    this.approvedTexts[bullet.bullet_number] = bullet.approved_text;
-
-                    if (bullet.customized_text) {
-                        this.customizedBullets[bullet.bullet_number] = bullet.customized_text;
-                    }
+            const saved = {{ approved_bullets_data | tojson }};
+            if (saved && saved.length) {
+                for (const b of saved) {
+                    this.approvedIndices.push(b.bullet_index);
+                    this.approvedTexts[b.bullet_index] = b.approved_text;
                 }
-
-                console.log(`Loaded ${this.approvedBullets.length} previously approved bullets`);
             }
         },
 
-        async saveToBackend() {
-            // Auto-save approved bullets to backend
-            console.log('💾 Saving to backend:', {
-                bullets: this.approvedBullets,
-                texts: this.approvedTexts,
-                customized: this.customizedBullets
-            });
-
-            try {
-                const response = await fetch('/api/save-approved-bullets', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        approved_bullets: this.approvedBullets,
-                        approved_texts: this.approvedTexts,
-                        customized_bullets: this.customizedBullets
-                    })
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    console.log('✅ Saved successfully');
-                } else {
-                    console.error('❌ Failed to save:', result.error);
-                }
-            } catch (error) {
-                console.error('❌ Error saving to backend:', error);
+        approveBullet(idx, text) {
+            if (!this.approvedIndices.includes(idx)) {
+                this.approvedIndices.push(idx);
+                this.approvedTexts[idx] = text;
             }
         },
 
-        approveBullet(bulletNumber, bulletText) {
-            if (!this.approvedBullets.includes(bulletNumber)) {
-                this.approvedBullets.push(bulletNumber);
-                this.approvedTexts[bulletNumber] = bulletText;
-                this.saveToBackend();  // Auto-save
+        removeBullet(idx) {
+            const i = this.approvedIndices.indexOf(idx);
+            if (i > -1) {
+                this.approvedIndices.splice(i, 1);
+                delete this.approvedTexts[idx];
+                delete this.customisedTexts[idx];
             }
         },
 
-        removeBullet(bulletNumber) {
-            const index = this.approvedBullets.indexOf(bulletNumber);
-            if (index > -1) {
-                this.approvedBullets.splice(index, 1);
-                delete this.approvedTexts[bulletNumber];
-                delete this.customizedBullets[bulletNumber];
-                this.saveToBackend();  // Auto-save
-            }
-        },
-
-        approveEditedRewrite(bulletNumber) {
-            // Get the edited text from textarea
-            const editedText = this.editedRewrites[bulletNumber];
-
-            if (!editedText || !editedText.trim()) {
-                alert('Please edit the rewrite first before approving.');
+        approveEdited(idx) {
+            const text = this.editedRewrites[idx];
+            if (!text || !text.trim()) {
+                alert('Please edit the rewrite first.');
                 return;
             }
-
-            // Store as customized version
-            this.customizedBullets[bulletNumber] = editedText.trim();
-
-            // Approve with edited text
-            this.approveBullet(bulletNumber, editedText.trim());
-            // Note: saveToBackend() called inside approveBullet()
+            this.customisedTexts[idx] = text.trim();
+            this.approveBullet(idx, text.trim());
         },
 
-        customizeBullet(bulletNumber, bulletText, aiSuggestion = '') {
-            // Open chat modal
-            this.currentBulletNumber = bulletNumber;
-            this.originalBulletText = bulletText;  // Store original
-            this.aiSuggestedRewrite = aiSuggestion || '';  // Store AI suggestion
-
-            // Start with AI suggestion if it exists, otherwise use original
-            this.currentBulletText = aiSuggestion || bulletText;
-
-            this.chatMessages = [];
+        customiseWithAI(idx, originalText) {
+            this.chatBulletIndex = idx;
+            this.chatOriginalText = originalText;
+            this.chatCurrentText = this.editedRewrites[idx] || originalText;
+            this.chatMessages = [{role: 'assistant', content: "I'll help you refine this bullet. What would you like to change or improve?"}];
             this.userMessage = '';
             this.chatOpen = true;
-
-            // Add initial AI greeting
-            this.chatMessages.push({
-                role: 'assistant',
-                content: "I'll help you refine this bullet to better match the job requirements. Tell me what you'd like to change or improve about it."
-            });
-
-            this.$nextTick(() => {
-                this.scrollChatToBottom();
-            });
+            this.$nextTick(() => this.scrollChat());
         },
 
         closeChatModal() {
             this.chatOpen = false;
-            this.currentBulletNumber = null;
-            this.originalBulletText = '';
-            this.aiSuggestedRewrite = '';
-            this.currentBulletText = '';
+            this.chatBulletIndex = null;
             this.chatMessages = [];
-            this.userMessage = '';
         },
 
         async sendChatMessage() {
             if (!this.userMessage.trim() || this.chatLoading) return;
-
-            const message = this.userMessage.trim();
+            const msg = this.userMessage.trim();
             this.userMessage = '';
-
-            // Add user message to chat
-            this.chatMessages.push({
-                role: 'user',
-                content: message
-            });
-
-            this.$nextTick(() => {
-                this.scrollChatToBottom();
-            });
-
-            // Show loading
+            this.chatMessages.push({role: 'user', content: msg});
             this.chatLoading = true;
-
+            this.$nextTick(() => this.scrollChat());
             try {
-                const response = await fetch('/api/customize-bullet-chat', {
+                const res = await fetch('/api/customize-bullet-chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        bullet_text: this.currentBulletText,
-                        user_message: message,
+                        bullet_text: this.chatCurrentText,
+                        user_message: msg,
                         chat_history: this.chatMessages
                     })
                 });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    // Add AI response to chat
-                    this.chatMessages.push({
-                        role: 'assistant',
-                        content: result.response
-                    });
-
-                    // If AI provided a refined bullet, update current bullet text
-                    if (result.refined_bullet) {
-                        this.currentBulletText = result.refined_bullet;
-                    }
-
-                    this.$nextTick(() => {
-                        this.scrollChatToBottom();
-                    });
+                const data = await res.json();
+                if (data.success) {
+                    this.chatMessages.push({role: 'assistant', content: data.response});
+                    if (data.refined_bullet) this.chatCurrentText = data.refined_bullet;
                 } else {
-                    alert('Error: ' + result.error);
+                    alert('Error: ' + data.error);
                 }
-            } catch (error) {
-                console.error('Error in chat:', error);
+            } catch (e) {
                 alert('Failed to get AI response. Please try again.');
             } finally {
                 this.chatLoading = false;
+                this.$nextTick(() => this.scrollChat());
             }
         },
 
-        approveChatBullet() {
-            // Store the customized version to show in UI
-            this.customizedBullets[this.currentBulletNumber] = this.currentBulletText;
-
-            // Approve with the final refined text
-            this.approveBullet(this.currentBulletNumber, this.currentBulletText);
-            // Note: saveToBackend() called inside approveBullet()
-
+        approveChatVersion() {
+            const idx = this.chatBulletIndex;
+            this.customisedTexts[idx] = this.chatCurrentText;
+            this.approveBullet(idx, this.chatCurrentText);
             this.closeChatModal();
         },
 
-        scrollChatToBottom() {
-            const chatContainer = this.$refs.chatMessages;
-            if (chatContainer) {
-                chatContainer.scrollTop = chatContainer.scrollHeight;
-            }
+        scrollChat() {
+            const el = this.$refs.chatMessages;
+            if (el) el.scrollTop = el.scrollHeight;
         },
 
         async saveAndContinue() {
-            if (this.approvedBullets.length < 6) {
-                alert('Please approve at least 6 bullets before continuing.');
-                return;
-            }
-
+            if (this.approvedIndices.length < 3) return;
             this.saving = true;
-
             try {
-                const response = await fetch('/customize-cv/bullets', {
+                const res = await fetch('/customize-cv/bullets', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        approved_bullets: this.approvedBullets,
+                        role_index: {{ role_index }},
+                        approved_bullets: this.approvedIndices,
                         approved_texts: this.approvedTexts
                     })
                 });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    window.location.href = result.next_step;
+                const data = await res.json();
+                if (data.success) {
+                    window.location.href = data.next_step;
                 } else {
-                    alert('Error: ' + result.error);
+                    alert('Error: ' + data.error);
                     this.saving = false;
                 }
-            } catch (error) {
-                console.error('Error saving bullets:', error);
-                alert('Failed to save bullets. Please try again.');
+            } catch (e) {
+                alert('Failed to save. Please try again.');
                 this.saving = false;
             }
         }
