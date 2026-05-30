@@ -1555,63 +1555,147 @@ def parse_career_summaries_from_template(template_text):
 
 
 def parse_roles_from_template(template_text):
-    """Parse role sections from employment history.
-    Each role block is delimited by === lines and contains
-    ROLE TITLES, CONTEXT LINES, BULLETS, KEY ACHIEVEMENTS.
+    """Parse role sections from employment history in a standard CV/resume format.
+
+    Handles real-world DOCX/PDF-extracted text where roles are identified by
+    date ranges (e.g. 'Dec 2024 – Present') rather than === delimiters.
+    Also supports the legacy === delimited format for backwards compatibility.
     """
     import re
+
+    DATE_RE = re.compile(
+        r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}'
+        r'\s*[–—\-]\s*'
+        r'(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}|Present)',
+        re.IGNORECASE
+    )
+    BULLET_PREFIXES = ('•', '▪', '◦', '●', '✓', '✗', '–', '—')
+
+    def has_date_range(line):
+        return bool(DATE_RE.search(line))
+
+    def is_bullet_line(line):
+        s = line.strip()
+        return s.startswith(BULLET_PREFIXES) or (len(s) > 2 and s[0] == '-' and s[1] == ' ')
+
+    def extract_company_and_dates(line):
+        m = DATE_RE.search(line)
+        if m:
+            dates = line[m.start():m.end()].strip()
+            company = line[:m.start()].strip().rstrip('–—-').strip()
+            return company, dates
+        return line.strip(), ''
+
+    def clean_bullet(line):
+        s = line.strip()
+        # Remove leading bullet character and whitespace
+        if s and s[0] in ''.join(BULLET_PREFIXES) + '-':
+            s = s[1:].strip()
+        return s
+
     lines = template_text.split('\n')
     roles = []
+
+    # ── Try legacy === format first ──────────────────────────────────────────
+    has_legacy = any(
+        l.strip().startswith('=') and len(l.strip()) >= 20 and 'EMPLOYMENT' in l.upper()
+        for l in lines
+    )
+    if has_legacy:
+        # Original === parser (unchanged)
+        in_employment = False
+        i = 0
+        while i < len(lines):
+            stripped = lines[i].strip()
+            if not in_employment:
+                if 'EMPLOYMENT HISTORY' in stripped.upper() and stripped.startswith('='):
+                    in_employment = True
+                i += 1
+                continue
+            if 'PERMANENT ROLES' in stripped.upper():
+                break
+            if stripped.startswith('=') and len(stripped) >= 20:
+                j = i + 1
+                while j < len(lines) and not lines[j].strip():
+                    j += 1
+                if j >= len(lines):
+                    i += 1
+                    continue
+                header = lines[j].strip()
+                if (not header or header.startswith('=') or
+                        'EMPLOYMENT HISTORY' in header.upper() or
+                        'PERMANENT ROLES' in header.upper() or
+                        'CONTRACTING ASSIGNMENTS' in header.upper()):
+                    i += 1
+                    continue
+                company, dates = extract_company_and_dates(header)
+                role = {'id': len(roles), 'company': company, 'dates': dates,
+                        'role_titles': [], 'context_lines': [], 'bullets': [], 'key_achievements': []}
+                i = j + 1
+                while i < len(lines) and (not lines[i].strip() or lines[i].strip().startswith('=')):
+                    i += 1
+                current_section = None
+                while i < len(lines):
+                    sec_line = lines[i].strip()
+                    if sec_line.startswith('=') and len(sec_line) >= 20:
+                        break
+                    if 'PERMANENT ROLES' in sec_line.upper():
+                        break
+                    if sec_line == 'ROLE TITLES:':
+                        current_section = 'role_titles'
+                    elif sec_line == 'CONTEXT LINES:':
+                        current_section = 'context_lines'
+                    elif sec_line == 'BULLETS:':
+                        current_section = 'bullets'
+                    elif sec_line == 'KEY ACHIEVEMENTS:':
+                        current_section = 'key_achievements'
+                    elif current_section and sec_line.startswith('- '):
+                        content = sec_line[2:].strip()
+                        if content and len(content) > 10:
+                            role[current_section].append(content)
+                    i += 1
+                if role['bullets']:
+                    roles.append(role)
+                    print(f"  ✓ Role (legacy): {role['company']} ({len(role['bullets'])} bullets)")
+                continue
+            i += 1
+        print(f"=== ROLES FOUND (legacy format): {len(roles)} ===")
+        return roles
+
+    # ── Real-world CV format parser ──────────────────────────────────────────
     in_employment = False
+    current_role = None
+    in_achievements = False
     i = 0
 
     while i < len(lines):
         stripped = lines[i].strip()
 
+        # Find start of employment history
         if not in_employment:
-            if 'EMPLOYMENT HISTORY' in stripped.upper() and stripped.startswith('='):
+            if 'EMPLOYMENT HISTORY' in stripped.upper() or 'WORK HISTORY' in stripped.upper():
                 in_employment = True
             i += 1
             continue
 
-        if 'PERMANENT ROLES' in stripped.upper():
+        # Stop at permanent/earlier roles summary
+        if 'PERMANENT ROLES' in stripped.upper() or 'EDUCATION' in stripped.upper():
             break
 
-        # Detect opening === block
-        if stripped.startswith('=') and len(stripped) >= 20:
-            # Next non-empty line is the header
-            j = i + 1
-            while j < len(lines) and not lines[j].strip():
-                j += 1
+        # Skip blank lines and section sub-headers like "Temporary Contracting Assignments"
+        if not stripped:
+            i += 1
+            continue
 
-            if j >= len(lines):
-                i += 1
-                continue
+        # A line with a date range = new role header
+        if has_date_range(stripped) and 'CONTRACTING ASSIGNMENTS' not in stripped.upper():
+            # Save previous role
+            if current_role and current_role['bullets']:
+                roles.append(current_role)
+                print(f"  ✓ Role: {current_role['company']} ({len(current_role['bullets'])} bullets)")
 
-            header = lines[j].strip()
-
-            # Skip pure separators and known non-role headers
-            if (not header or header.startswith('=') or
-                    'EMPLOYMENT HISTORY' in header.upper() or
-                    'PERMANENT ROLES' in header.upper() or
-                    'CONTRACTING ASSIGNMENTS' in header.upper()):
-                i += 1
-                continue
-
-            # Extract company and dates
-            date_match = re.search(
-                r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}|'
-                r'(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4})\s*[–—-]\s*'
-                r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{4}|Present)',
-                header
-            )
-            company = header
-            dates = ''
-            if date_match:
-                dates = header[date_match.start():date_match.end()].strip()
-                company = header[:date_match.start()].strip()
-
-            role = {
+            company, dates = extract_company_and_dates(stripped)
+            current_role = {
                 'id': len(roles),
                 'company': company,
                 'dates': dates,
@@ -1620,43 +1704,40 @@ def parse_roles_from_template(template_text):
                 'bullets': [],
                 'key_achievements': []
             }
+            in_achievements = False
 
-            # Skip past the closing === line
-            i = j + 1
-            while i < len(lines) and (not lines[i].strip() or lines[i].strip().startswith('=')):
-                i += 1
+            # Next non-empty, non-date, non-bullet line is the job title
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines):
+                next_line = lines[j].strip()
+                if (next_line and not has_date_range(next_line) and not is_bullet_line(next_line)
+                        and 'PERMANENT ROLES' not in next_line.upper()
+                        and len(next_line) < 120):
+                    current_role['role_titles'].append(next_line)
+                    i = j  # advance past the title line
 
-            # Parse sections
-            current_section = None
-            while i < len(lines):
-                sec_line = lines[i].strip()
-
-                if sec_line.startswith('=') and len(sec_line) >= 20:
-                    break
-                if 'PERMANENT ROLES' in sec_line.upper():
-                    break
-
-                if sec_line == 'ROLE TITLES:':
-                    current_section = 'role_titles'
-                elif sec_line == 'CONTEXT LINES:':
-                    current_section = 'context_lines'
-                elif sec_line == 'BULLETS:':
-                    current_section = 'bullets'
-                elif sec_line == 'KEY ACHIEVEMENTS:':
-                    current_section = 'key_achievements'
-                elif current_section and sec_line.startswith('- '):
-                    content = sec_line[2:].strip()
-                    if content and len(content) > 10:
-                        role[current_section].append(content)
-
-                i += 1
-
-            if role['bullets']:
-                roles.append(role)
-                print(f"  ✓ Role: {role['company']} ({len(role['bullets'])} bullets)")
-            continue
+        elif current_role is not None:
+            if 'KEY ACHIEVEMENTS' in stripped.upper():
+                in_achievements = True
+            elif is_bullet_line(stripped):
+                content = clean_bullet(stripped)
+                if content and len(content) > 10:
+                    if in_achievements:
+                        current_role['key_achievements'].append(content)
+                    else:
+                        current_role['bullets'].append(content)
+            elif stripped and len(stripped) > 15 and not stripped.startswith('P a g e'):
+                # Context / description line
+                current_role['context_lines'].append(stripped)
 
         i += 1
+
+    # Don't forget the last role
+    if current_role and current_role['bullets']:
+        roles.append(current_role)
+        print(f"  ✓ Role: {current_role['company']} ({len(current_role['bullets'])} bullets)")
 
     print(f"=== ROLES FOUND: {len(roles)} ===")
     return roles
