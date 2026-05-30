@@ -3838,11 +3838,17 @@ def render_template_with_admin(template_name, **kwargs):
     
 @app.route("/")
 def root():
-    # If user is logged in, go to AI Match Tool (main feature)
-    if get_current_user_id():
-        return redirect("/ai-match")
-    else:
+    user_id = get_current_user_id()
+    if not user_id:
         return redirect("/login")
+
+    # Send new/incomplete users to Get Started until setup is done
+    has_prompt = get_user_prompt_preference(user_id) is not None
+    has_template = get_user_master_template(user_id) is not None
+    if not has_prompt or not has_template:
+        return redirect("/get-started")
+
+    return redirect("/ai-match")
 
 @app.route("/app", methods=["GET", "POST"])
 def index():
