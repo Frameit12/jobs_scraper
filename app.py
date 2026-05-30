@@ -325,6 +325,23 @@ def init_user_prompt_preferences_table():
 init_user_prompt_preferences_table()
 
 
+def get_user_prompt_preference(user_id):
+    """Return the user's active prompt preference row, or None if not set up."""
+    engine = get_db_connection()
+    if not engine:
+        return None
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT id FROM user_prompt_preferences
+                WHERE user_id = :user_id AND is_active = TRUE
+                LIMIT 1
+            """), {"user_id": user_id})
+            return result.fetchone()
+    except Exception:
+        return None
+
+
 def init_master_templates_table():
     """Initialize table for storing user master resume templates"""
     engine = get_db_connection()
