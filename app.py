@@ -1464,37 +1464,71 @@ def parse_bullets_from_template(template_text):
 
 
 def parse_career_summaries_from_template(template_text):
-    """Parse [VERSION N — Label] blocks from CAREER SUMMARY section."""
+    """Parse career summary versions from template.
+
+    Handles the key format variants Claude/Haiku may produce:
+      [VERSION 1 — Label]  or  [VERSION 1 - Label]
+      VERSION 1: Label     or  VERSION 1 — Label
+    Also skips the === separator lines that immediately follow the section header.
+    """
     import re
     lines = template_text.split('\n')
     summaries = []
     in_summary = False
+    found_content = False   # True once we've moved past the opening separators
     current_version = None
     current_text = []
+    auto_counter = 0
 
     for line in lines:
         stripped = line.strip()
 
         if not in_summary:
-            if 'CAREER SUMMARY' in stripped.upper() and '=' not in stripped:
+            # Accept lines like "CAREER SUMMARY [MULTIPLE VERSIONS...]" (no = chars in the line)
+            if any(kw in stripped.upper() for kw in
+                   ['CAREER SUMMARY', 'PROFESSIONAL SUMMARY', 'EXECUTIVE SUMMARY']):
                 in_summary = True
+                found_content = False
             continue
 
-        # End of section
-        if stripped.startswith('=') and len(stripped) >= 10:
+        # Skip empty lines and === separators until we hit real content
+        is_separator = stripped.startswith('=') and len(stripped) >= 5
+        if not found_content:
+            if is_separator or not stripped:
+                continue
+            found_content = True
+
+        # A === line after content marks the end of the section
+        if is_separator:
             if current_version and current_text:
                 summaries.append({**current_version, 'text': ' '.join(current_text).strip()})
             break
 
-        version_match = re.match(r'\[VERSION\s+(\d+)\s*[—–-]\s*(.+?)\]', stripped)
-        if version_match:
+        # --- Version marker detection (multiple formats) ---
+        vm = (re.match(r'\[VERSION\s+(\d+)\s*[—–\-:]+\s*(.+?)\]?$', stripped, re.IGNORECASE) or
+              re.match(r'VERSION\s+(\d+)\s*[—–\-:]+\s*(.+)',          stripped, re.IGNORECASE) or
+              re.match(r'\[V(\d+)\s*[—–\-:]+\s*(.+?)\]?$',            stripped, re.IGNORECASE))
+
+        if vm:
             if current_version and current_text:
                 summaries.append({**current_version, 'text': ' '.join(current_text).strip()})
-            n = int(version_match.group(1))
-            current_version = {'id': n - 1, 'number': n, 'label': version_match.group(2).strip()}
+            n = int(vm.group(1))
+            label = vm.group(2).strip().rstrip(']').strip()
+            current_version = {'id': n - 1, 'number': n, 'label': label}
             current_text = []
         elif current_version and stripped:
             current_text.append(stripped)
+        elif not current_version and stripped and len(stripped) > 40:
+            # No version marker — treat each long paragraph as its own version
+            auto_counter += 1
+            if current_text:
+                summaries.append({'id': auto_counter - 2, 'number': auto_counter - 1,
+                                   'label': f'Version {auto_counter - 1}',
+                                   'text': ' '.join(current_text).strip()})
+                current_text = []
+            current_version = {'id': auto_counter - 1, 'number': auto_counter,
+                                'label': f'Version {auto_counter}'}
+            current_text = [stripped]
 
     if current_version and current_text:
         summaries.append({**current_version, 'text': ' '.join(current_text).strip()})
