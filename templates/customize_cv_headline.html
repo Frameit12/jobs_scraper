@@ -16,6 +16,79 @@
 
 <div x-data="headlineSelector()" class="max-w-2xl mx-auto px-6 py-8" x-cloak>
 
+    <!-- Chat modal (x-if removes from DOM when closed — no CSS conflict) -->
+    <template x-if="chatOpen">
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+             style="background:rgba(0,0,0,0.5);">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col"
+                 style="max-height:85vh;">
+
+                <!-- Modal header -->
+                <div class="flex items-center justify-between px-5 py-4 border-b">
+                    <div>
+                        <p class="font-semibold text-gray-900 text-sm">Customise with AI</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Refining your headline for this role</p>
+                    </div>
+                    <button @click="closeChatModal()"
+                            class="text-gray-400 hover:text-gray-600 p-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Current headline preview -->
+                <div class="px-5 py-3" style="background:#fafaf8; border-bottom:1px solid #f0ece4;">
+                    <p class="text-xs text-gray-400 mb-1">Current version</p>
+                    <p class="text-sm text-gray-800 leading-relaxed" x-text="chatCurrentText"></p>
+                </div>
+
+                <!-- Messages -->
+                <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3" x-ref="chatMessages">
+                    <template x-for="(msg, i) in chatMessages" :key="i">
+                        <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                            <div :class="msg.role === 'user'
+                                    ? 'bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-xs'
+                                    : 'bg-gray-100 text-gray-800 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm max-w-sm'"
+                                 x-text="msg.display">
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="chatLoading" class="flex justify-start">
+                        <div class="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-gray-500">
+                            AI is thinking…
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Approve refined version button (if available) -->
+                <div x-show="chatCurrentText !== chatOriginalText"
+                     class="px-5 py-3" style="border-top:1px solid #f0ece4; background:#fafaf8;">
+                    <button @click="approveChatVersion()"
+                            class="w-full text-sm font-semibold text-white py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 transition">
+                        ✓ Use This Refined Headline
+                    </button>
+                </div>
+
+                <!-- Input -->
+                <div class="px-4 py-3 border-t flex gap-2">
+                    <input type="text"
+                           x-model="userMessage"
+                           @keydown.enter="sendChatMessage()"
+                           :disabled="chatLoading"
+                           placeholder="e.g. Make it more senior, add fintech keywords…"
+                           class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                           style="border-color:#e8e4dc;">
+                    <button @click="sendChatMessage()"
+                            :disabled="chatLoading || !userMessage.trim()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition disabled:bg-gray-300">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <!-- Header -->
     <div class="mb-6">
         <div class="flex items-center justify-between mb-3">
@@ -114,11 +187,13 @@
 
         <!-- Action buttons -->
         <div class="px-5 pb-5 flex gap-2">
-            <button @click="selectAndContinue('{{ recommended_headline.text }}', {{ recommended_headline.match_score }})"
+            <button data-text="{{ recommended_headline.text }}" data-score="{{ recommended_headline.match_score }}"
+                    @click="selectAndContinue($el.dataset.text, Number($el.dataset.score))"
                     class="flex-1 text-white text-sm font-semibold py-2.5 rounded-lg transition bg-blue-600 hover:bg-blue-700">
                 ✓ Use This Headline
             </button>
-            <button @click="openCustomizeModal('{{ recommended_headline.text }}')"
+            <button data-text="{{ recommended_headline.text }}"
+                    @click="openCustomizeModal($el.dataset.text)"
                     class="flex-1 text-sm font-semibold py-2.5 rounded-lg transition"
                     style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;"
                     onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fef3c7'">
@@ -146,15 +221,15 @@
         {% for headline in headlines %}
         {% if headline.id != recommended_headline.id %}
         <div class="headline-card bg-white rounded-xl border-2 cursor-pointer"
-             :style="selectedHeadline === '{{ headline.text }}' ? 'border-color:#d97706;' : 'border-color:#e8e4dc;'"
+             :style="selectedHeadlineId === {{ headline.id }} ? 'border-color:#d97706;' : 'border-color:#e8e4dc;'"
              @click="expandedHeadline = (expandedHeadline === {{ loop.index }} ? null : {{ loop.index }})">
 
             <!-- Collapsed row -->
             <div class="p-4 flex items-start justify-between">
                 <div class="flex items-start gap-3 flex-1">
                     <div class="mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center"
-                         :style="selectedHeadline === '{{ headline.text }}' ? 'background:#d97706; border-color:#d97706;' : 'border-color:#d1cdc4;'">
-                        <svg x-show="selectedHeadline === '{{ headline.text }}'" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                         :style="selectedHeadlineId === {{ headline.id }} ? 'background:#d97706; border-color:#d97706;' : 'border-color:#d1cdc4;'">
+                        <svg x-show="selectedHeadlineId === {{ headline.id }}" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                         </svg>
                     </div>
@@ -175,7 +250,8 @@
                 {% if headline.tier == 'other' and headline.weakness %}
                 <p class="text-xs text-gray-400 mt-2 italic">Note: {{ headline.weakness }}</p>
                 {% endif %}
-                <button @click.stop="selectAndContinue('{{ headline.text }}', {{ headline.match_score }})"
+                <button data-text="{{ headline.text }}" data-score="{{ headline.match_score }}"
+                        @click.stop="selectAndContinue($el.dataset.text, Number($el.dataset.score))"
                         class="mt-3 text-sm font-semibold text-white px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition">
                     ✓ Use This Headline
                 </button>
@@ -187,33 +263,23 @@
 
 </div>
 
-<!-- Fixed bottom bar — shows when an "other" headline is selected -->
-<div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg p-4"
-     style="border-top:2px solid #e8e4dc;"
-     x-show="selectedHeadline !== null && selectedHeadline !== '{{ recommended_headline.text if recommended_headline else '' }}'">
-    <div class="max-w-2xl mx-auto flex items-center justify-between">
-        <div class="flex-1 mr-4 min-w-0">
-            <p class="text-xs text-gray-400">Selected headline</p>
-            <p class="text-sm font-semibold text-gray-800 truncate" x-text="selectedHeadline"></p>
-        </div>
-        <button @click="saveAndContinue()"
-                :disabled="saving"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition disabled:bg-gray-300 whitespace-nowrap">
-            <span x-show="!saving">Continue →</span>
-            <span x-show="saving">Saving...</span>
-        </button>
-    </div>
-</div>
-
 <script>
 function headlineSelector() {
     return {
         selectedHeadline: null,
+        selectedHeadlineId: null,
         selectedMatchScore: 0,
         showAllHeadlines: false,
         showReasons: false,
         expandedHeadline: null,
         saving: false,
+
+        chatOpen: false,
+        chatOriginalText: '',
+        chatCurrentText: '',
+        chatMessages: [],
+        userMessage: '',
+        chatLoading: false,
 
         selectAndContinue(headline, matchScore) {
             this.selectedHeadline = headline;
@@ -221,14 +287,75 @@ function headlineSelector() {
             this.saveAndContinue();
         },
 
-        selectHeadline(headline, matchScore) {
-            this.selectedHeadline = headline;
-            this.selectedMatchScore = matchScore;
+        openCustomizeModal(headline) {
+            this.chatOriginalText = headline;
+            this.chatCurrentText = headline;
+            this.chatMessages = [{
+                role: 'assistant',
+                content: "I'll help you refine this headline. What would you like to change or emphasise?",
+                display: "I'll help you refine this headline. What would you like to change or emphasise?"
+            }];
+            this.userMessage = '';
+            this.chatOpen = true;
+            this.$nextTick(() => this.scrollChat());
         },
 
-        openCustomizeModal(headline) {
-            // TODO: Chat customization — coming in step 2
-            alert('Customise with AI is coming soon. For now, use this headline or choose another.');
+        closeChatModal() {
+            this.chatOpen = false;
+            this.chatMessages = [];
+        },
+
+        async sendChatMessage() {
+            if (!this.userMessage.trim() || this.chatLoading) return;
+            const msg = this.userMessage.trim();
+            this.userMessage = '';
+            this.chatMessages.push({ role: 'user', content: msg, display: msg });
+            this.chatLoading = true;
+            this.$nextTick(() => this.scrollChat());
+            try {
+                const res = await fetch('/api/customize-headline-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        headline_text: this.chatCurrentText,
+                        user_message: msg,
+                        chat_history: this.chatMessages.map(m => ({ role: m.role, content: m.content }))
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const displayText = data.response
+                        .replace(/\[REFINED_HEADLINE\][\s\S]*?\[\/REFINED_HEADLINE\]/g, '')
+                        .trim();
+                    this.chatMessages.push({
+                        role: 'assistant',
+                        content: data.response,
+                        display: displayText
+                    });
+                    if (data.refined_headline) {
+                        this.chatCurrentText = data.refined_headline;
+                    }
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (e) {
+                alert('Failed to get AI response. Please try again.');
+            } finally {
+                this.chatLoading = false;
+                this.$nextTick(() => this.scrollChat());
+            }
+        },
+
+        approveChatVersion() {
+            this.selectedHeadline = this.chatCurrentText;
+            this.selectedMatchScore = 0;
+            this.closeChatModal();
+            this.saveAndContinue();
+        },
+
+        scrollChat() {
+            const el = this.$refs.chatMessages;
+            if (el) el.scrollTop = el.scrollHeight;
         },
 
         async saveAndContinue() {

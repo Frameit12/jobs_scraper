@@ -6503,6 +6503,108 @@ This version better highlights the leadership and stakeholder management aspects
         return jsonify({'error': 'Failed to get AI response'}), 500
 
 
+@app.route("/api/customize-headline-chat", methods=["POST"])
+def customize_headline_chat():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+
+    try:
+        data = request.json
+        headline_text = data.get('headline_text')
+        user_message = data.get('user_message')
+        chat_history = data.get('chat_history', [])
+
+        if not headline_text or not user_message:
+            return jsonify({'error': 'Missing required fields'}), 400
+
+        cv_session_id = session.get('cv_session_id')
+        if not cv_session_id:
+            return jsonify({'error': 'No active CV customization session'}), 400
+
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return jsonify({'error': 'Session not found'}), 404
+
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        if not analysis:
+            return jsonify({'error': 'Analysis not found'}), 404
+
+        job_description = analysis['job_description']
+
+        messages = []
+        for msg in chat_history:
+            if msg['role'] in ['user', 'assistant']:
+                messages.append({"role": msg['role'], "content": msg['content']})
+
+        client = get_anthropic_client()
+        system_prompt = get_user_system_prompt(user_id)
+
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=1000,
+            temperature=0.3,
+            system=[
+                {
+                    "type": "text",
+                    "text": f"""{system_prompt}
+
+You are helping a job seeker refine their CV headline to better match this job description.
+
+**JOB DESCRIPTION:**
+{job_description}
+
+**CURRENT HEADLINE:**
+{headline_text}
+
+**YOUR ROLE:**
+- Help the user refine this headline based on their feedback
+- Keep the headline truthful — only suggest changes that reflect the user's real experience
+- NEVER invent credentials, titles, or experience the user doesn't have
+- Focus on word choice, positioning, and highlighting relevant aspects
+- Incorporate JD keywords naturally where appropriate
+- Headlines should be concise (1–3 sentences max)
+
+**IMPORTANT:**
+If you provide a refined headline in your response, put it between [REFINED_HEADLINE] and [/REFINED_HEADLINE] tags so it can be extracted.
+
+Example:
+"Here's a stronger version that emphasises your leadership background:
+
+[REFINED_HEADLINE]
+Senior Finance Leader | 15+ Years Driving Strategic Growth Across FTSE-100 Businesses
+[/REFINED_HEADLINE]
+
+This version better highlights the leadership scope mentioned in the JD."
+""",
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
+            messages=messages
+        )
+
+        ai_response = response.content[0].text
+
+        refined_headline = None
+        if '[REFINED_HEADLINE]' in ai_response and '[/REFINED_HEADLINE]' in ai_response:
+            start = ai_response.find('[REFINED_HEADLINE]') + len('[REFINED_HEADLINE]')
+            end = ai_response.find('[/REFINED_HEADLINE]')
+            refined_headline = ai_response[start:end].strip()
+
+        return jsonify({
+            'success': True,
+            'response': ai_response,
+            'refined_headline': refined_headline
+        })
+
+    except Exception as e:
+        print(f"Error in headline chat: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to get AI response'}), 500
+
+
 @app.route("/api/save-approved-bullets", methods=["POST"])
 def save_approved_bullets():
     """Save approved bullets to avoid re-selection"""
