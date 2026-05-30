@@ -6686,6 +6686,30 @@ This version better highlights the leadership scope mentioned in the JD."
         return jsonify({'error': 'Failed to get AI response'}), 500
 
 
+@app.route("/debug-template-roles")
+def debug_template_roles():
+    """Temporary debug: show raw template text and parsed roles."""
+    if 'user_id' not in session:
+        return redirect('/login')
+    user_id = session['user_id']
+    master_template = get_user_master_template(user_id)
+    if not master_template:
+        return "<pre>No master template found for this user.</pre>"
+    text = master_template['template_text']
+    roles = parse_roles_from_template(text)
+    lines = text.split('\n')
+    # Show first 120 lines of raw text + parse result
+    raw_preview = '\n'.join(f"{i+1:4d}: {l}" for i, l in enumerate(lines[:120]))
+    roles_summary = '\n'.join(
+        f"Role {r['id']}: company={r['company']!r}  dates={r['dates']!r}  "
+        f"title={r['role_titles']}  bullets={len(r['bullets'])}"
+        for r in roles
+    )
+    return f"<pre style='font-size:12px;white-space:pre-wrap'>" \
+           f"=== PARSED ROLES ({len(roles)} found) ===\n{roles_summary or '(none)'}\n\n" \
+           f"=== RAW TEMPLATE (first 120 lines) ===\n{raw_preview}</pre>"
+
+
 @app.route("/api/save-approved-bullets", methods=["POST"])
 def save_approved_bullets():
     """Save approved bullets to avoid re-selection"""
