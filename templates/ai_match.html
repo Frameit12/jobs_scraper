@@ -878,16 +878,28 @@ We're looking for a Senior VP to lead our AI Risk team...
                     // Use resume route which will restore Flask session and redirect to correct step
                     const continueUrl = `/customize-cv/resume/${cvProgress.session_id}`;
 
+                    const scoreForContinue = analysis.match_score || 0;
+                    let continueMsg;
+                    if (scoreForContinue >= 70) {
+                        continueMsg = '🎯 Strong match — tailor your CV to maximise your chances';
+                    } else if (scoreForContinue >= 40) {
+                        continueMsg = '📝 Want to apply? Tailor your CV to improve your chances';
+                    } else {
+                        continueMsg = '📝 Want to apply anyway? Let AI tailor your CV for this role';
+                    }
+
                     customizeButton = `
-                        <div class="mt-6 text-center">
+                        <div class="mt-8 mx-auto max-w-md text-center">
+                            <p class="text-sm font-semibold text-slate-700 mb-4">${continueMsg}</p>
                             <a href="${continueUrl}"
-                               class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-600 to-teal-600 text-white font-semibold rounded-lg shadow-lg hover:from-green-700 hover:to-teal-700 transition">
+                               class="inline-flex items-center justify-center w-full px-6 py-3 text-white font-semibold rounded-lg shadow transition"
+                               style="background:#d97706;" onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#d97706'">
                                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
-                                ✓ Continue Customizing CV
+                                Continue Customising CV →
                             </a>
-                            <p class="text-sm text-slate-500 mt-2">📍 ${progressText}</p>
+                            <p class="text-xs text-slate-400 mt-2">📍 ${progressText}</p>
                         </div>
                     `;
                 } else {
