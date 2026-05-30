@@ -14,21 +14,80 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-<!-- DEBUG: Alpine not loaded at all (this banner disappears once Alpine runs) -->
-<div id="alpine-not-loaded" style="background:#fee2e2;border-bottom:2px solid #ef4444;padding:10px 16px;font-size:13px;font-family:monospace;position:fixed;top:0;left:0;right:0;z-index:9999;">
-  ⚠️ Alpine.js has NOT loaded yet — if this banner stays visible, Alpine failed to load (CDN issue?).
-</div>
+<div x-data="headlineSelector()" class="max-w-2xl mx-auto px-6 py-8" x-cloak>
 
-<div x-data="headlineSelector()" class="max-w-2xl mx-auto px-6 py-8" x-cloak x-init="$el.closest('body').querySelector('#alpine-not-loaded').remove()">
+    <!-- Chat modal (x-if removes from DOM when closed — no CSS conflict) -->
+    <template x-if="chatOpen">
+        <div class="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+             style="background:rgba(0,0,0,0.5);">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg flex flex-col"
+                 style="max-height:85vh;">
 
-    <!-- DEBUG PANEL -->
-    <div style="background:#1e293b;color:#94a3b8;padding:8px 12px;border-radius:8px;font-size:11px;font-family:monospace;margin-bottom:12px;">
-        <span style="color:#64748b;">DEBUG</span>
-        · Alpine: <span style="color:#4ade80;">✓ loaded</span>
-        · chatOpen: <span x-text="chatOpen" style="color:#fbbf24;"></span>
-        · <span x-text="chatOpen ? '→ modal should be visible' : '→ modal hidden'"></span>
-        <span x-show="debugError" style="color:#f87171;" x-text="' · ERROR: ' + debugError"></span>
-    </div>
+                <!-- Modal header -->
+                <div class="flex items-center justify-between px-5 py-4 border-b">
+                    <div>
+                        <p class="font-semibold text-gray-900 text-sm">Customise with AI</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Refining your headline for this role</p>
+                    </div>
+                    <button @click="closeChatModal()"
+                            class="text-gray-400 hover:text-gray-600 p-1">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Current headline preview -->
+                <div class="px-5 py-3" style="background:#fafaf8; border-bottom:1px solid #f0ece4;">
+                    <p class="text-xs text-gray-400 mb-1">Current version</p>
+                    <p class="text-sm text-gray-800 leading-relaxed" x-text="chatCurrentText"></p>
+                </div>
+
+                <!-- Messages -->
+                <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3" x-ref="chatMessages">
+                    <template x-for="(msg, i) in chatMessages" :key="i">
+                        <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                            <div :class="msg.role === 'user'
+                                    ? 'bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-xs'
+                                    : 'bg-gray-100 text-gray-800 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm max-w-sm'"
+                                 x-text="msg.display">
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="chatLoading" class="flex justify-start">
+                        <div class="bg-gray-100 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm text-gray-500">
+                            AI is thinking…
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Approve refined version button (if available) -->
+                <div x-show="chatCurrentText !== chatOriginalText"
+                     class="px-5 py-3" style="border-top:1px solid #f0ece4; background:#fafaf8;">
+                    <button @click="approveChatVersion()"
+                            class="w-full text-sm font-semibold text-white py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 transition">
+                        ✓ Use This Refined Headline
+                    </button>
+                </div>
+
+                <!-- Input -->
+                <div class="px-4 py-3 border-t flex gap-2">
+                    <input type="text"
+                           x-model="userMessage"
+                           @keydown.enter="sendChatMessage()"
+                           :disabled="chatLoading"
+                           placeholder="e.g. Make it more senior, add fintech keywords…"
+                           class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                           style="border-color:#e8e4dc;">
+                    <button @click="sendChatMessage()"
+                            :disabled="chatLoading || !userMessage.trim()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition disabled:bg-gray-300">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
 
     <!-- Header -->
     <div class="mb-6">
@@ -137,8 +196,7 @@
                     @click="openCustomizeModal($el.dataset.text)"
                     class="flex-1 text-sm font-semibold py-2.5 rounded-lg transition"
                     style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;"
-                    onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fef3c7'"
-                    id="customise-ai-btn">
+                    onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fef3c7'">
                 ✎ Customise with AI
             </button>
         </div>
@@ -203,87 +261,6 @@
         {% endfor %}
     </div>
 
-    <!-- AI Chat Modal (Customise with AI) -->
-    <template x-if="chatOpen">
-    <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-         @click.self="closeChatModal()">
-    <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col">
-        <div class="p-5 border-b flex items-start justify-between">
-            <div>
-                <h2 class="text-xl font-bold text-gray-900">Customise Headline with AI</h2>
-                <p class="text-sm text-gray-500 mt-1">Tell AI how to improve this headline for the role.</p>
-            </div>
-            <button @click="closeChatModal()" class="text-gray-400 hover:text-gray-600">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-        </div>
-        <div class="flex-1 overflow-y-auto p-5 space-y-3" x-ref="chatMessages">
-            <div class="rounded-lg p-4" style="background:#fffbeb; border-left:3px solid #d97706;">
-                <p class="text-xs font-semibold mb-1" style="color:#92400e;">Current headline:</p>
-                <p class="text-sm text-gray-900 leading-relaxed" x-text="chatCurrentText"></p>
-            </div>
-            <template x-for="(msg, i) in chatMessages" :key="i">
-                <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
-                    <div :class="msg.role === 'user' ? 'text-white rounded-lg p-3 max-w-xs' : 'bg-gray-100 text-gray-900 rounded-lg p-3 max-w-md'"
-                         :style="msg.role === 'user' ? 'background:#d97706;' : ''">
-                        <p class="text-sm whitespace-pre-wrap" x-text="msg.content"></p>
-                    </div>
-                </div>
-            </template>
-            <div x-show="chatLoading" class="flex justify-start">
-                <div class="bg-gray-100 rounded-lg p-3">
-                    <div class="flex items-center gap-1">
-                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0.1s"></div>
-                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0.2s"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="p-5 border-t">
-            <div class="flex gap-2 mb-3">
-                <input type="text" x-model="userMessage" @keyup.enter="sendChatMessage()"
-                       placeholder="e.g. Emphasise AI governance, make it more concise..."
-                       class="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:border-yellow-500">
-                <button @click="sendChatMessage()" :disabled="!userMessage.trim() || chatLoading"
-                        class="px-5 py-2 text-white rounded-lg text-sm font-semibold disabled:bg-gray-300 transition"
-                        style="background:#d97706;">
-                    Send
-                </button>
-            </div>
-            <div class="flex gap-2">
-                <button @click="approveChatVersion()"
-                        class="flex-1 text-white px-4 py-2 rounded-lg text-sm font-semibold transition bg-blue-600 hover:bg-blue-700">
-                    ✓ Use This Version
-                </button>
-                <button @click="closeChatModal()"
-                        class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-200 transition">
-                    Cancel
-                </button>
-            </div>
-        </div>
-    </div>
-    </div>
-    </template>
-
-    <!-- Fixed bottom bar — shows when an "other" headline is selected -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white shadow-lg p-4"
-     style="border-top:2px solid #e8e4dc;"
-     x-show="selectedHeadline !== null && selectedHeadlineId !== {{ recommended_headline.id if recommended_headline else 0 }}">
-    <div class="max-w-2xl mx-auto flex items-center justify-between">
-        <div class="flex-1 mr-4 min-w-0">
-            <p class="text-xs text-gray-400">Selected headline</p>
-            <p class="text-sm font-semibold text-gray-800 truncate" x-text="selectedHeadline"></p>
-        </div>
-        <button @click="saveAndContinue()"
-                :disabled="saving"
-                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition disabled:bg-gray-300 whitespace-nowrap">
-            <span x-show="!saving">Continue →</span>
-            <span x-show="saving">Saving...</span>
-        </button>
-    </div>
-    </div>
-
 </div>
 
 <script>
@@ -303,7 +280,6 @@ function headlineSelector() {
         chatMessages: [],
         userMessage: '',
         chatLoading: false,
-        debugError: '',
 
         selectAndContinue(headline, matchScore) {
             this.selectedHeadline = headline;
@@ -311,23 +287,17 @@ function headlineSelector() {
             this.saveAndContinue();
         },
 
-        selectHeadline(headline, matchScore) {
-            this.selectedHeadline = headline;
-            this.selectedMatchScore = matchScore;
-        },
-
         openCustomizeModal(headline) {
-            try {
-                this.debugError = '';
-                this.chatOriginalText = headline;
-                this.chatCurrentText = headline;
-                this.chatMessages = [{role: 'assistant', content: "I'll help you refine this headline. What would you like to change or emphasise?"}];
-                this.userMessage = '';
-                this.chatOpen = true;
-                this.$nextTick(() => this.scrollChat());
-            } catch(e) {
-                this.debugError = e.message;
-            }
+            this.chatOriginalText = headline;
+            this.chatCurrentText = headline;
+            this.chatMessages = [{
+                role: 'assistant',
+                content: "I'll help you refine this headline. What would you like to change or emphasise?",
+                display: "I'll help you refine this headline. What would you like to change or emphasise?"
+            }];
+            this.userMessage = '';
+            this.chatOpen = true;
+            this.$nextTick(() => this.scrollChat());
         },
 
         closeChatModal() {
@@ -339,23 +309,32 @@ function headlineSelector() {
             if (!this.userMessage.trim() || this.chatLoading) return;
             const msg = this.userMessage.trim();
             this.userMessage = '';
-            this.chatMessages.push({role: 'user', content: msg});
+            this.chatMessages.push({ role: 'user', content: msg, display: msg });
             this.chatLoading = true;
             this.$nextTick(() => this.scrollChat());
             try {
                 const res = await fetch('/api/customize-headline-chat', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         headline_text: this.chatCurrentText,
                         user_message: msg,
-                        chat_history: this.chatMessages
+                        chat_history: this.chatMessages.map(m => ({ role: m.role, content: m.content }))
                     })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    this.chatMessages.push({role: 'assistant', content: data.response});
-                    if (data.refined_headline) this.chatCurrentText = data.refined_headline;
+                    const displayText = data.response
+                        .replace(/\[REFINED_HEADLINE\][\s\S]*?\[\/REFINED_HEADLINE\]/g, '')
+                        .trim();
+                    this.chatMessages.push({
+                        role: 'assistant',
+                        content: data.response,
+                        display: displayText
+                    });
+                    if (data.refined_headline) {
+                        this.chatCurrentText = data.refined_headline;
+                    }
                 } else {
                     alert('Error: ' + data.error);
                 }
@@ -410,23 +389,5 @@ function headlineSelector() {
 }
 </script>
 
-<script>
-// Vanilla JS fallback: if Alpine isn't handling the click, this fires instead
-document.addEventListener('DOMContentLoaded', function() {
-    var btn = document.getElementById('customise-ai-btn');
-    if (!btn) return;
-    btn.addEventListener('click', function() {
-        // Check if Alpine has taken over this element
-        var el = btn.closest('[x-data]');
-        if (el && el._x_dataStack) return; // Alpine is handling it, do nothing
-        // Alpine not working — show diagnostic
-        document.getElementById('alpine-not-loaded') && (
-            document.getElementById('alpine-not-loaded').innerHTML =
-            '⚠️ Alpine.js is NOT processing events on this page. CDN may be blocked or erroring.'
-        );
-        alert('DEBUG: button click fired but Alpine is not active on this element. Check the red banner at the top of the page.');
-    });
-});
-</script>
 </body>
 </html>
