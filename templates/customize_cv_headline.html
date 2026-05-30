@@ -14,7 +14,21 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-<div x-data="headlineSelector()" class="max-w-2xl mx-auto px-6 py-8" x-cloak>
+<!-- DEBUG: Alpine not loaded at all (this banner disappears once Alpine runs) -->
+<div id="alpine-not-loaded" style="background:#fee2e2;border-bottom:2px solid #ef4444;padding:10px 16px;font-size:13px;font-family:monospace;position:fixed;top:0;left:0;right:0;z-index:9999;">
+  ⚠️ Alpine.js has NOT loaded yet — if this banner stays visible, Alpine failed to load (CDN issue?).
+</div>
+
+<div x-data="headlineSelector()" class="max-w-2xl mx-auto px-6 py-8" x-cloak x-init="$el.closest('body').querySelector('#alpine-not-loaded').remove()">
+
+    <!-- DEBUG PANEL -->
+    <div style="background:#1e293b;color:#94a3b8;padding:8px 12px;border-radius:8px;font-size:11px;font-family:monospace;margin-bottom:12px;">
+        <span style="color:#64748b;">DEBUG</span>
+        · Alpine: <span style="color:#4ade80;">✓ loaded</span>
+        · chatOpen: <span x-text="chatOpen" style="color:#fbbf24;"></span>
+        · <span x-text="chatOpen ? '→ modal should be visible' : '→ modal hidden'"></span>
+        <span x-show="debugError" style="color:#f87171;" x-text="' · ERROR: ' + debugError"></span>
+    </div>
 
     <!-- Header -->
     <div class="mb-6">
@@ -123,7 +137,8 @@
                     @click="openCustomizeModal($el.dataset.text)"
                     class="flex-1 text-sm font-semibold py-2.5 rounded-lg transition"
                     style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;"
-                    onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fef3c7'">
+                    onmouseover="this.style.background='#fde68a'" onmouseout="this.style.background='#fef3c7'"
+                    id="customise-ai-btn">
                 ✎ Customise with AI
             </button>
         </div>
@@ -288,6 +303,7 @@ function headlineSelector() {
         chatMessages: [],
         userMessage: '',
         chatLoading: false,
+        debugError: '',
 
         selectAndContinue(headline, matchScore) {
             this.selectedHeadline = headline;
@@ -301,12 +317,17 @@ function headlineSelector() {
         },
 
         openCustomizeModal(headline) {
-            this.chatOriginalText = headline;
-            this.chatCurrentText = headline;
-            this.chatMessages = [{role: 'assistant', content: "I'll help you refine this headline. What would you like to change or emphasise?"}];
-            this.userMessage = '';
-            this.chatOpen = true;
-            this.$nextTick(() => this.scrollChat());
+            try {
+                this.debugError = '';
+                this.chatOriginalText = headline;
+                this.chatCurrentText = headline;
+                this.chatMessages = [{role: 'assistant', content: "I'll help you refine this headline. What would you like to change or emphasise?"}];
+                this.userMessage = '';
+                this.chatOpen = true;
+                this.$nextTick(() => this.scrollChat());
+            } catch(e) {
+                this.debugError = e.message;
+            }
         },
 
         closeChatModal() {
@@ -389,5 +410,23 @@ function headlineSelector() {
 }
 </script>
 
+<script>
+// Vanilla JS fallback: if Alpine isn't handling the click, this fires instead
+document.addEventListener('DOMContentLoaded', function() {
+    var btn = document.getElementById('customise-ai-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+        // Check if Alpine has taken over this element
+        var el = btn.closest('[x-data]');
+        if (el && el._x_dataStack) return; // Alpine is handling it, do nothing
+        // Alpine not working — show diagnostic
+        document.getElementById('alpine-not-loaded') && (
+            document.getElementById('alpine-not-loaded').innerHTML =
+            '⚠️ Alpine.js is NOT processing events on this page. CDN may be blocked or erroring.'
+        );
+        alert('DEBUG: button click fired but Alpine is not active on this element. Check the red banner at the top of the page.');
+    });
+});
+</script>
 </body>
 </html>
