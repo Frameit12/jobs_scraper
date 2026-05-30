@@ -7209,14 +7209,9 @@ def consolidate_cvs():
             })
 
         # Build Claude consolidation prompt
-        # Cap each CV at 6000 chars to keep total input manageable and avoid timeout
-        MAX_CHARS_PER_CV = 6000
         cv_sections = ""
         for i, item in enumerate(extracted_texts, 1):
-            text = item['text']
-            if len(text) > MAX_CHARS_PER_CV:
-                text = text[:MAX_CHARS_PER_CV] + "\n...[truncated for length]"
-            cv_sections += f"\n\n--- CV VERSION {i}: {item['filename']} ---\n{text}\n"
+            cv_sections += f"\n\n--- CV VERSION {i}: {item['filename']} ---\n{item['text']}\n"
 
         consolidation_prompt = f"""You are consolidating {len(extracted_texts)} versions of the same person's CV into one comprehensive master template.
 
