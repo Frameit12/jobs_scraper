@@ -32,7 +32,7 @@
         }
 
         .tab.active {
-            border-bottom-color: #10b981;
+            border-bottom-color: #d97706;
             background: rgba(255, 255, 255, 0.05);
             font-weight: 600;
         }
@@ -48,8 +48,8 @@
         }
 
         .cv-card.selected {
-            border-color: #10b981;
-            background: #f0fdf4;
+            border-color: #d97706;
+            background: #fffbeb;
         }
 
         .upload-area {
@@ -58,8 +58,8 @@
         }
 
         .upload-area:hover {
-            border-color: #10b981;
-            background: #f0fdf4;
+            border-color: #d97706;
+            background: #fffbeb;
         }
 
         .skill-badge {
@@ -82,7 +82,7 @@
         }
 
         .result-card.has-match {
-            border-left-color: #10b981;
+            border-left-color: #d97706;
         }
 
         .result-card.missing {
@@ -103,7 +103,7 @@
 
         .spinner {
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #10b981;
+            border-top: 3px solid #d97706;
             border-radius: 50%;
             width: 20px;
             height: 20px;
@@ -161,7 +161,7 @@
 
         .analysis-history-card:hover {
             background: #f8fafc;
-            border-left-color: #10b981;
+            border-left-color: #d97706;
         }
 
         .match-score-badge {
@@ -173,8 +173,8 @@
         }
 
         .match-score-high {
-            background: #d1fae5;
-            color: #065f46;
+            background: #fef3c7;
+            color: #92400e;
         }
 
         .match-score-medium {
@@ -282,7 +282,7 @@
             <div class="flex gap-4">
                 <label class="flex-1 cursor-pointer">
                     <input type="radio" name="resume-source" value="master-template" class="sr-only peer" onchange="toggleResumeSource('master-template')" {% if has_master_template %}checked{% endif %}>
-                    <div class="peer-checked:border-green-500 peer-checked:bg-green-50 border-2 border-gray-200 rounded-lg p-4 transition">
+                    <div class="peer-checked:border-amber-500 peer-checked:bg-amber-50 border-2 border-gray-200 rounded-lg p-4 transition">
                         <div class="flex items-center">
                             <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
@@ -429,7 +429,7 @@ We're looking for a Senior VP to lead our AI Risk team...
                     <button
                         type="submit"
                         id="analyze-button"
-                        class="w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 text-white font-semibold py-4 px-6 rounded-lg shadow-lg transition-all transform hover:scale-[1.02] flex items-center justify-center"
+                        class="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-4 px-6 rounded-lg shadow-lg transition-all transform hover:scale-[1.02] flex items-center justify-center"
                     >
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
@@ -450,7 +450,7 @@ We're looking for a Senior VP to lead our AI Risk team...
             <!-- Match Score -->
             <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-8 mb-8 text-center">
                 <div class="mb-4">
-                    <div id="match-score-display" style="font-size: 4rem; font-weight: bold; background: linear-gradient(135deg, #10b981 0%, #059669 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                    <div id="match-score-display" style="font-size: 4rem; font-weight: bold; background: linear-gradient(135deg, #d97706 0%, #b45309 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
                         --
                     </div>
                     <p class="text-slate-600 text-lg mt-2">Match Score</p>
@@ -694,8 +694,8 @@ We're looking for a Senior VP to lead our AI Risk team...
         dropzone.addEventListener('dragover', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            dropzone.style.borderColor = '#10b981';
-            dropzone.style.background = '#f0fdf4';
+            dropzone.style.borderColor = '#d97706';
+            dropzone.style.background = '#fffbeb';
         });
 
         dropzone.addEventListener('dragleave', function(e) {
@@ -909,8 +909,8 @@ We're looking for a Senior VP to lead our AI Risk team...
                     <div class="result-card has-match bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
                         <div class="flex items-start mb-4">
                             <div class="flex-shrink-0">
-                                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
                                 </div>
@@ -920,12 +920,12 @@ We're looking for a Senior VP to lead our AI Risk team...
                                 <p class="text-slate-600 text-sm mt-1">Your qualifications that match this role</p>
                             </div>
                         </div>
-                        <div class="bg-green-50 rounded-lg p-4">
+                        <div class="bg-amber-50 rounded-lg p-4">
                             ${analysis.skills_match.map(skill => `
-                                <div class="mb-3 pb-3 border-b border-green-100 last:border-0">
+                                <div class="mb-3 pb-3 border-b border-amber-100 last:border-0">
                                     <div class="font-semibold text-slate-800">${skill.skill}</div>
                                     <div class="text-sm text-slate-600 mt-1">${skill.evidence}</div>
-                                    <span class="text-xs px-2 py-1 bg-green-200 text-green-800 rounded mt-1 inline-block">${skill.strength}</span>
+                                    <span class="text-xs px-2 py-1 bg-amber-200 text-amber-800 rounded mt-1 inline-block">${skill.strength}</span>
                                 </div>
                             `).join('')}
                         </div>
