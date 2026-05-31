@@ -8081,6 +8081,11 @@ def consolidate_cvs():
 
             if text_content and text_content.strip():
                 extracted_texts.append({'filename': file.filename, 'text': text_content})
+                # Save binary to user_cvs so export can use the original file later
+                try:
+                    save_cv_to_db(user_id, file.filename, file_data, ext, text_content)
+                except Exception as _save_err:
+                    print(f"Non-critical: could not save CV binary during consolidation: {_save_err}")
 
         if not extracted_texts:
             return jsonify({'error': 'Could not extract text from any of the uploaded files'}), 400
