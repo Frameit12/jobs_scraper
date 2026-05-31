@@ -6729,7 +6729,9 @@ def customize_cv_export():
         if not approved_bullets or not selected_headline:
             return redirect('/customize-cv/preview')
 
-        job_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
+        import unicodedata as _ud
+        _raw_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
+        job_slug = _ud.normalize('NFKD', _raw_slug).encode('ascii', 'ignore').decode('ascii') or 'CV'
 
         # ── Build replacement list: [(original_text, approved_text), …] ──────
         replacements = []
@@ -7494,7 +7496,9 @@ def customize_cv_export_start():
         selected_headline = cv_session.get('selected_headline') or ''
         bullet_analysis_by_role = cv_session.get('bullet_analysis_by_role') or {}
         analysis_id = cv_session.get('analysis_id')
-        job_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
+        import unicodedata as _ud
+        _raw_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
+        job_slug = _ud.normalize('NFKD', _raw_slug).encode('ascii', 'ignore').decode('ascii') or 'CV'
 
         print(f"[EXPORT-START] bullets={len(approved_bullets)} headline_len={len(selected_headline)} analysis_id={analysis_id}")
 
