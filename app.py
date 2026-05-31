@@ -8160,6 +8160,7 @@ Output the COMPLETE master template now. Do not truncate or stop early — inclu
                                 _conn.commit()
                 except Exception as _le:
                     print(f"Activity log error in consolidation thread: {_le}")
+                with _consolidation_lock:
                     _consolidation_jobs[job_id] = {
                         'status': 'done',
                         'created_at': _time2.time(),
