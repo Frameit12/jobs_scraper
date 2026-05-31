@@ -382,8 +382,8 @@ function bulletSelector() {
         approveBullet(idx, text) {
             if (!this.approvedIndices.includes(idx)) {
                 this.approvedIndices.push(idx);
-                this.approvedTexts[idx] = text;
             }
+            this.approvedTexts[idx] = text;
         },
 
         removeBullet(idx) {

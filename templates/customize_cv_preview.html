@@ -43,7 +43,12 @@
             </svg>
             <div>
                 <h3 class="text-lg font-semibold text-green-900">CV Customization Complete!</h3>
-                <p class="text-sm text-green-800 mt-1">Your CV has been tailored to maximize your chances for this role.</p>
+                <p class="text-sm text-green-800 mt-1">
+                    Your CV has been tailored with
+                    <strong>{{ approved_bullets | length }} bullet{{ 's' if approved_bullets | length != 1 }}</strong>
+                    across
+                    <strong>{{ bullets_by_role | length }} role{{ 's' if bullets_by_role | length != 1 }}</strong>.
+                </p>
             </div>
         </div>
     </div>
@@ -57,21 +62,31 @@
             <p class="text-2xl font-bold text-gray-900 leading-relaxed">{{ selected_headline }}</p>
         </div>
 
-        <!-- Bullets Section -->
+        <!-- Bullets grouped by role -->
         <div>
             <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Key Experience Highlights</h2>
-            <div class="space-y-4">
-                {% for bullet in approved_bullets %}
-                <div class="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-500">
-                    <div class="flex items-start">
-                        <span class="text-blue-600 font-bold mr-3 flex-shrink-0">{{ loop.index }}.</span>
-                        <p class="text-base text-gray-900 leading-relaxed">
-                            {{ bullet.customized_text if bullet.customized_text else bullet.approved_text }}
-                        </p>
-                    </div>
+
+            {% for group in bullets_by_role %}
+            <div class="mb-6">
+                <!-- Role label -->
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="flex-shrink-0 w-2 h-2 rounded-full bg-blue-600"></div>
+                    <h3 class="text-sm font-semibold text-gray-700">{{ group.role.company }}</h3>
+                    <span class="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">{{ group.bullets | length }} bullet{{ 's' if group.bullets | length != 1 }}</span>
                 </div>
-                {% endfor %}
+
+                <div class="space-y-3 pl-5">
+                    {% for bullet in group.bullets %}
+                    <div class="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-500">
+                        <p class="text-base text-gray-900 leading-relaxed">{{ bullet.approved_text }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
+            {% if not loop.last %}
+            <div class="border-t border-gray-100 mb-6"></div>
+            {% endif %}
+            {% endfor %}
         </div>
     </div>
 
@@ -120,18 +135,19 @@
 
 <script>
 function copyToClipboard() {
-    // Build the text to copy
     let text = "{{ selected_headline }}\n\n";
     text += "KEY EXPERIENCE HIGHLIGHTS:\n\n";
 
-    {% for bullet in approved_bullets %}
-    text += "{{ loop.index }}. {{ (bullet.customized_text if bullet.customized_text else bullet.approved_text) | replace('\n', ' ') | replace('"', '\\"') }}\n\n";
+    {% for group in bullets_by_role %}
+    text += "{{ group.role.company | replace('\n', ' ') | replace('"', '\\"') }}\n";
+    {% for bullet in group.bullets %}
+    text += "• {{ bullet.approved_text | replace('\n', ' ') | replace('"', '\\"') }}\n";
+    {% endfor %}
+    text += "\n";
     {% endfor %}
 
-    // Copy to clipboard
     navigator.clipboard.writeText(text).then(() => {
-        // Show success message
-        alert('✅ Copied to clipboard! You can now paste this into your CV application.');
+        alert('Copied to clipboard! You can now paste this into your CV application.');
     }).catch(err => {
         console.error('Failed to copy:', err);
         alert('Failed to copy to clipboard. Please try again.');

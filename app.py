@@ -6571,9 +6571,24 @@ def customize_cv_preview():
 
         # Get approved bullets
         approved_bullets_data = cv_session.get('approved_bullets', [])
+        selected_roles = cv_session.get('selected_roles', [])
 
         if not approved_bullets_data or len(approved_bullets_data) < 3:
             return redirect('/customize-cv/bullets?role=0')
+
+        # Group bullets by role, preserving selected_roles order
+        bullets_by_role = []
+        role_companies = [r['company'] for r in selected_roles]
+        for role in selected_roles:
+            company = role['company']
+            role_bullets = [b for b in approved_bullets_data if b.get('role_company') == company]
+            if role_bullets:
+                bullets_by_role.append({'role': role, 'bullets': role_bullets})
+        # Catch any bullets whose role_company doesn't match (shouldn't happen but be safe)
+        seen_companies = set(role_companies)
+        orphan_bullets = [b for b in approved_bullets_data if b.get('role_company') not in seen_companies]
+        if orphan_bullets:
+            bullets_by_role.append({'role': {'company': 'Other'}, 'bullets': orphan_bullets})
 
         # Render preview template
         return render_template('customize_cv_preview.html',
@@ -6581,6 +6596,7 @@ def customize_cv_preview():
                              job_company=cv_session['job_company'],
                              selected_headline=cv_session['selected_headline'],
                              approved_bullets=approved_bullets_data,
+                             bullets_by_role=bullets_by_role,
                              analysis_id=cv_session['analysis_id'])
 
     except Exception as e:
