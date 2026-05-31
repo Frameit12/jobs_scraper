@@ -1718,28 +1718,85 @@ def parse_roles_from_template(template_text):
                 print(f"  ✓ Role: {current_role['company']} ({len(current_role['bullets'])} bullets)")
 
             company, dates = extract_company_and_dates(stripped)
+
+            # If the date range is on its own line (company=''), scan backwards past
+            # blank lines and "Job Titles (across versions):" labels to find the company
+            # name — new consolidated template format puts company on its own line above.
+            if not company:
+                k = i - 1
+                while k >= 0:
+                    prev = lines[k].strip()
+                    if not prev:
+                        k -= 1
+                        continue
+                    # Skip "Job Titles (across versions):" labels and section headers
+                    if (prev.startswith('=') or is_bullet_line(prev)
+                            or has_date_range(prev)
+                            or 'JOB TITLES' in prev.upper()
+                            or 'EMPLOYMENT' in prev.upper()):
+                        k -= 1
+                        continue
+                    if len(prev) < 120:
+                        company = prev
+                    break
+
+            role_titles_found = []
+
+            # In new-style templates, job title / "Job Titles (across versions):" appears
+            # BEFORE the date range (between company line and date line). Scan backwards
+            # from the date line to pick it up.
+            k = i - 1
+            while k >= 0:
+                prev = lines[k].strip()
+                if not prev:
+                    k -= 1
+                    continue
+                if 'JOB TITLES' in prev.upper():
+                    colon_pos = prev.find(':')
+                    if colon_pos != -1:
+                        tv = prev[colon_pos + 1:].strip()
+                        if tv:
+                            role_titles_found.append(tv)
+                elif (not prev.startswith('=') and not is_bullet_line(prev)
+                        and not has_date_range(prev)
+                        and 'EMPLOYMENT' not in prev.upper()
+                        and prev != company):
+                    # Non-date, non-bullet, non-header line that isn't the company name
+                    # could be a standalone job title (old-style format)
+                    if len(prev) < 200:
+                        role_titles_found.append(prev)
+                break  # stop after first non-blank line before the date
+
             current_role = {
                 'id': len(roles),
                 'company': company,
                 'dates': dates,
-                'role_titles': [],
+                'role_titles': role_titles_found,
                 'context_lines': [],
                 'bullets': [],
                 'key_achievements': []
             }
             in_achievements = False
 
-            # Next non-empty, non-date, non-bullet line is the job title
+            # Also look for job title AFTER the date range (older format where title follows date)
             j = i + 1
             while j < len(lines) and not lines[j].strip():
                 j += 1
             if j < len(lines):
                 next_line = lines[j].strip()
-                if (next_line and not has_date_range(next_line) and not is_bullet_line(next_line)
+                if next_line.upper().startswith('JOB TITLES'):
+                    colon_pos = next_line.find(':')
+                    if colon_pos != -1:
+                        tv = next_line[colon_pos + 1:].strip()
+                        if tv and tv not in current_role['role_titles']:
+                            current_role['role_titles'].append(tv)
+                    i = j
+                elif (next_line and not has_date_range(next_line) and not is_bullet_line(next_line)
                         and 'PERMANENT ROLES' not in next_line.upper()
+                        and next_line not in current_role['role_titles']
                         and len(next_line) < 300):
                     current_role['role_titles'].append(next_line)
-                    i = j  # advance past the title line
+                    i = j
 
         elif current_role is not None:
             if 'KEY ACHIEVEMENTS' in stripped.upper():
