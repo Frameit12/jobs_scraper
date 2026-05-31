@@ -6594,6 +6594,10 @@ def debug_cv_bullets():
                     saved = update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, result)
                     out['run_result'] = 'SUCCESS' if saved else 'AI_OK_BUT_SAVE_FAILED'
                     out['recommended_bullets_count'] = len(result.get('recommended_bullets', []))
+                    # Re-read the session to confirm cache was actually written
+                    verify = get_cv_session(cv_session_id)
+                    verify_cached = (verify.get('bullet_analysis_by_role') or {}).get(role_key)
+                    out['cache_verified_after_save'] = bool(verify_cached)
                 else:
                     out['run_result'] = 'FAILED: returned None'
             except Exception as e:
