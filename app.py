@@ -6637,27 +6637,64 @@ def customize_cv_export():
         # ── Build clean CV text from master template ─────────────────────────
         BULLET_CHARS = '•●○◦▸▪▶·'
 
-        def _strip_headline_section(template_text):
+        def _extract_export_parts(template_text):
             """
-            Master templates contain multiple headline variations at the top
-            (e.g. [VERSION 1 — ...], [VERSION 2 — ...]).
-            Strip everything before the first major CV section so the export
-            contains only the actual CV body, not all the headline options.
-            Returns body text (from first section header onwards), or None if
-            no section boundary found (simple single-headline templates).
+            Decompose a master template into (personal_details, body) for export.
+
+            Master templates have the structure:
+              ===== PERSONAL DETAILS =====   ← optional, new-style templates
+              <name / contact lines>
+              ===== CAREER SUMMARY =====
+              [VERSION 1 — ...] ... [VERSION N — ...]
+              ===== CORE EXPERTISE =====     ← body starts here
+              ...
+
+            Returns (personal_details_block, body_block):
+              - personal_details_block: text of the PERSONAL DETAILS section, or ''
+              - body_block: text from first non-personal / non-career-summary section,
+                            or None if no section boundary was found (simple templates)
             """
             import re as _re
+            PERSONAL_MARKERS = ['PERSONAL DETAILS', 'PERSONAL INFORMATION', 'CONTACT']
+            SKIP_MARKERS = ['CAREER SUMMARY', 'PROFESSIONAL SUMMARY', 'EXECUTIVE SUMMARY']
             BODY_MARKERS = [
                 'CORE EXPERTISE', 'EMPLOYMENT HISTORY', 'PROFESSIONAL EXPERIENCE',
                 'WORK EXPERIENCE', 'CAREER HISTORY', 'EXPERIENCE', 'EDUCATION',
-                'SKILLS', 'QUALIFICATIONS', 'EMPLOYMENT', 'PROFESSIONAL SUMMARY',
+                'SKILLS', 'QUALIFICATIONS', 'EMPLOYMENT', 'CERTIFICATIONS',
+                'TECHNOLOGY', 'TECHNOLOGY & TOOLS',
             ]
-            for i, line in enumerate(template_text.split('\n')):
-                s = _re.sub(r'[=*_#\-]', '', line.strip()).strip().upper()
-                if any(s == m or s.startswith(m + ' ') or s.startswith(m + ':')
-                       for m in BODY_MARKERS):
-                    return '\n'.join(template_text.split('\n')[i:])
-            return None
+
+            def _norm(line):
+                return _re.sub(r'[=*_#\-]', '', line.strip()).strip().upper()
+
+            lines = template_text.split('\n')
+            personal_start = None
+            personal_end = None
+            body_start = None
+
+            for i, line in enumerate(lines):
+                s = _norm(line)
+                if personal_start is None and any(
+                        s == m or s.startswith(m + ' ') or s.startswith(m + ':')
+                        for m in PERSONAL_MARKERS):
+                    personal_start = i
+                elif personal_start is not None and personal_end is None:
+                    # End of personal section = next ===== section =====
+                    if s and any(s == m or s.startswith(m + ' ') or s.startswith(m + ':')
+                                 for m in SKIP_MARKERS + BODY_MARKERS):
+                        personal_end = i
+                if body_start is None and any(
+                        s == m or s.startswith(m + ' ') or s.startswith(m + ':')
+                        for m in BODY_MARKERS):
+                    body_start = i
+
+            personal_block = ''
+            if personal_start is not None:
+                end = personal_end if personal_end is not None else (body_start or len(lines))
+                personal_block = '\n'.join(lines[personal_start:end]).strip()
+
+            body_block = '\n'.join(lines[body_start:]) if body_start is not None else None
+            return personal_block, body_block
 
         def _replace_bullet(text, original, replacement):
             """Find a bullet by its cleaned text and replace it, preserving prefix."""
@@ -6674,11 +6711,16 @@ def customize_cv_export():
 
         raw = master_template['template_text']
 
-        # Strip headline variations; keep only the selected headline
-        body = _strip_headline_section(raw)
+        # Decompose template: extract personal details header + body (strips CAREER SUMMARY versions)
+        personal_block, body = _extract_export_parts(raw)
         if body is not None:
-            # Multi-version template — prepend just the one selected headline
-            modified = selected_headline + '\n\n' + body
+            # Multi-version template — keep personal details, prepend selected headline, then body
+            parts = []
+            if personal_block:
+                parts.append(personal_block)
+            parts.append(selected_headline)
+            parts.append(body)
+            modified = '\n\n'.join(parts)
         else:
             # Simple template — replace first non-empty line with selected headline
             lines = raw.split('\n')
@@ -7822,15 +7864,17 @@ RULES — follow these exactly:
 4. Keep ALL job title variations for each role (list them on one line separated by " / ")
 5. Keep ALL unique context/intro lines for each role
 6. Organise the output in this structure:
+   - PERSONAL DETAILS (full name, phone, email, location, nationality — taken verbatim from any CV version; place at the very top before all other sections)
    - CAREER SUMMARY (all versions labeled)
    - CORE EXPERTISE (all unique skills from all CVs)
    - EMPLOYMENT HISTORY (reverse chronological, with all unique bullets per role)
    - PERMANENT ROLES SUMMARISED
-   - EDUCATION
-   - CERTIFICATIONS
+   - EDUCATION (all qualifications, institutions, years — verbatim from any CV version)
+   - CERTIFICATIONS (all certifications — verbatim from any CV version)
    - TECHNOLOGY & TOOLS (if present)
 7. Use plain text formatting with ===== section dividers
 8. Do NOT add any commentary, explanations or notes — output only the master template text
+9. CRITICAL: The PERSONAL DETAILS section MUST include the person's full name, and any contact information (phone number, email address, location, nationality) found anywhere in the CV versions. Do not omit or summarise this information.
 
 Here are the {len(extracted_texts)} CV versions to consolidate:
 {cv_sections}
