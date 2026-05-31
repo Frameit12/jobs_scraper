@@ -6357,18 +6357,29 @@ def customize_cv_roles():
 # Track which role analyses are in-flight to avoid duplicate concurrent AI calls
 _bullet_analysis_in_progress = set()
 _bullet_analysis_lock = threading.Lock()
+_bullet_analysis_errors = {}  # key -> last error string for debugging
 
 def _run_bullet_analysis_background(cv_session_id, role_key, current_role, job_description, user_id):
     """Run bullet analysis in a background thread so it's not tied to an HTTP request timeout."""
+    key = f"{cv_session_id}:{role_key}"
     try:
+        print(f"[BG thread] Starting bullet analysis for {role_key}")
         ai_analysis = analyze_bullets_for_role_with_ai(current_role, job_description, user_id)
         if ai_analysis:
             update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, ai_analysis)
+            print(f"[BG thread] Completed and cached bullet analysis for {role_key}")
+        else:
+            err = "analyze_bullets_for_role_with_ai returned None"
+            print(f"[BG thread] {err}")
+            _bullet_analysis_errors[key] = err
     except Exception as e:
-        print(f"Background bullet analysis error for {role_key}: {e}")
+        import traceback
+        err = f"{e}\n{traceback.format_exc()}"
+        print(f"[BG thread] Exception for {role_key}: {err}")
+        _bullet_analysis_errors[key] = err
     finally:
         with _bullet_analysis_lock:
-            _bullet_analysis_in_progress.discard(f"{cv_session_id}:{role_key}")
+            _bullet_analysis_in_progress.discard(key)
 
 
 def start_bullet_analysis_if_needed(cv_session_id, role_key, current_role, job_description, user_id):
@@ -6532,6 +6543,7 @@ def debug_cv_bullets():
         selected_roles = cv_session.get('selected_roles', [])
         out['selected_roles_count'] = len(selected_roles)
         out['in_progress_keys'] = list(_bullet_analysis_in_progress)
+        out['thread_errors'] = _bullet_analysis_errors
 
         if role_index >= len(selected_roles):
             return jsonify({'error': 'role_index out of range', **out})
@@ -6562,6 +6574,11 @@ def debug_cv_bullets():
             out['ai_test'] = 'ok: ' + test.content[0].text
         except Exception as e:
             out['ai_test'] = f'FAILED: {e}'
+
+        # If trigger=1, kick off the background thread manually
+        if request.args.get('trigger') == '1' and analysis:
+            start_bullet_analysis_if_needed(cv_session_id, role_key, current_role, analysis['job_description'], user_id)
+            out['trigger'] = 'background thread started (check /debug-cv-bullets?role=0 in 30s)'
 
         # If run=1 is passed, execute the full analysis synchronously and report result/error
         if request.args.get('run') == '1' and analysis:
