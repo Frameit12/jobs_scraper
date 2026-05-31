@@ -7857,35 +7857,62 @@ def consolidate_cvs():
 
         consolidation_prompt = f"""You are consolidating {len(extracted_texts)} versions of the same person's CV into one comprehensive master template.
 
+YOUR GOAL: produce a COMPLETE master template that is a superset of all input CVs — nothing from any CV version should be lost except true word-for-word duplicates.
+
 RULES — follow these exactly:
-1. Keep ALL unique bullet points and phrases VERBATIM — do not rewrite, paraphrase, or improve any wording
-2. Remove ONLY true word-for-word duplicate sentences/bullets (where text is identical or near-identical)
+1. Keep ALL unique bullet points and phrases VERBATIM — do not rewrite, paraphrase, improve, or shorten any wording under any circumstances
+2. Remove ONLY true word-for-word duplicate sentences/bullets (where text is completely identical). If bullets are even slightly different in wording, keep BOTH.
 3. Keep ALL career summary variations as separate clearly labeled sections: [VERSION 1 — focus], [VERSION 2 — focus], etc.
 4. Keep ALL job title variations for each role (list them on one line separated by " / ")
 5. Keep ALL unique context/intro lines for each role
-6. Organise the output in this structure:
-   - PERSONAL DETAILS (full name, phone, email, location, nationality — taken verbatim from any CV version; place at the very top before all other sections)
-   - CAREER SUMMARY (all versions labeled)
-   - CORE EXPERTISE (all unique skills from all CVs)
-   - EMPLOYMENT HISTORY (reverse chronological, with all unique bullets per role)
-   - PERMANENT ROLES SUMMARISED
-   - EDUCATION (all qualifications, institutions, years — verbatim from any CV version)
-   - CERTIFICATIONS (all certifications — verbatim from any CV version)
-   - TECHNOLOGY & TOOLS (if present)
-7. Use plain text formatting with ===== section dividers
-8. Do NOT add any commentary, explanations or notes — output only the master template text
-9. CRITICAL: The PERSONAL DETAILS section MUST include the person's full name, and any contact information (phone number, email address, location, nationality) found anywhere in the CV versions. Do not omit or summarise this information.
+6. PERSONAL DETAILS: extract and preserve the person's full name, phone number(s), email address(es), location, nationality, LinkedIn/URL — these appear at the top of each CV. Include ALL of this verbatim.
+7. EDUCATION: include every qualification, institution, degree, year and grade mentioned in any CV version — verbatim. Do not summarise or drop any qualification.
+8. CERTIFICATIONS: include every certification, accreditation and professional membership mentioned in any CV version — verbatim.
+9. If any CV contains sections NOT listed in the output structure below (e.g. ACHIEVEMENTS, AWARDS, LANGUAGES, PUBLICATIONS, VOLUNTEER WORK, INTERESTS), include those sections verbatim at the end.
+10. Organise the output in this exact structure:
+    ===== PERSONAL DETAILS =====
+    <full name, contact details, nationality, location — verbatim>
+
+    ===== CAREER SUMMARY =====
+    [VERSION 1 — <focus>]
+    <text>
+    [VERSION 2 — <focus>]
+    <text>
+    ... (one block per CV version)
+
+    ===== CORE EXPERTISE =====
+    <all unique skills from all CVs>
+
+    ===== EMPLOYMENT HISTORY =====
+    <reverse chronological; all unique bullets per role>
+
+    ===== PERMANENT ROLES SUMMARISED =====
+    <if present>
+
+    ===== EDUCATION =====
+    <all qualifications verbatim>
+
+    ===== CERTIFICATIONS =====
+    <all certifications verbatim>
+
+    ===== TECHNOLOGY & TOOLS =====
+    <if present>
+
+    <any additional sections found in the CVs>
+
+11. Use plain text formatting with ===== section dividers exactly as shown above
+12. Do NOT add any commentary, explanations, notes or meta-text — output only the master template content
 
 Here are the {len(extracted_texts)} CV versions to consolidate:
 {cv_sections}
 
-Output the complete master template now:"""
+Output the COMPLETE master template now. Do not truncate or stop early — include every section fully:
 
-        # Use Haiku for speed — this task is text organisation, not analysis
+        # Use Sonnet for faithful instruction-following on complex multi-CV consolidation
         anthropic_client = get_anthropic_client()
         message = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=6000,
+            model="claude-sonnet-4-6",
+            max_tokens=16000,
             messages=[{"role": "user", "content": consolidation_prompt}]
         )
 
