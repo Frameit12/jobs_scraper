@@ -6709,7 +6709,6 @@ def customize_cv_export():
     if fmt not in ('pdf', 'docx'):
         return "Invalid format", 400
 
-    import re as _re
     import traceback as _tb
     from io import BytesIO as _BytesIO
 
@@ -6752,43 +6751,256 @@ def customize_cv_export():
             if cv_id:
                 original_cv = get_cv_by_id(cv_id, user_id)
 
-        # ── Attempt original-file export ──────────────────────────────────────
+        # ── PyMuPDF export (primary path for PDF originals) ───────────────────
         if original_cv and original_cv.get('file_data'):
-            try:
-                file_data = bytes(original_cv['file_data'])
-                file_type = (original_cv.get('file_type') or '').lower().strip('.')
+            file_data = bytes(original_cv['file_data'])
+            file_type = (original_cv.get('file_type') or '').lower().strip('.')
 
-                # Convert PDF → DOCX in memory using pdf2docx
-                if file_type == 'pdf':
-                    import tempfile, os
+            if file_type == 'pdf':
+                try:
+                    import fitz as _fitz
+
+                    def _get_bullet_sym_tops(blocks):
+                        """Return sorted list of y_top values for all bullet symbol lines."""
+                        tops = []
+                        for b in blocks:
+                            if b['type'] == 0:
+                                for line in b['lines']:
+                                    for span in line['spans']:
+                                        t = span['text'].strip()
+                                        if t in ('•', '●', '○', '◦', '▸', '▪', '▶', '·') or (
+                                            len(t) == 1 and ord(t) in (8226, 9679, 9675, 9702, 9656, 9642, 9654, 183)
+                                        ):
+                                            tops.append(span['bbox'][1])
+                        return sorted(set(tops))
+
+                    def _replace_career_summary(page, blocks, new_headline):
+                        """Find career summary paragraph and replace with new_headline."""
+                        SUMMARY_HEADERS = {'CAREER SUMMARY', 'PROFESSIONAL SUMMARY',
+                                           'EXECUTIVE SUMMARY', 'PROFILE', 'SUMMARY'}
+                        # Stop only when the line IS a section header (prefix match, not substring)
+                        STOP_HEADERS = ['EMPLOYMENT HISTORY', 'PROFESSIONAL EXPERIENCE',
+                                        'WORK EXPERIENCE', 'CAREER HISTORY', 'CORE EXPERTISE',
+                                        'EDUCATION', 'SKILLS', 'QUALIFICATIONS',
+                                        'KEY ACHIEVEMENTS', 'KEY SKILLS', 'ACHIEVEMENTS']
+
+                        def _is_stop_header(txt):
+                            return any(
+                                txt == h or txt.startswith(h + ' ') or txt.startswith(h + ':')
+                                for h in STOP_HEADERS
+                            )
+
+                        summary_lines = []
+                        in_summary = False
+                        done = False
+                        for b in blocks:
+                            if done or b['type'] != 0:
+                                continue
+                            for line in b['lines']:
+                                txt = ''.join(s['text'] for s in line['spans']).strip().upper()
+                                if not in_summary:
+                                    if any(h in txt for h in SUMMARY_HEADERS):
+                                        in_summary = True
+                                    continue
+                                if _is_stop_header(txt):
+                                    done = True
+                                    break
+                                summary_lines.append(line['bbox'])
+                        if not summary_lines:
+                            return False
+                        x0 = min(l[0] for l in summary_lines) - 2
+                        y0 = min(l[1] for l in summary_lines) - 2
+                        x1 = max(l[2] for l in summary_lines) + 2
+                        y1 = max(l[3] for l in summary_lines) + 2
+                        rect = _fitz.Rect(x0, y0, x1, y1)
+                        # Sample font size from first span
+                        fsize = 9
+                        for b in blocks:
+                            if b['type'] == 0:
+                                for line in b['lines']:
+                                    if abs(line['bbox'][1] - summary_lines[0][1]) < 5:
+                                        for span in line['spans']:
+                                            if span['text'].strip():
+                                                fsize = span['size']
+                                                break
+                        page.add_redact_annot(rect, fill=(1, 1, 1))
+                        page.apply_redactions()
+                        html = (f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                                f'line-height:1.3;margin:0">{new_headline}</p>')
+                        page.insert_htmlbox(rect, html)
+                        return True
+
+                    def _replace_bullet_in_page(page, blocks, original_text, new_text):
+                        """
+                        Find bullet by matching original_text (cleaned, no bullet prefix).
+                        Matches on bold title prefix (text before first colon) for robustness.
+                        Redacts the full bullet area and inserts replacement.
+                        """
+                        # Derive search key: bold title (before ":") or first 40 chars
+                        colon = original_text.find(':')
+                        search_key = original_text[:colon].strip() if colon > 0 else original_text[:40].strip()
+
+                        bullet_sym_tops = _get_bullet_sym_tops(blocks)
+
+                        # Find the line containing search_key
+                        target_line_y = None
+                        for b in blocks:
+                            if b['type'] == 0:
+                                for line in b['lines']:
+                                    line_text = ''.join(s['text'] for s in line['spans'])
+                                    if search_key in line_text:
+                                        target_line_y = line['bbox'][1]
+                                        break
+                            if target_line_y is not None:
+                                break
+                        if target_line_y is None:
+                            return False
+
+                        # Find the bullet symbol y just at or before target_line_y
+                        sym_y = None
+                        for y in bullet_sym_tops:
+                            if y <= target_line_y + 6:
+                                sym_y = y
+                            else:
+                                break
+                        if sym_y is None:
+                            return False
+
+                        # Find the next bullet symbol y
+                        next_sym_y = next((y for y in bullet_sym_tops if y > sym_y + 2), None)
+
+                        # Collect all lines belonging to this bullet
+                        bullet_bboxes = []
+                        for b in blocks:
+                            if b['type'] == 0:
+                                for line in b['lines']:
+                                    y = line['bbox'][1]
+                                    if sym_y - 0.5 <= y < (next_sym_y - 0.5 if next_sym_y else float('inf')):
+                                        bullet_bboxes.append(line['bbox'])
+                        if not bullet_bboxes:
+                            return False
+
+                        bul_x0 = min(l[0] for l in bullet_bboxes) - 1
+                        bul_y0 = sym_y  # exact top of bullet symbol — no upward padding
+                        bul_x1 = max(l[2] for l in bullet_bboxes) + 2
+                        bul_y1 = max(l[3] for l in bullet_bboxes) + 1
+                        rect = _fitz.Rect(bul_x0, bul_y0, bul_x1, bul_y1)
+
+                        # Sample font size
+                        fsize = 9
+                        for b in blocks:
+                            if b['type'] == 0:
+                                for line in b['lines']:
+                                    if abs(line['bbox'][1] - target_line_y) < 3:
+                                        for span in line['spans']:
+                                            if span['text'].strip() and 'Symbol' not in span['font']:
+                                                fsize = span['size']
+                                                break
+
+                        # Build HTML: bullet + bold title + regular body
+                        colon_pos = new_text.find(':')
+                        if colon_pos > 0:
+                            bold_part = new_text[:colon_pos + 1]
+                            regular_part = new_text[colon_pos + 1:]
+                        else:
+                            bold_part = ''
+                            regular_part = new_text
+
+                        indent = round(bul_x1 - bul_x0 - (bul_x0 - min(l[0] for l in bullet_bboxes) + 1))
+                        # Indent the wrapped lines to align with text start (after bullet)
+                        text_x0 = min(l[0] for l in bullet_bboxes if l[1] > sym_y + 2) if len(bullet_bboxes) > 1 else bul_x0 + 18
+                        text_indent_pt = round(text_x0 - bul_x0 + 1)
+                        html_bullet = (
+                            f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                            f'line-height:1.3;margin:0;padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
+                            f'&#x2022; <b>{bold_part}</b>{regular_part}</p>'
+                        ) if bold_part else (
+                            f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                            f'line-height:1.3;margin:0;padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
+                            f'&#x2022; {regular_part}</p>'
+                        )
+
+                        page.add_redact_annot(rect, fill=(1, 1, 1))
+                        page.apply_redactions()
+                        page.insert_htmlbox(rect, html_bullet)
+                        return True
+
+                    doc = _fitz.open(stream=file_data, filetype='pdf')
+                    headline_replaced = False
+                    bullets_applied = 0
+
+                    for page in doc:
+                        blocks = page.get_text('dict')['blocks']
+
+                        # Replace career summary on first page it appears
+                        if not headline_replaced:
+                            if _replace_career_summary(page, blocks, selected_headline):
+                                headline_replaced = True
+                                blocks = page.get_text('dict')['blocks']  # refresh after redaction
+
+                        # Replace bullets on every page
+                        for orig, appr in replacements:
+                            if _replace_bullet_in_page(page, blocks, orig, appr):
+                                bullets_applied += 1
+                                blocks = page.get_text('dict')['blocks']  # refresh after each redaction
+
+                    print(f"CV export (PyMuPDF): headline={'yes' if headline_replaced else 'no'}, "
+                          f"bullets={bullets_applied}/{len(replacements)}")
+
+                    # ── PDF output ────────────────────────────────────────────
+                    if fmt == 'pdf':
+                        buf = _BytesIO()
+                        doc.save(buf)
+                        pdf_bytes = buf.getvalue()
+                        doc.close()
+                        return Response(
+                            pdf_bytes,
+                            mimetype='application/pdf',
+                            headers={
+                                'Content-Disposition': f'attachment; filename="CV_{job_slug}.pdf"',
+                                'Content-Length': len(pdf_bytes),
+                            }
+                        )
+
+                    # ── DOCX output: save modified PDF then convert ────────────
+                    import tempfile, os as _os
+                    from pdf2docx import Converter as _PdfConverter
+                    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
+                        doc.save(tmp_pdf.name)
+                        tmp_pdf_path = tmp_pdf.name
+                    doc.close()
+                    tmp_docx_path = tmp_pdf_path.replace('.pdf', '.docx')
                     try:
-                        from pdf2docx import Converter as _PdfConverter
-                        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
-                            tmp_pdf.write(file_data)
-                            tmp_pdf_path = tmp_pdf.name
-                        tmp_docx_path = tmp_pdf_path.replace('.pdf', '.docx')
-                        try:
-                            cv_conv = _PdfConverter(tmp_pdf_path)
-                            cv_conv.convert(tmp_docx_path, start=0, end=None)
-                            cv_conv.close()
-                            with open(tmp_docx_path, 'rb') as f:
-                                docx_bytes_in = f.read()
-                            file_type = 'docx'
-                            file_data = docx_bytes_in
-                        finally:
-                            try: os.unlink(tmp_pdf_path)
-                            except: pass
-                            try: os.unlink(tmp_docx_path)
-                            except: pass
-                    except ImportError:
-                        print("pdf2docx not available — falling back to text export")
-                        original_cv = None  # trigger fallback
+                        cv_conv = _PdfConverter(tmp_pdf_path)
+                        cv_conv.convert(tmp_docx_path, start=0, end=None)
+                        cv_conv.close()
+                        with open(tmp_docx_path, 'rb') as f:
+                            docx_bytes = f.read()
+                    finally:
+                        try: _os.unlink(tmp_pdf_path)
+                        except: pass
+                        try: _os.unlink(tmp_docx_path)
+                        except: pass
+                    return Response(
+                        docx_bytes,
+                        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        headers={
+                            'Content-Disposition': f'attachment; filename="CV_{job_slug}.docx"',
+                            'Content-Length': len(docx_bytes),
+                        }
+                    )
 
-                if original_cv and file_type in ('docx', 'doc'):
+                except Exception as e:
+                    print(f"PyMuPDF export failed: {e}")
+                    _tb.print_exc()
+                    # fall through to DOCX path or text fallback
+
+            # ── DOCX original: python-docx find/replace ───────────────────────
+            if file_type in ('docx', 'doc'):
+                try:
                     from docx import Document as _DocxDoc
 
                     def _replace_para(para, old, new):
-                        """Replace old text in a paragraph (multi-run aware)."""
                         full = "".join(r.text for r in para.runs)
                         if old not in full:
                             return False
@@ -6802,7 +7014,6 @@ def customize_cv_export():
                         return True
 
                     def _all_paragraphs(doc):
-                        """Yield all paragraphs in body + tables."""
                         yield from doc.paragraphs
                         for tbl in doc.tables:
                             for row in tbl.rows:
@@ -6810,17 +7021,12 @@ def customize_cv_export():
                                     yield from cell.paragraphs
 
                     doc = _DocxDoc(_BytesIO(file_data))
-
-                    # Replace bullets
                     applied = 0
                     for orig, appr in replacements:
                         for para in _all_paragraphs(doc):
                             if _replace_para(para, orig, appr):
                                 applied += 1
                                 break
-
-                    # Replace career summary: find the first substantial prose paragraph
-                    # (search body + table cells — some CV templates use a two-column table layout)
                     replaced_headline = False
                     for para in _all_paragraphs(doc):
                         txt = para.text.strip()
@@ -6828,17 +7034,8 @@ def customize_cv_export():
                             _replace_para(para, txt, selected_headline)
                             replaced_headline = True
                             break
-                    if not replaced_headline:
-                        # Fall back: replace first non-empty paragraph anywhere in the doc
-                        for para in _all_paragraphs(doc):
-                            if para.text.strip():
-                                _replace_para(para, para.text.strip(), selected_headline)
-                                break
-
-                    print(f"CV export (original file): {applied}/{len(replacements)} bullets replaced, "
-                          f"headline={'yes' if replaced_headline else 'fallback'}")
-
-                    # Save modified DOCX
+                    print(f"CV export (python-docx): {applied}/{len(replacements)} bullets, "
+                          f"headline={'yes' if replaced_headline else 'no'}")
                     buf = _BytesIO()
                     doc.save(buf)
                     modified_docx = buf.getvalue()
@@ -6852,24 +7049,11 @@ def customize_cv_export():
                                 'Content-Length': len(modified_docx),
                             }
                         )
-
-                    # PDF: convert DOCX → HTML via mammoth → PDF via weasyprint
-                    import mammoth as _mammoth
-                    import weasyprint as _weasyprint
+                    import weasyprint as _weasyprint, mammoth as _mammoth
                     result = _mammoth.convert_to_html(_BytesIO(modified_docx))
-                    html_body = result.value
-                    html_doc = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><style>
-@page {{ margin: 2cm; size: A4; }}
-body {{ font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #111; }}
-h1 {{ font-size: 14pt; margin: 0 0 4px 0; }}
-h2 {{ font-size: 12pt; margin: 10px 0 3px 0; border-bottom: 1px solid #bbb; }}
-h3 {{ font-size: 11pt; margin: 8px 0 2px 0; }}
-p {{ margin: 2px 0 4px 0; }}
-ul {{ margin: 2px 0; padding-left: 18px; }}
-li {{ margin: 1px 0; }}
-strong {{ font-weight: bold; }}
-</style></head><body>{html_body}</body></html>"""
+                    html_doc = (f'<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+                                f'@page{{margin:2cm;size:A4}}body{{font-family:Arial,sans-serif;font-size:11pt;'
+                                f'line-height:1.5;color:#111}}</style></head><body>{result.value}</body></html>')
                     pdf_bytes = _weasyprint.HTML(string=html_doc).write_pdf()
                     return Response(
                         pdf_bytes,
@@ -6879,163 +7063,11 @@ strong {{ font-weight: bold; }}
                             'Content-Length': len(pdf_bytes),
                         }
                     )
+                except Exception as e:
+                    print(f"python-docx export failed: {e}")
+                    _tb.print_exc()
 
-            except Exception as e:
-                print(f"Original-file export failed, falling back to text export: {e}")
-                _tb.print_exc()
-                # fall through to text-based export below
-
-        # ── Fallback: text-based export from master template ─────────────────
-        print("CV export: using text-based fallback")
-
-        master_template = get_user_master_template(user_id)
-        if not master_template:
-            return "Master template not found", 404
-
-        raw = master_template['template_text']
-        BULLET_CHARS = '•●○◦▸▪▶·'
-
-        def _extract_export_parts(template_text):
-            PERSONAL_MARKERS = ['PERSONAL DETAILS', 'PERSONAL INFORMATION', 'CONTACT']
-            SKIP_MARKERS = ['CAREER SUMMARY', 'PROFESSIONAL SUMMARY', 'EXECUTIVE SUMMARY']
-            BODY_MARKERS = [
-                'CORE EXPERTISE', 'EMPLOYMENT HISTORY', 'PROFESSIONAL EXPERIENCE',
-                'WORK EXPERIENCE', 'CAREER HISTORY', 'EXPERIENCE', 'EDUCATION',
-                'SKILLS', 'QUALIFICATIONS', 'EMPLOYMENT', 'CERTIFICATIONS',
-                'TECHNOLOGY', 'TECHNOLOGY & TOOLS',
-            ]
-            def _norm(line):
-                return _re.sub(r'[=*_#\-]', '', line.strip()).strip().upper()
-            lines = template_text.split('\n')
-            personal_start = personal_end = body_start = None
-            for i, line in enumerate(lines):
-                s = _norm(line)
-                if personal_start is None and any(s == m or s.startswith(m + ' ') or s.startswith(m + ':') for m in PERSONAL_MARKERS):
-                    personal_start = i
-                elif personal_start is not None and personal_end is None:
-                    if s and any(s == m or s.startswith(m + ' ') or s.startswith(m + ':') for m in SKIP_MARKERS + BODY_MARKERS):
-                        personal_end = i
-                if body_start is None and any(s == m or s.startswith(m + ' ') or s.startswith(m + ':') for m in BODY_MARKERS):
-                    body_start = i
-            personal_block = ''
-            if personal_start is not None:
-                end = personal_end if personal_end is not None else (body_start if body_start is not None else len(lines))
-                personal_block = '\n'.join(lines[personal_start:end]).strip()
-            body_block = '\n'.join(lines[body_start:]) if body_start is not None else None
-            return personal_block, body_block
-
-        def _replace_bullet_text(text, original, replacement):
-            lines = text.split('\n')
-            for i, line in enumerate(lines):
-                stripped = line.strip()
-                content = stripped[1:].strip() if stripped and stripped[0] in BULLET_CHARS + '-' else stripped
-                if content == original:
-                    leading = line[:len(line) - len(line.lstrip())]
-                    bullet_char = stripped[0] if stripped and stripped[0] in BULLET_CHARS else None
-                    lines[i] = (leading + bullet_char + ' ' + replacement) if bullet_char else (leading + replacement)
-                    return '\n'.join(lines), True
-            return text, False
-
-        personal_block, body = _extract_export_parts(raw)
-        if body is not None:
-            parts = []
-            if personal_block:
-                parts.append(personal_block)
-            parts.append(selected_headline)
-            parts.append(body)
-            modified = '\n\n'.join(parts)
-        else:
-            lines = raw.split('\n')
-            for i, line in enumerate(lines):
-                if line.strip():
-                    lines[i] = selected_headline
-                    break
-            modified = '\n'.join(lines)
-
-        applied = 0
-        for orig, appr in replacements:
-            modified, ok = _replace_bullet_text(modified, orig, appr)
-            if ok:
-                applied += 1
-        print(f"CV export (text fallback): applied {applied}/{len(replacements)} bullet replacements")
-
-        if fmt == 'pdf':
-            import html as _html_mod
-            import weasyprint as _weasyprint
-            parts = ["""<html><head><meta charset="utf-8"><style>
-            @page { margin: 2cm; size: A4; }
-            body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #111; }
-            .headline { font-size: 14pt; font-weight: bold; margin-bottom: 6px; }
-            .section { font-size: 11pt; font-weight: bold; border-bottom: 1px solid #bbb;
-                       margin: 14px 0 4px 0; text-transform: uppercase; letter-spacing: 0.04em; }
-            .bullet { margin: 2px 0 2px 16px; }
-            p { margin: 2px 0; }
-            </style></head><body>"""]
-            is_first = True
-            for line in modified.split('\n'):
-                s = line.strip()
-                if not s:
-                    if not is_first:  # don't emit blank lines before the headline
-                        parts.append('<br style="line-height:0.4">')
-                    continue
-                e = _html_mod.escape(s)
-                if is_first:
-                    parts.append(f'<div class="headline">{e}</div>')
-                    is_first = False
-                elif s.upper() == s and len(s) < 35 and not s[0].isdigit():
-                    parts.append(f'<div class="section">{e}</div>')
-                elif s[0] in BULLET_CHARS + '-':
-                    parts.append(f'<p class="bullet">{e}</p>')
-                else:
-                    parts.append(f'<p>{e}</p>')
-            parts.append('</body></html>')
-            pdf_bytes = _weasyprint.HTML(string=''.join(parts)).write_pdf()
-            return Response(
-                pdf_bytes,
-                mimetype='application/pdf',
-                headers={
-                    'Content-Disposition': f'attachment; filename="CV_{job_slug}.pdf"',
-                    'Content-Length': len(pdf_bytes),
-                }
-            )
-
-        from docx import Document as _DocxDoc2
-        from docx.shared import Pt as _Pt
-        doc2 = _DocxDoc2()
-        for p in doc2.paragraphs:
-            p._element.getparent().remove(p._element)
-        is_first = True
-        for line in modified.split('\n'):
-            s = line.strip()
-            if not s:
-                continue
-            if is_first:
-                p = doc2.add_paragraph()
-                run = p.add_run(s)
-                run.bold = True
-                run.font.size = _Pt(14)
-                is_first = False
-            elif s.upper() == s and len(s) < 35 and not s[0].isdigit():
-                p = doc2.add_paragraph()
-                run = p.add_run(s)
-                run.bold = True
-                run.font.size = _Pt(11)
-            elif s[0] in BULLET_CHARS + '-':
-                doc2.add_paragraph(s[1:].strip(), style='List Bullet')
-            else:
-                p = doc2.add_paragraph()
-                p.add_run(s)
-        buf2 = _BytesIO()
-        doc2.save(buf2)
-        docx_bytes = buf2.getvalue()
-        return Response(
-            docx_bytes,
-            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            headers={
-                'Content-Disposition': f'attachment; filename="CV_{job_slug}.docx"',
-                'Content-Length': len(docx_bytes),
-            }
-        )
+        return "Could not generate export — original CV file not found.", 400
 
     except Exception as e:
         print(f"Error exporting CV: {e}")
