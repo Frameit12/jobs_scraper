@@ -6563,6 +6563,21 @@ def debug_cv_bullets():
         except Exception as e:
             out['ai_test'] = f'FAILED: {e}'
 
+        # If run=1 is passed, execute the full analysis synchronously and report result/error
+        if request.args.get('run') == '1' and analysis:
+            try:
+                result = analyze_bullets_for_role_with_ai(current_role, analysis['job_description'], user_id)
+                if result:
+                    update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, result)
+                    out['run_result'] = 'SUCCESS'
+                    out['recommended_bullets_count'] = len(result.get('recommended_bullets', []))
+                else:
+                    out['run_result'] = 'FAILED: returned None'
+            except Exception as e:
+                import traceback
+                out['run_result'] = f'EXCEPTION: {e}'
+                out['run_traceback'] = traceback.format_exc()
+
         return jsonify(out)
 
     except Exception as e:
