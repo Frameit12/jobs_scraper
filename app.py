@@ -6690,6 +6690,9 @@ def customize_bullet_chat():
                     "role": msg['role'],
                     "content": msg['content']
                 })
+        # Anthropic API requires conversation to start with 'user'
+        while messages and messages[0]['role'] == 'assistant':
+            messages.pop(0)
 
         # Get AI response
         client = get_anthropic_client()
@@ -6794,6 +6797,9 @@ def customize_headline_chat():
         for msg in chat_history:
             if msg['role'] in ['user', 'assistant']:
                 messages.append({"role": msg['role'], "content": msg['content']})
+        # Anthropic API requires conversation to start with 'user'
+        while messages and messages[0]['role'] == 'assistant':
+            messages.pop(0)
 
         client = get_anthropic_client()
         system_prompt = get_user_system_prompt(user_id)
