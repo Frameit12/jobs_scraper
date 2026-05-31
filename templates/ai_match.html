@@ -539,6 +539,15 @@ We're looking for a Senior VP to lead our AI Risk team...
 
     </div>
 
+    <!-- DEBUG PANEL: remove once issue is diagnosed -->
+    <div id="debug-panel" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#1e293b; color:#f1f5f9; font-family:monospace; font-size:12px; padding:12px 16px; z-index:9999; max-height:220px; overflow-y:auto; border-top:3px solid #f59e0b;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <strong style="color:#fbbf24;">🔍 Debug — history click</strong>
+            <button onclick="document.getElementById('debug-panel').style.display='none'" style="background:#475569; color:#f1f5f9; border:none; border-radius:4px; padding:2px 8px; cursor:pointer;">✕ close</button>
+        </div>
+        <pre id="debug-output" style="margin:0; white-space:pre-wrap; word-break:break-all;"></pre>
+    </div>
+
     <!-- Usage Stats Modal -->
     <div id="usage-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white rounded-lg p-6 max-w-md mx-4 w-full">
@@ -1084,35 +1093,44 @@ We're looking for a Senior VP to lead our AI Risk team...
             sidebar.classList.toggle('open');
         }
 
+        function debugLog(msg) {
+            const panel = document.getElementById('debug-panel');
+            const out = document.getElementById('debug-output');
+            out.textContent += msg + '\n';
+            panel.style.display = 'block';
+        }
+
         async function loadAnalysis(analysisId) {
+            document.getElementById('debug-output').textContent = '';
+            debugLog('1. Clicked history card — analysis_id=' + analysisId);
             try {
-                console.log('[loadAnalysis] fetching analysis id=', analysisId);
                 const response = await fetch(`/get-analysis/${analysisId}`);
+                debugLog('2. HTTP status: ' + response.status);
                 const result = await response.json();
-                console.log('[loadAnalysis] API response:', JSON.stringify(result.cv_progress));
+                debugLog('3. result.success=' + result.success);
+                debugLog('4. result.cv_progress=' + JSON.stringify(result.cv_progress));
 
                 if (result.success) {
                     const cvProgress = result.cv_progress || null;
 
-                    // If there's an in-progress CV session, go straight back to where they left off
                     if (cvProgress && cvProgress.session_id) {
-                        console.log('[loadAnalysis] cv_progress found, resuming session', cvProgress.session_id);
-                        window.location.href = `/customize-cv/resume/${cvProgress.session_id}`;
+                        debugLog('5. FOUND session_id=' + cvProgress.session_id + ', current_step=' + cvProgress.current_step + ' → redirecting in 3s (close panel to cancel)');
+                        setTimeout(() => { window.location.href = `/customize-cv/resume/${cvProgress.session_id}`; }, 3000);
                         return;
                     }
 
-                    console.log('[loadAnalysis] no cv_progress, showing analysis results');
-                    // Otherwise show the analysis results
+                    debugLog('5. cv_progress is null or missing session_id → showing match results');
                     toggleHistorySidebar();
                     const resultsSection = document.getElementById('results-section');
                     resultsSection.classList.add('active');
                     resultsSection.scrollIntoView({ behavior: 'smooth' });
                     displayResults(result.analysis, analysisId, null);
                 } else {
+                    debugLog('ERROR: ' + result.error);
                     alert('Error: ' + result.error);
                 }
             } catch (error) {
-                console.error('[loadAnalysis] Error:', error);
+                debugLog('EXCEPTION: ' + error.toString());
                 alert('Failed to load analysis');
             }
         }
