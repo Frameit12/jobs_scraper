@@ -7086,6 +7086,8 @@ def customize_bullet_chat():
     try:
         data = request.json
         bullet_text = data.get('bullet_text')
+        bullet_index = data.get('bullet_index')
+        all_bullets = data.get('all_bullets', [])
         user_message = data.get('user_message')
         chat_history = data.get('chat_history', [])
 
@@ -7138,10 +7140,15 @@ You are a CV writing assistant helping a job seeker sharpen a resume bullet poin
 **JOB DESCRIPTION:**
 {job_description}
 
-**ORIGINAL BULLET:**
+**ALL RECOMMENDED BULLETS FOR THIS ROLE (for reference — the user may refer to these by number):**
+{chr(10).join(f'Bullet #{b["num"]}: {b["text"]}' for b in all_bullets) if all_bullets else '(not provided)'}
+
+**CURRENT BULLET BEING REFINED (Bullet #{(bullet_index or 0) + 1}):**
 {bullet_text}
 
 **YOUR ROLE:**
+- You already have the bullet above — never ask the user to share it again
+- If the user asks to "use bullet #N", switch your working version to that bullet and refine it for the JD
 - Always provide a concrete rewritten bullet — never refuse or just give analysis
 - Find the strongest angle to frame the user's real experience against what the JD is looking for
 - Use language and keywords from the JD to position the bullet favourably
