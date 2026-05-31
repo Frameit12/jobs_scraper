@@ -1875,23 +1875,12 @@ def get_cv_session(session_id):
 
 def get_cv_session_by_analysis(analysis_id, user_id):
     """Get CV customization session by analysis_id and user_id"""
-    print(f"  [get_cv_session_by_analysis] looking for analysis_id={analysis_id!r} (type={type(analysis_id).__name__}) user_id={user_id!r} (type={type(user_id).__name__})")
     engine = get_db_connection()
     if not engine:
-        print(f"  [get_cv_session_by_analysis] ERROR: no DB connection")
         return None
 
     try:
         with engine.connect() as conn:
-            # Debug: show all sessions for this user so we can compare
-            all_rows = conn.execute(text("""
-                SELECT id, user_id, analysis_id, status, created_at
-                FROM cv_customization_sessions
-                WHERE user_id = :user_id
-                ORDER BY created_at DESC
-            """), {"user_id": user_id}).fetchall()
-            print(f"  [get_cv_session_by_analysis] all sessions for user {user_id}: {[(r[0], r[1], r[2], r[3]) for r in all_rows]}")
-
             result = conn.execute(text("""
                 SELECT id, user_id, analysis_id, job_title, job_company,
                        selected_headline, bullet_analysis, approved_bullets, new_bullets,
@@ -1904,7 +1893,6 @@ def get_cv_session_by_analysis(analysis_id, user_id):
 
             row = result.fetchone()
             if row:
-                print(f"  [get_cv_session_by_analysis] FOUND session id={row[0]}, status={row[10]}, headline={bool(row[5])}")
                 return {
                     'id': row[0],
                     'user_id': row[1],
@@ -1919,13 +1907,10 @@ def get_cv_session_by_analysis(analysis_id, user_id):
                     'status': row[10],
                     'created_at': row[11]
                 }
-            print(f"  [get_cv_session_by_analysis] NOT FOUND — no row matched analysis_id={analysis_id}, user_id={user_id}")
             return None
 
     except Exception as e:
-        print(f"  [get_cv_session_by_analysis] EXCEPTION: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error getting CV session by analysis: {e}")
         return None
 
 
@@ -3063,7 +3048,7 @@ def save_job_analysis(user_id, cv_id, job_title, job_company, job_description, a
 
 
 def get_user_analyses(user_id, limit=10):
-    """Get recent job analyses for a user"""
+    """Get recent job analyses for a user, including any in-progress CV session."""
     engine = get_db_connection()
     if not engine:
         return []
@@ -3072,9 +3057,20 @@ def get_user_analyses(user_id, limit=10):
         with engine.connect() as conn:
             result = conn.execute(text("""
                 SELECT ja.id, ja.job_title, ja.job_company, ja.match_score,
-                       ja.created_at, cv.cv_name
+                       ja.created_at, cv.cv_name,
+                       cs.id AS cv_session_id,
+                       cs.selected_headline,
+                       cs.selected_roles,
+                       cs.approved_bullets
                 FROM job_analyses ja
                 LEFT JOIN user_cvs cv ON ja.cv_id = cv.id
+                LEFT JOIN LATERAL (
+                    SELECT id, selected_headline, selected_roles, approved_bullets
+                    FROM cv_customization_sessions
+                    WHERE analysis_id = ja.id AND user_id = :user_id
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                ) cs ON true
                 WHERE ja.user_id = :user_id
                 ORDER BY ja.created_at DESC
                 LIMIT :limit
@@ -3082,13 +3078,20 @@ def get_user_analyses(user_id, limit=10):
 
             analyses = []
             for row in result:
+                cv_session_id = row[6]
+                resume_url = None
+                if cv_session_id:
+                    resume_url = f'/customize-cv/resume/{cv_session_id}'
+
                 analyses.append({
                     'id': row[0],
                     'job_title': row[1],
                     'job_company': row[2],
                     'match_score': row[3],
                     'created_at': row[4],
-                    'cv_name': row[5] if row[5] else 'Master Template'
+                    'cv_name': row[5] if row[5] else 'Master Template',
+                    'resume_url': resume_url,
+                    'cv_session_id': cv_session_id,
                 })
             return analyses
     except Exception as e:

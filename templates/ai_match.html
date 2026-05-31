@@ -496,7 +496,7 @@ We're looking for a Senior VP to lead our AI Risk team...
                     {% for analysis in recent_analyses[:2] %}
                     <div class="analysis-history-card bg-white border border-gray-200 rounded-lg p-5 shadow-sm"
                          data-analysis-id="{{ analysis.id }}"
-                         onclick="loadAnalysis({{ analysis.id }})">
+                         onclick="{% if analysis.resume_url %}window.location.href='{{ analysis.resume_url }}'{% else %}loadAnalysis({{ analysis.id }}){% endif %}">
                         <div class="flex items-start justify-between mb-3">
                             <div class="flex-1">
                                 <h4 class="font-semibold text-slate-800">{{ analysis.job_title }}</h4>
@@ -597,7 +597,7 @@ We're looking for a Senior VP to lead our AI Risk team...
             {% for analysis in recent_analyses %}
             <div class="analysis-history-card bg-white border border-gray-200 rounded-lg p-4 mb-3"
                  data-analysis-id="{{ analysis.id }}"
-                 onclick="loadAnalysis({{ analysis.id }})">
+                 onclick="{% if analysis.resume_url %}window.location.href='{{ analysis.resume_url }}'{% else %}loadAnalysis({{ analysis.id }}){% endif %}">
                 <div class="flex items-start justify-between mb-2">
                     <div class="flex-1">
                         <h4 class="font-semibold text-slate-800 text-sm">{{ analysis.job_title }}</h4>
@@ -629,6 +629,9 @@ We're looking for a Senior VP to lead our AI Risk team...
                     </svg>
                     {{ analysis.cv_name }}
                 </p>
+                {% if analysis.resume_url %}
+                <p class="text-xs mt-2 font-semibold" style="color:#d97706;">✎ CV in progress — click to continue</p>
+                {% endif %}
             </div>
             {% endfor %}
             {% endif %}
@@ -1089,33 +1092,19 @@ We're looking for a Senior VP to lead our AI Risk team...
                 const response = await fetch(`/get-analysis/${analysisId}`);
                 const result = await response.json();
 
-                // DEBUG ALERT — remove once diagnosed
-                alert(
-                    'DEBUG — analysis_id: ' + analysisId + '\n' +
-                    'success: ' + result.success + '\n' +
-                    'cv_progress: ' + JSON.stringify(result.cv_progress)
-                );
-
                 if (result.success) {
-                    const cvProgress = result.cv_progress || null;
-
-                    if (cvProgress && cvProgress.session_id) {
-                        window.location.href = `/customize-cv/resume/${cvProgress.session_id}`;
-                        return;
-                    }
-
                     toggleHistorySidebar();
                     const resultsSection = document.getElementById('results-section');
                     resultsSection.classList.add('active');
                     resultsSection.scrollIntoView({ behavior: 'smooth' });
-                    // Clear any previously inserted customize buttons before adding a new one
+                    // Clear any previously inserted customize buttons before re-rendering
                     document.querySelectorAll('#match-stats ~ div').forEach(el => el.remove());
-                    displayResults(result.analysis, analysisId, null);
+                    displayResults(result.analysis, analysisId, result.cv_progress || null);
                 } else {
                     alert('Error: ' + result.error);
                 }
             } catch (error) {
-                alert('DEBUG error: ' + error.toString());
+                alert('Failed to load analysis. Please try again.');
             }
         }
 
