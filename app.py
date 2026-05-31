@@ -2006,22 +2006,28 @@ def update_cv_session_bullet_analysis_by_role(session_id, role_key, analysis):
         return False
     try:
         with engine.connect() as conn:
-            import json
+            # Read current value, update in Python, write back — avoids complex JSONB operators
+            row = conn.execute(text("""
+                SELECT bullet_analysis_by_role FROM cv_customization_sessions WHERE id = :session_id
+            """), {"session_id": session_id}).fetchone()
+
+            current = {}
+            if row and row[0]:
+                current = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+
+            current[role_key] = analysis
+
             conn.execute(text("""
                 UPDATE cv_customization_sessions
-                SET bullet_analysis_by_role = COALESCE(bullet_analysis_by_role, '{}'::jsonb)
-                    || jsonb_build_object(:role_key, :analysis::jsonb),
-                    updated_at = CURRENT_TIMESTAMP
+                SET bullet_analysis_by_role = :data, updated_at = CURRENT_TIMESTAMP
                 WHERE id = :session_id
-            """), {
-                "session_id": session_id,
-                "role_key": role_key,
-                "analysis": json.dumps(analysis)
-            })
+            """), {"session_id": session_id, "data": json.dumps(current)})
             conn.commit()
+            print(f"Saved bullet analysis for role: {role_key} (session {session_id})")
             return True
     except Exception as e:
-        print(f"Error saving role bullet analysis: {e}")
+        import traceback
+        print(f"Error saving role bullet analysis: {e}\n{traceback.format_exc()}")
         return False
 
 
@@ -6585,8 +6591,8 @@ def debug_cv_bullets():
             try:
                 result = analyze_bullets_for_role_with_ai(current_role, analysis['job_description'], user_id)
                 if result:
-                    update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, result)
-                    out['run_result'] = 'SUCCESS'
+                    saved = update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, result)
+                    out['run_result'] = 'SUCCESS' if saved else 'AI_OK_BUT_SAVE_FAILED'
                     out['recommended_bullets_count'] = len(result.get('recommended_bullets', []))
                 else:
                     out['run_result'] = 'FAILED: returned None'
