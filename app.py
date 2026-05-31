@@ -6751,6 +6751,27 @@ def customize_cv_export():
             if cv_id:
                 original_cv = get_cv_by_id(cv_id, user_id)
 
+        # Master template flow: cv_id is NULL — fall back to most recent uploaded CV
+        if not original_cv:
+            try:
+                engine = get_db_connection()
+                if engine:
+                    with engine.connect() as conn:
+                        row = conn.execute(text("""
+                            SELECT id, cv_name, file_data, file_type, extracted_text
+                            FROM user_cvs
+                            WHERE user_id = :uid AND file_data IS NOT NULL
+                            ORDER BY id DESC LIMIT 1
+                        """), {"uid": user_id}).fetchone()
+                        if row:
+                            original_cv = {
+                                'id': row[0], 'cv_name': row[1],
+                                'file_data': row[2], 'file_type': row[3],
+                                'extracted_text': row[4]
+                            }
+            except Exception as e:
+                print(f"Error fetching fallback CV: {e}")
+
         # ── PyMuPDF export (primary path for PDF originals) ───────────────────
         if original_cv and original_cv.get('file_data'):
             file_data = bytes(original_cv['file_data'])
