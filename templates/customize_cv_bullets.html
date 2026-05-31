@@ -128,8 +128,8 @@
     <!-- Bullets -->
     <div class="space-y-4 mb-32">
         {% for bullet in recommended_bullets %}
-        <div class="bullet-card bg-white rounded-lg border-2 p-5"
-             :class="approvedIndices.includes({{ loop.index0 }}) ? 'border-blue-600' : 'border-gray-200'">
+        <div class="bullet-card bg-white rounded-lg border-2 p-5 transition-opacity"
+             :class="approvedIndices.includes({{ loop.index0 }}) ? 'border-blue-600' : skippedIndices.includes({{ loop.index0 }}) ? 'border-gray-200 opacity-40' : 'border-gray-200'"
 
             <div class="flex items-start gap-4">
                 <!-- Rank badge -->
@@ -202,34 +202,42 @@
 
             <!-- Action buttons -->
             <div class="flex gap-2 mt-4 pl-12">
-                <template x-if="!approvedIndices.includes({{ loop.index0 }})">
-                    <button @click="approveBullet({{ loop.index0 }}, '{{ bullet.original_text | replace("'", "\\'") }}')"
-                            class="flex-1 text-white px-4 py-2 rounded-lg text-sm font-semibold transition bg-blue-600 hover:bg-blue-700">
-                        ✓ Approve
-                    </button>
-                </template>
                 <template x-if="approvedIndices.includes({{ loop.index0 }})">
                     <button @click="removeBullet({{ loop.index0 }})"
                             class="flex-1 bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-600 transition">
                         ✗ Remove
                     </button>
                 </template>
-
-                {% if bullet.rewrite_suggestion %}
-                <template x-if="!approvedIndices.includes({{ loop.index0 }})">
-                    <button @click="approveEdited({{ loop.index0 }})"
-                            class="flex-1 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
-                            style="background:#d97706;">
-                        ✓ Approve Edited
+                <template x-if="!approvedIndices.includes({{ loop.index0 }}) && !skippedIndices.includes({{ loop.index0 }})">
+                    <div class="flex gap-2 flex-1">
+                        <button @click="approveBullet({{ loop.index0 }}, '{{ bullet.original_text | replace("'", "\\'") }}')"
+                                class="flex-1 text-white px-4 py-2 rounded-lg text-sm font-semibold transition bg-blue-600 hover:bg-blue-700">
+                            ✓ Approve
+                        </button>
+                        {% if bullet.rewrite_suggestion %}
+                        <button @click="approveEdited({{ loop.index0 }})"
+                                class="flex-1 text-white px-4 py-2 rounded-lg text-sm font-semibold transition"
+                                style="background:#d97706;">
+                            ✓ Approve Edited
+                        </button>
+                        {% endif %}
+                        <button @click="skipBullet({{ loop.index0 }})"
+                                class="px-4 py-2 bg-gray-100 text-gray-500 rounded-lg text-sm font-semibold hover:bg-gray-200 transition">
+                            ✕ Skip
+                        </button>
+                        <button @click="customiseWithAI({{ loop.index0 }}, '{{ bullet.original_text | replace("'", "\\'") }}')"
+                                class="px-4 py-2 rounded-lg text-sm font-semibold transition"
+                                style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
+                            ✎ Refine with AI
+                        </button>
+                    </div>
+                </template>
+                <template x-if="skippedIndices.includes({{ loop.index0 }})">
+                    <button @click="restoreBullet({{ loop.index0 }})"
+                            class="px-4 py-2 bg-gray-100 text-gray-500 rounded-lg text-sm font-semibold hover:bg-gray-200 transition">
+                        ↩ Restore
                     </button>
                 </template>
-                {% endif %}
-
-                <button @click="customiseWithAI({{ loop.index0 }}, '{{ bullet.original_text | replace("'", "\\'") }}')"
-                        class="px-4 py-2 rounded-lg text-sm font-semibold transition"
-                        style="background:#fef3c7; color:#92400e; border:1px solid #fde68a;">
-                    ✎ Refine with AI
-                </button>
             </div>
         </div>
         {% endfor %}
@@ -339,6 +347,7 @@
 function bulletSelector() {
     return {
         approvedIndices: [],
+        skippedIndices: [],
         approvedTexts: {},
         editedRewrites: {},
         customisedTexts: {},
@@ -376,6 +385,17 @@ function bulletSelector() {
                 delete this.approvedTexts[idx];
                 delete this.customisedTexts[idx];
             }
+        },
+
+        skipBullet(idx) {
+            if (!this.skippedIndices.includes(idx)) {
+                this.skippedIndices.push(idx);
+            }
+        },
+
+        restoreBullet(idx) {
+            const i = this.skippedIndices.indexOf(idx);
+            if (i > -1) this.skippedIndices.splice(i, 1);
         },
 
         approveEdited(idx) {
