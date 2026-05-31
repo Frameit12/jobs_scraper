@@ -6512,6 +6512,66 @@ def api_analyze_bullets_for_role():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route("/debug-cv-bullets", methods=["GET"])
+def debug_cv_bullets():
+    """Debug endpoint: shows bullet analysis state and tries a test AI call."""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+    role_index = int(request.args.get('role', 0))
+
+    out = {'cv_session_id': cv_session_id, 'user_id': user_id, 'role_index': role_index}
+
+    try:
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return jsonify({'error': 'cv_session not found', **out})
+
+        selected_roles = cv_session.get('selected_roles', [])
+        out['selected_roles_count'] = len(selected_roles)
+        out['in_progress_keys'] = list(_bullet_analysis_in_progress)
+
+        if role_index >= len(selected_roles):
+            return jsonify({'error': 'role_index out of range', **out})
+
+        current_role = selected_roles[role_index]
+        role_key = current_role['company']
+        out['role_key'] = role_key
+        out['bullets_count'] = len(current_role.get('bullets', []))
+
+        cached = (cv_session.get('bullet_analysis_by_role') or {}).get(role_key)
+        out['cache_exists'] = bool(cached)
+        if cached:
+            out['cached_bullets_count'] = len(cached.get('recommended_bullets', []))
+
+        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
+        out['analysis_found'] = bool(analysis)
+        if analysis:
+            out['jd_length'] = len(analysis.get('job_description', ''))
+
+        # Try a minimal AI call to test connectivity
+        try:
+            client = get_anthropic_client()
+            test = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=10,
+                messages=[{"role": "user", "content": "Say ok"}]
+            )
+            out['ai_test'] = 'ok: ' + test.content[0].text
+        except Exception as e:
+            out['ai_test'] = f'FAILED: {e}'
+
+        return jsonify(out)
+
+    except Exception as e:
+        import traceback
+        out['error'] = str(e)
+        out['traceback'] = traceback.format_exc()
+        return jsonify(out)
+
+
 @app.route("/customize-cv/preview", methods=["GET"])
 def customize_cv_preview():
     """Step 3: Preview and download customized CV"""
