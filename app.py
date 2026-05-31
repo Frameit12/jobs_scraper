@@ -1196,6 +1196,23 @@ def get_cv_by_id(cv_id, user_id):
         return None
 
 
+def get_cv_id_for_analysis(analysis_id):
+    """Return the cv_id stored against a job_analyses row."""
+    engine = get_db_connection()
+    if not engine:
+        return None
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(
+                text("SELECT cv_id FROM job_analyses WHERE id = :aid"),
+                {"aid": analysis_id}
+            ).fetchone()
+            return row[0] if row else None
+    except Exception as e:
+        print(f"Error getting cv_id for analysis {analysis_id}: {e}")
+        return None
+
+
 # ==================== AI MATCH TOOL: MASTER TEMPLATE FUNCTIONS ====================
 
 def save_master_template(user_id, template_text, filename):
@@ -6613,7 +6630,7 @@ def customize_cv_preview():
 
 @app.route("/customize-cv/export", methods=["GET"])
 def customize_cv_export():
-    """Export customized CV as PDF or DOCX download."""
+    """Export customized CV as PDF or DOCX, preserving the original file's formatting."""
     if 'user_id' not in session or 'cv_session_id' not in session:
         return redirect('/ai-match')
 
@@ -6623,120 +6640,27 @@ def customize_cv_export():
     if fmt not in ('pdf', 'docx'):
         return "Invalid format", 400
 
+    import re as _re
+    import traceback as _tb
+    from io import BytesIO as _BytesIO
+
     try:
         cv_session = get_cv_session(cv_session_id)
         if not cv_session:
             return "Session not found", 404
 
-        master_template = get_user_master_template(user_id)
-        if not master_template:
-            return "Master template not found", 404
-
         approved_bullets = cv_session.get('approved_bullets') or []
         selected_headline = cv_session.get('selected_headline') or ''
         bullet_analysis_by_role = cv_session.get('bullet_analysis_by_role') or {}
+        analysis_id = cv_session.get('analysis_id')
 
         if not approved_bullets or not selected_headline:
             return redirect('/customize-cv/preview')
 
-        # ── Build clean CV text from master template ─────────────────────────
-        BULLET_CHARS = '•●○◦▸▪▶·'
+        job_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
 
-        def _extract_export_parts(template_text):
-            """
-            Decompose a master template into (personal_details, body) for export.
-
-            Master templates have the structure:
-              ===== PERSONAL DETAILS =====   ← optional, new-style templates
-              <name / contact lines>
-              ===== CAREER SUMMARY =====
-              [VERSION 1 — ...] ... [VERSION N — ...]
-              ===== CORE EXPERTISE =====     ← body starts here
-              ...
-
-            Returns (personal_details_block, body_block):
-              - personal_details_block: text of the PERSONAL DETAILS section, or ''
-              - body_block: text from first non-personal / non-career-summary section,
-                            or None if no section boundary was found (simple templates)
-            """
-            import re as _re
-            PERSONAL_MARKERS = ['PERSONAL DETAILS', 'PERSONAL INFORMATION', 'CONTACT']
-            SKIP_MARKERS = ['CAREER SUMMARY', 'PROFESSIONAL SUMMARY', 'EXECUTIVE SUMMARY']
-            BODY_MARKERS = [
-                'CORE EXPERTISE', 'EMPLOYMENT HISTORY', 'PROFESSIONAL EXPERIENCE',
-                'WORK EXPERIENCE', 'CAREER HISTORY', 'EXPERIENCE', 'EDUCATION',
-                'SKILLS', 'QUALIFICATIONS', 'EMPLOYMENT', 'CERTIFICATIONS',
-                'TECHNOLOGY', 'TECHNOLOGY & TOOLS',
-            ]
-
-            def _norm(line):
-                return _re.sub(r'[=*_#\-]', '', line.strip()).strip().upper()
-
-            lines = template_text.split('\n')
-            personal_start = None
-            personal_end = None
-            body_start = None
-
-            for i, line in enumerate(lines):
-                s = _norm(line)
-                if personal_start is None and any(
-                        s == m or s.startswith(m + ' ') or s.startswith(m + ':')
-                        for m in PERSONAL_MARKERS):
-                    personal_start = i
-                elif personal_start is not None and personal_end is None:
-                    # End of personal section = next ===== section =====
-                    if s and any(s == m or s.startswith(m + ' ') or s.startswith(m + ':')
-                                 for m in SKIP_MARKERS + BODY_MARKERS):
-                        personal_end = i
-                if body_start is None and any(
-                        s == m or s.startswith(m + ' ') or s.startswith(m + ':')
-                        for m in BODY_MARKERS):
-                    body_start = i
-
-            personal_block = ''
-            if personal_start is not None:
-                end = personal_end if personal_end is not None else (body_start or len(lines))
-                personal_block = '\n'.join(lines[personal_start:end]).strip()
-
-            body_block = '\n'.join(lines[body_start:]) if body_start is not None else None
-            return personal_block, body_block
-
-        def _replace_bullet(text, original, replacement):
-            """Find a bullet by its cleaned text and replace it, preserving prefix."""
-            lines = text.split('\n')
-            for i, line in enumerate(lines):
-                stripped = line.strip()
-                content = stripped[1:].strip() if stripped and stripped[0] in BULLET_CHARS + '-' else stripped
-                if content == original:
-                    leading = line[:len(line) - len(line.lstrip())]
-                    bullet_char = stripped[0] if stripped and stripped[0] in BULLET_CHARS else None
-                    lines[i] = (leading + bullet_char + ' ' + replacement) if bullet_char else (leading + replacement)
-                    return '\n'.join(lines), True
-            return text, False
-
-        raw = master_template['template_text']
-
-        # Decompose template: extract personal details header + body (strips CAREER SUMMARY versions)
-        personal_block, body = _extract_export_parts(raw)
-        if body is not None:
-            # Multi-version template — keep personal details, prepend selected headline, then body
-            parts = []
-            if personal_block:
-                parts.append(personal_block)
-            parts.append(selected_headline)
-            parts.append(body)
-            modified = '\n\n'.join(parts)
-        else:
-            # Simple template — replace first non-empty line with selected headline
-            lines = raw.split('\n')
-            for i, line in enumerate(lines):
-                if line.strip():
-                    lines[i] = selected_headline
-                    break
-            modified = '\n'.join(lines)
-
-        # Replace approved bullets
-        applied = 0
+        # ── Build replacement list: [(original_text, approved_text), …] ──────
+        replacements = []
         for bullet in approved_bullets:
             role_key = bullet.get('role_company', '')
             idx = bullet.get('bullet_index')
@@ -6750,19 +6674,225 @@ def customize_cv_export():
                 None
             )
             if original_text and original_text != new_text:
-                modified, ok = _replace_bullet(modified, original_text, new_text)
-                if ok:
-                    applied += 1
+                replacements.append((original_text, new_text))
 
-        print(f"CV export: applied {applied}/{len(approved_bullets)} bullet replacements")
+        # ── Fetch original CV binary ──────────────────────────────────────────
+        original_cv = None
+        if analysis_id:
+            cv_id = get_cv_id_for_analysis(analysis_id)
+            if cv_id:
+                original_cv = get_cv_by_id(cv_id, user_id)
 
-        job_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
+        # ── Attempt original-file export ──────────────────────────────────────
+        if original_cv and original_cv.get('file_data'):
+            try:
+                file_data = bytes(original_cv['file_data'])
+                file_type = (original_cv.get('file_type') or '').lower().strip('.')
 
-        # ── Generate PDF ─────────────────────────────────────────────────────
+                # Convert PDF → DOCX in memory using pdf2docx
+                if file_type == 'pdf':
+                    import tempfile, os
+                    try:
+                        from pdf2docx import Converter as _PdfConverter
+                        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
+                            tmp_pdf.write(file_data)
+                            tmp_pdf_path = tmp_pdf.name
+                        tmp_docx_path = tmp_pdf_path.replace('.pdf', '.docx')
+                        try:
+                            cv_conv = _PdfConverter(tmp_pdf_path)
+                            cv_conv.convert(tmp_docx_path, start=0, end=None)
+                            cv_conv.close()
+                            with open(tmp_docx_path, 'rb') as f:
+                                docx_bytes_in = f.read()
+                            file_type = 'docx'
+                            file_data = docx_bytes_in
+                        finally:
+                            try: os.unlink(tmp_pdf_path)
+                            except: pass
+                            try: os.unlink(tmp_docx_path)
+                            except: pass
+                    except ImportError:
+                        print("pdf2docx not available — falling back to text export")
+                        original_cv = None  # trigger fallback
+
+                if original_cv and file_type in ('docx', 'doc'):
+                    from docx import Document as _DocxDoc
+
+                    def _replace_para(para, old, new):
+                        """Replace old text in a paragraph (multi-run aware)."""
+                        full = "".join(r.text for r in para.runs)
+                        if old not in full:
+                            return False
+                        new_full = full.replace(old, new, 1)
+                        if para.runs:
+                            para.runs[0].text = new_full
+                            for r in para.runs[1:]:
+                                r.text = ""
+                        else:
+                            para.text = new_full
+                        return True
+
+                    def _all_paragraphs(doc):
+                        """Yield all paragraphs in body + tables."""
+                        yield from doc.paragraphs
+                        for tbl in doc.tables:
+                            for row in tbl.rows:
+                                for cell in row.cells:
+                                    yield from cell.paragraphs
+
+                    doc = _DocxDoc(_BytesIO(file_data))
+
+                    # Replace bullets
+                    applied = 0
+                    for orig, appr in replacements:
+                        for para in _all_paragraphs(doc):
+                            if _replace_para(para, orig, appr):
+                                applied += 1
+                                break
+
+                    # Replace career summary: find the first substantial prose paragraph
+                    # after the contact block (first paragraph > 80 chars that isn't a heading)
+                    replaced_headline = False
+                    for para in doc.paragraphs:
+                        txt = para.text.strip()
+                        if len(txt) > 80 and not txt.isupper():
+                            _replace_para(para, txt, selected_headline)
+                            replaced_headline = True
+                            break
+                    if not replaced_headline:
+                        # Fall back: replace first non-empty paragraph
+                        for para in doc.paragraphs:
+                            if para.text.strip():
+                                _replace_para(para, para.text.strip(), selected_headline)
+                                break
+
+                    print(f"CV export (original file): {applied}/{len(replacements)} bullets replaced, "
+                          f"headline={'yes' if replaced_headline else 'fallback'}")
+
+                    # Save modified DOCX
+                    buf = _BytesIO()
+                    doc.save(buf)
+                    modified_docx = buf.getvalue()
+
+                    if fmt == 'docx':
+                        return Response(
+                            modified_docx,
+                            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            headers={
+                                'Content-Disposition': f'attachment; filename="CV_{job_slug}.docx"',
+                                'Content-Length': len(modified_docx),
+                            }
+                        )
+
+                    # PDF: convert DOCX → HTML via mammoth → PDF via weasyprint
+                    import mammoth as _mammoth
+                    import weasyprint as _weasyprint
+                    result = _mammoth.convert_to_html(_BytesIO(modified_docx))
+                    html_body = result.value
+                    html_doc = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+@page {{ margin: 2cm; size: A4; }}
+body {{ font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #111; }}
+h1 {{ font-size: 14pt; margin: 0 0 4px 0; }}
+h2 {{ font-size: 12pt; margin: 10px 0 3px 0; border-bottom: 1px solid #bbb; }}
+h3 {{ font-size: 11pt; margin: 8px 0 2px 0; }}
+p {{ margin: 2px 0 4px 0; }}
+ul {{ margin: 2px 0; padding-left: 18px; }}
+li {{ margin: 1px 0; }}
+strong {{ font-weight: bold; }}
+</style></head><body>{html_body}</body></html>"""
+                    pdf_bytes = _weasyprint.HTML(string=html_doc).write_pdf()
+                    return Response(
+                        pdf_bytes,
+                        mimetype='application/pdf',
+                        headers={
+                            'Content-Disposition': f'attachment; filename="CV_{job_slug}.pdf"',
+                            'Content-Length': len(pdf_bytes),
+                        }
+                    )
+
+            except Exception as e:
+                print(f"Original-file export failed, falling back to text export: {e}")
+                _tb.print_exc()
+                # fall through to text-based export below
+
+        # ── Fallback: text-based export from master template ─────────────────
+        print("CV export: using text-based fallback")
+
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return "Master template not found", 404
+
+        raw = master_template['template_text']
+        BULLET_CHARS = '•●○◦▸▪▶·'
+
+        def _extract_export_parts(template_text):
+            PERSONAL_MARKERS = ['PERSONAL DETAILS', 'PERSONAL INFORMATION', 'CONTACT']
+            SKIP_MARKERS = ['CAREER SUMMARY', 'PROFESSIONAL SUMMARY', 'EXECUTIVE SUMMARY']
+            BODY_MARKERS = [
+                'CORE EXPERTISE', 'EMPLOYMENT HISTORY', 'PROFESSIONAL EXPERIENCE',
+                'WORK EXPERIENCE', 'CAREER HISTORY', 'EXPERIENCE', 'EDUCATION',
+                'SKILLS', 'QUALIFICATIONS', 'EMPLOYMENT', 'CERTIFICATIONS',
+                'TECHNOLOGY', 'TECHNOLOGY & TOOLS',
+            ]
+            def _norm(line):
+                return _re.sub(r'[=*_#\-]', '', line.strip()).strip().upper()
+            lines = template_text.split('\n')
+            personal_start = personal_end = body_start = None
+            for i, line in enumerate(lines):
+                s = _norm(line)
+                if personal_start is None and any(s == m or s.startswith(m + ' ') or s.startswith(m + ':') for m in PERSONAL_MARKERS):
+                    personal_start = i
+                elif personal_start is not None and personal_end is None:
+                    if s and any(s == m or s.startswith(m + ' ') or s.startswith(m + ':') for m in SKIP_MARKERS + BODY_MARKERS):
+                        personal_end = i
+                if body_start is None and any(s == m or s.startswith(m + ' ') or s.startswith(m + ':') for m in BODY_MARKERS):
+                    body_start = i
+            personal_block = ''
+            if personal_start is not None:
+                end = personal_end if personal_end is not None else (body_start or len(lines))
+                personal_block = '\n'.join(lines[personal_start:end]).strip()
+            body_block = '\n'.join(lines[body_start:]) if body_start is not None else None
+            return personal_block, body_block
+
+        def _replace_bullet_text(text, original, replacement):
+            lines = text.split('\n')
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                content = stripped[1:].strip() if stripped and stripped[0] in BULLET_CHARS + '-' else stripped
+                if content == original:
+                    leading = line[:len(line) - len(line.lstrip())]
+                    bullet_char = stripped[0] if stripped and stripped[0] in BULLET_CHARS else None
+                    lines[i] = (leading + bullet_char + ' ' + replacement) if bullet_char else (leading + replacement)
+                    return '\n'.join(lines), True
+            return text, False
+
+        personal_block, body = _extract_export_parts(raw)
+        if body is not None:
+            parts = []
+            if personal_block:
+                parts.append(personal_block)
+            parts.append(selected_headline)
+            parts.append(body)
+            modified = '\n\n'.join(parts)
+        else:
+            lines = raw.split('\n')
+            for i, line in enumerate(lines):
+                if line.strip():
+                    lines[i] = selected_headline
+                    break
+            modified = '\n'.join(lines)
+
+        applied = 0
+        for orig, appr in replacements:
+            modified, ok = _replace_bullet_text(modified, orig, appr)
+            if ok:
+                applied += 1
+        print(f"CV export (text fallback): applied {applied}/{len(replacements)} bullet replacements")
+
         if fmt == 'pdf':
-            import html as html_mod
-            import weasyprint
-
+            import html as _html_mod
+            import weasyprint as _weasyprint
             parts = ["""<html><head><meta charset="utf-8"><style>
             @page { margin: 2cm; size: A4; }
             body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #111; }
@@ -6770,10 +6900,8 @@ def customize_cv_export():
             .section { font-size: 11pt; font-weight: bold; border-bottom: 1px solid #bbb;
                        margin: 14px 0 4px 0; text-transform: uppercase; letter-spacing: 0.04em; }
             .bullet { margin: 2px 0 2px 16px; }
-            .bold  { font-weight: bold; }
             p { margin: 2px 0; }
             </style></head><body>"""]
-
             is_first = True
             for line in modified.split('\n'):
                 s = line.strip()
@@ -6781,7 +6909,7 @@ def customize_cv_export():
                     parts.append('<br style="line-height:0.4">')
                     is_first = False
                     continue
-                e = html_mod.escape(s)
+                e = _html_mod.escape(s)
                 if is_first:
                     parts.append(f'<div class="headline">{e}</div>')
                     is_first = False
@@ -6790,16 +6918,9 @@ def customize_cv_export():
                 elif s[0] in BULLET_CHARS + '-':
                     parts.append(f'<p class="bullet">{e}</p>')
                 else:
-                    is_bold = any(
-                        kw in s for kw in ['Ltd', 'Corp', 'Inc', 'Group', 'MSc', 'BSc', 'BA ', 'MA ']
-                    )
-                    tag = 'class="bold"' if is_bold else ''
-                    parts.append(f'<p {tag}>{e}</p>')
-
+                    parts.append(f'<p>{e}</p>')
             parts.append('</body></html>')
-            pdf_bytes = weasyprint.HTML(string=''.join(parts)).write_pdf()
-
-            from flask import Response
+            pdf_bytes = _weasyprint.HTML(string=''.join(parts)).write_pdf()
             return Response(
                 pdf_bytes,
                 mimetype='application/pdf',
@@ -6809,47 +6930,35 @@ def customize_cv_export():
                 }
             )
 
-        # ── Generate DOCX ────────────────────────────────────────────────────
-        from docx import Document as DocxDocument
-        from docx.shared import Pt
-        from io import BytesIO as _BytesIO
-
-        doc = DocxDocument()
-        # Remove default empty paragraph
-        for p in doc.paragraphs:
+        from docx import Document as _DocxDoc2
+        from docx.shared import Pt as _Pt
+        doc2 = _DocxDoc2()
+        for p in doc2.paragraphs:
             p._element.getparent().remove(p._element)
-
         is_first = True
         for line in modified.split('\n'):
             s = line.strip()
             if not s:
                 continue
             if is_first:
-                p = doc.add_paragraph()
+                p = doc2.add_paragraph()
                 run = p.add_run(s)
                 run.bold = True
-                run.font.size = Pt(14)
+                run.font.size = _Pt(14)
                 is_first = False
             elif s.upper() == s and len(s) < 35 and not s[0].isdigit():
-                p = doc.add_paragraph()
+                p = doc2.add_paragraph()
                 run = p.add_run(s)
                 run.bold = True
-                run.font.size = Pt(11)
+                run.font.size = _Pt(11)
             elif s[0] in BULLET_CHARS + '-':
-                doc.add_paragraph(s[1:].strip(), style='List Bullet')
+                doc2.add_paragraph(s[1:].strip(), style='List Bullet')
             else:
-                is_bold = any(
-                    kw in s for kw in ['Ltd', 'Corp', 'Inc', 'Group', 'MSc', 'BSc', 'BA ', 'MA ']
-                )
-                p = doc.add_paragraph()
-                run = p.add_run(s)
-                run.bold = is_bold
-
-        buf = _BytesIO()
-        doc.save(buf)
-        docx_bytes = buf.getvalue()
-
-        from flask import Response
+                p = doc2.add_paragraph()
+                p.add_run(s)
+        buf2 = _BytesIO()
+        doc2.save(buf2)
+        docx_bytes = buf2.getvalue()
         return Response(
             docx_bytes,
             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -6861,8 +6970,7 @@ def customize_cv_export():
 
     except Exception as e:
         print(f"Error exporting CV: {e}")
-        import traceback
-        traceback.print_exc()
+        _tb.print_exc()
         return "Error generating export", 500
 
 
