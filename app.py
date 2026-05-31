@@ -29,8 +29,10 @@ import threading
 import uuid
 
 # In-memory store for long-running background jobs (single-process Railway deployment)
-_consolidation_jobs = {}   # job_id -> {'status': pending|done|error, 'result': ..., 'error': ...}
+# job_id -> {'status': pending|done|error, 'created_at': float, ...}
+_consolidation_jobs = {}
 _consolidation_lock = threading.Lock()
+_CONSOLIDATION_JOB_TTL = 3600  # expire after 1 hour regardless of poll status
 
 # Configure logging to show in Railway
 logging.basicConfig(
@@ -6751,17 +6753,17 @@ def customize_cv_export():
                                 break
 
                     # Replace career summary: find the first substantial prose paragraph
-                    # after the contact block (first paragraph > 80 chars that isn't a heading)
+                    # (search body + table cells — some CV templates use a two-column table layout)
                     replaced_headline = False
-                    for para in doc.paragraphs:
+                    for para in _all_paragraphs(doc):
                         txt = para.text.strip()
                         if len(txt) > 80 and not txt.isupper():
                             _replace_para(para, txt, selected_headline)
                             replaced_headline = True
                             break
                     if not replaced_headline:
-                        # Fall back: replace first non-empty paragraph
-                        for para in doc.paragraphs:
+                        # Fall back: replace first non-empty paragraph anywhere in the doc
+                        for para in _all_paragraphs(doc):
                             if para.text.strip():
                                 _replace_para(para, para.text.strip(), selected_headline)
                                 break
@@ -7964,8 +7966,15 @@ def consolidate_cvs():
 
         # Multiple files — run Claude consolidation in a background thread to avoid proxy timeout
         job_id = str(uuid.uuid4())
+        import time as _time
         with _consolidation_lock:
-            _consolidation_jobs[job_id] = {'status': 'pending'}
+            # Sweep entries older than TTL before adding a new one
+            now = _time.time()
+            stale = [k for k, v in _consolidation_jobs.items()
+                     if now - v.get('created_at', now) > _CONSOLIDATION_JOB_TTL]
+            for k in stale:
+                del _consolidation_jobs[k]
+            _consolidation_jobs[job_id] = {'status': 'pending', 'created_at': now}
 
         def _run_consolidation(job_id, extracted_texts):
             try:
@@ -8034,9 +8043,12 @@ Output the COMPLETE master template now. Do not truncate or stop early — inclu
                 )
                 consolidated_text = message.content[0].text
 
+                log_user_activity('cv_consolidation', f'Consolidated {len(extracted_texts)} CV files into master template')
+                import time as _time2
                 with _consolidation_lock:
                     _consolidation_jobs[job_id] = {
                         'status': 'done',
+                        'created_at': _time2.time(),
                         'consolidated_text': consolidated_text,
                         'stats': {
                             'files_processed': len(extracted_texts),
@@ -8045,8 +8057,9 @@ Output the COMPLETE master template now. Do not truncate or stop early — inclu
                     }
             except Exception as e:
                 print(f"Background consolidation error: {e}")
+                import time as _time3
                 with _consolidation_lock:
-                    _consolidation_jobs[job_id] = {'status': 'error', 'error': str(e)}
+                    _consolidation_jobs[job_id] = {'status': 'error', 'created_at': _time3.time(), 'error': str(e)}
 
         t = threading.Thread(target=_run_consolidation, args=(job_id, extracted_texts), daemon=True)
         t.start()
