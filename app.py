@@ -2309,7 +2309,7 @@ def analyze_bullets_for_role_with_ai(role, job_description, user_id):
     try:
         message = client.messages.create(
             model="claude-sonnet-4-5-20250929",
-            max_tokens=3000,
+            max_tokens=6000,
             temperature=0.3,
             system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             messages=[{
@@ -2326,14 +2326,13 @@ def analyze_bullets_for_role_with_ai(role, job_description, user_id):
 {bullets_text}
 
 **YOUR TASK:**
-Score every bullet (0–100) against the JD. Select the top bullets (aim for 4–6, minimum 3).
-Return them ordered highest score first.
+Score EVERY bullet (0–100) against the JD. Return ALL bullets ordered highest score first.
 
-For each selected bullet determine:
+For each bullet determine:
 - ready_to_use: strong as-is
 - needs_rewriting: relevant but needs adaptation — provide a specific rewrite
 
-Return JSON:
+Return JSON with ALL {len(role['bullets'])} bullets:
 {{
     "recommended_bullets": [
         {{
