@@ -6149,6 +6149,72 @@ def debug_template():
     return html
 
 
+@app.route("/debug-cv-export-data", methods=["GET"])
+def debug_cv_export_data():
+    """Debug endpoint: dumps all CV session export data to diagnose bullet replacement/deletion issues."""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+    cv_session = get_cv_session(cv_session_id)
+    if not cv_session:
+        return jsonify({'error': 'Session not found'}), 404
+
+    approved_bullets = cv_session.get('approved_bullets') or []
+    selected_headline = cv_session.get('selected_headline') or ''
+    bullet_analysis_by_role = cv_session.get('bullet_analysis_by_role') or {}
+    selected_roles = cv_session.get('selected_roles') or []
+
+    # Build what replacements and deletions would be made
+    selected_role_keys = {r.get('company', '') for r in selected_roles if r.get('company')}
+    approved_map = {}
+    for b in approved_bullets:
+        rk = b.get('role_company', '')
+        idx = b.get('bullet_index')
+        txt = b.get('approved_text', '')
+        if rk and txt:
+            approved_map[(rk, idx)] = txt
+
+    replacements = []
+    deletions = []
+    for role_key, role_data in bullet_analysis_by_role.items():
+        if selected_role_keys and role_key not in selected_role_keys:
+            continue
+        for b in role_data.get('recommended_bullets', []):
+            idx = b.get('bullet_index')
+            orig = b.get('original_text', '')
+            if not orig:
+                continue
+            k = (role_key, idx)
+            if k in approved_map:
+                new_txt = approved_map[k]
+                replacements.append({
+                    'role': role_key, 'bullet_index': idx,
+                    'original_text': orig[:120], 'approved_text': new_txt[:120],
+                    'text_changed': new_txt != orig
+                })
+            else:
+                deletions.append({'role': role_key, 'bullet_index': idx, 'original_text': orig[:120]})
+
+    return jsonify({
+        'cv_session_id': cv_session_id,
+        'selected_headline_len': len(selected_headline),
+        'selected_roles': [{'company': r.get('company'), 'dates': r.get('dates')} for r in selected_roles],
+        'selected_role_keys': list(selected_role_keys),
+        'bullet_analysis_by_role_keys': list(bullet_analysis_by_role.keys()),
+        'bullet_analysis_counts': {k: len(v.get('recommended_bullets', [])) for k, v in bullet_analysis_by_role.items()},
+        'approved_bullets': approved_bullets,
+        'replacements_dry_run': replacements,
+        'deletions_dry_run': deletions,
+        'summary': {
+            'total_replacements': len(replacements),
+            'total_deletions': len(deletions),
+            'text_changed_replacements': sum(1 for r in replacements if r['text_changed'])
+        }
+    })
+
+
 @app.route("/debug-bullets", methods=["GET"])
 def debug_bullets():
     """Debug endpoint to test bullet parsing"""
