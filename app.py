@@ -6553,90 +6553,6 @@ def api_analyze_bullets_for_role():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route("/debug-cv-bullets", methods=["GET"])
-def debug_cv_bullets():
-    """Debug endpoint: shows bullet analysis state and tries a test AI call."""
-    if 'user_id' not in session or 'cv_session_id' not in session:
-        return jsonify({'error': 'Not logged in'}), 401
-
-    user_id = session['user_id']
-    cv_session_id = session['cv_session_id']
-    role_index = int(request.args.get('role', 0))
-
-    out = {'cv_session_id': cv_session_id, 'user_id': user_id, 'role_index': role_index}
-
-    try:
-        cv_session = get_cv_session(cv_session_id)
-        if not cv_session:
-            return jsonify({'error': 'cv_session not found', **out})
-
-        selected_roles = cv_session.get('selected_roles', [])
-        out['selected_roles_count'] = len(selected_roles)
-        out['in_progress_keys'] = list(_bullet_analysis_in_progress)
-        out['thread_errors'] = _bullet_analysis_errors
-
-        if role_index >= len(selected_roles):
-            return jsonify({'error': 'role_index out of range', **out})
-
-        current_role = selected_roles[role_index]
-        role_key = current_role['company']
-        out['role_key'] = role_key
-        out['bullets_count'] = len(current_role.get('bullets', []))
-
-        cached = (cv_session.get('bullet_analysis_by_role') or {}).get(role_key)
-        out['cache_exists'] = bool(cached)
-        if cached:
-            out['cached_bullets_count'] = len(cached.get('recommended_bullets', []))
-
-        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
-        out['analysis_found'] = bool(analysis)
-        if analysis:
-            out['jd_length'] = len(analysis.get('job_description', ''))
-
-        # Try a minimal AI call to test connectivity
-        try:
-            client = get_anthropic_client()
-            test = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=10,
-                messages=[{"role": "user", "content": "Say ok"}]
-            )
-            out['ai_test'] = 'ok: ' + test.content[0].text
-        except Exception as e:
-            out['ai_test'] = f'FAILED: {e}'
-
-        # If trigger=1, kick off the background thread manually
-        if request.args.get('trigger') == '1' and analysis:
-            start_bullet_analysis_if_needed(cv_session_id, role_key, current_role, analysis['job_description'], user_id)
-            out['trigger'] = 'background thread started (check /debug-cv-bullets?role=0 in 30s)'
-
-        # If run=1 is passed, execute the full analysis synchronously and report result/error
-        if request.args.get('run') == '1' and analysis:
-            try:
-                result = analyze_bullets_for_role_with_ai(current_role, analysis['job_description'], user_id)
-                if result:
-                    saved = update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, result)
-                    out['run_result'] = 'SUCCESS' if saved else 'AI_OK_BUT_SAVE_FAILED'
-                    out['recommended_bullets_count'] = len(result.get('recommended_bullets', []))
-                    # Re-read the session to confirm cache was actually written
-                    verify = get_cv_session(cv_session_id)
-                    verify_cached = (verify.get('bullet_analysis_by_role') or {}).get(role_key)
-                    out['cache_verified_after_save'] = bool(verify_cached)
-                else:
-                    out['run_result'] = 'FAILED: returned None'
-            except Exception as e:
-                import traceback
-                out['run_result'] = f'EXCEPTION: {e}'
-                out['run_traceback'] = traceback.format_exc()
-
-        return jsonify(out)
-
-    except Exception as e:
-        import traceback
-        out['error'] = str(e)
-        out['traceback'] = traceback.format_exc()
-        return jsonify(out)
-
 
 @app.route("/customize-cv/preview", methods=["GET"])
 def customize_cv_preview():
@@ -6896,29 +6812,6 @@ Leads with the scope the JD emphasises."
         traceback.print_exc()
         return jsonify({'error': 'Failed to get AI response'}), 500
 
-
-@app.route("/debug-template-roles")
-def debug_template_roles():
-    """Temporary debug: show raw template text and parsed roles."""
-    if 'user_id' not in session:
-        return redirect('/login')
-    user_id = session['user_id']
-    master_template = get_user_master_template(user_id)
-    if not master_template:
-        return "<pre>No master template found for this user.</pre>"
-    text = master_template['template_text']
-    roles = parse_roles_from_template(text)
-    lines = text.split('\n')
-    # Show first 120 lines of raw text + parse result
-    raw_preview = '\n'.join(f"{i+1:4d}: {l}" for i, l in enumerate(lines[:120]))
-    roles_summary = '\n'.join(
-        f"Role {r['id']}: company={r['company']!r}  dates={r['dates']!r}  "
-        f"title={r['role_titles']}  bullets={len(r['bullets'])}"
-        for r in roles
-    )
-    return f"<pre style='font-size:12px;white-space:pre-wrap'>" \
-           f"=== PARSED ROLES ({len(roles)} found) ===\n{roles_summary or '(none)'}\n\n" \
-           f"=== RAW TEMPLATE (first 120 lines) ===\n{raw_preview}</pre>"
 
 
 @app.route("/api/save-approved-bullets", methods=["POST"])
@@ -7584,34 +7477,6 @@ def delete_analysis(analysis_id):
         return jsonify({'error': 'Failed to delete analysis'}), 500
 
 
-@app.route("/debug/sessions", methods=["GET"])
-def debug_sessions():
-    """Temporary diagnostic: show raw DB state for analyses and cv_sessions."""
-    if 'user_id' not in session:
-        return redirect('/login')
-    user_id = session['user_id']
-    engine = get_db_connection()
-    html = f"<h2>Debug — user_id={user_id}</h2>"
-    try:
-        with engine.connect() as conn:
-            analyses = conn.execute(text(
-                "SELECT id, job_title, job_company, created_at FROM job_analyses WHERE user_id=:u ORDER BY created_at DESC LIMIT 20"
-            ), {"u": user_id}).fetchall()
-            html += f"<h3>job_analyses ({len(analyses)} rows)</h3><table border=1><tr><th>id</th><th>job_title</th><th>company</th><th>created_at</th></tr>"
-            for r in analyses:
-                html += f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td>{r[3]}</td></tr>"
-            html += "</table>"
-
-            sessions = conn.execute(text(
-                "SELECT id, analysis_id, user_id, status, selected_headline IS NOT NULL as has_headline, created_at FROM cv_customization_sessions WHERE user_id=:u ORDER BY created_at DESC LIMIT 20"
-            ), {"u": user_id}).fetchall()
-            html += f"<h3>cv_customization_sessions ({len(sessions)} rows)</h3><table border=1><tr><th>id</th><th>analysis_id</th><th>user_id</th><th>status</th><th>has_headline</th><th>created_at</th></tr>"
-            for r in sessions:
-                html += f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td>{r[3]}</td><td>{r[4]}</td><td>{r[5]}</td></tr>"
-            html += "</table>"
-    except Exception as e:
-        html += f"<p style='color:red'>ERROR: {e}</p>"
-    return html
 
 
 @app.route("/user-guide", methods=["GET"])
