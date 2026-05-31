@@ -1810,7 +1810,8 @@ def get_cv_session(session_id):
             result = conn.execute(text("""
                 SELECT id, user_id, analysis_id, job_title, job_company,
                        selected_headline, bullet_analysis, approved_bullets, new_bullets,
-                       match_score_progression, status, created_at
+                       match_score_progression, status, created_at,
+                       selected_roles, bullet_analysis_by_role
                 FROM cv_customization_sessions
                 WHERE id = :session_id
             """), {"session_id": session_id})
@@ -1836,6 +1837,18 @@ def get_cv_session(session_id):
                 elif match_score is None:
                     match_score = {}
 
+                selected_roles = row[12]
+                if isinstance(selected_roles, str):
+                    selected_roles = json.loads(selected_roles) if selected_roles else []
+                elif selected_roles is None:
+                    selected_roles = []
+
+                bullet_analysis_by_role = row[13]
+                if isinstance(bullet_analysis_by_role, str):
+                    bullet_analysis_by_role = json.loads(bullet_analysis_by_role) if bullet_analysis_by_role else {}
+                elif bullet_analysis_by_role is None:
+                    bullet_analysis_by_role = {}
+
                 return {
                     'id': row[0],
                     'user_id': row[1],
@@ -1848,7 +1861,9 @@ def get_cv_session(session_id):
                     'new_bullets': new_bullets,
                     'match_score_progression': match_score,
                     'status': row[10],
-                    'created_at': row[11]
+                    'created_at': row[11],
+                    'selected_roles': selected_roles,
+                    'bullet_analysis_by_role': bullet_analysis_by_role,
                 }
             return None
 
