@@ -1738,7 +1738,7 @@ def parse_roles_from_template(template_text):
                             or 'EMPLOYMENT' in prev.upper()):
                         k -= 1
                         continue
-                    if len(prev) < 120:
+                    if len(prev) < 300:
                         company = prev
                     break
 
