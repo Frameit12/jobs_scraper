@@ -6707,7 +6707,7 @@ def customize_bullet_chat():
                     "type": "text",
                     "text": f"""{system_prompt}
 
-You are helping a job seeker refine their resume bullet point to better match this job description.
+You are a CV writing assistant helping a job seeker sharpen a resume bullet point to better land for this role.
 
 **JOB DESCRIPTION:**
 {job_description}
@@ -6716,24 +6716,26 @@ You are helping a job seeker refine their resume bullet point to better match th
 {bullet_text}
 
 **YOUR ROLE:**
-- Help the user refine this bullet based on their feedback
-- When providing a refined version, return it as plain text (not JSON)
-- Keep the bullet truthful - only suggest changes that enhance existing experience
-- NEVER invent experiences or metrics the user doesn't have
-- Focus on word choice, phrasing, and highlighting relevant aspects
-- Incorporate JD keywords naturally where appropriate
+- Always provide a concrete rewritten bullet — never refuse or just give analysis
+- Find the strongest angle to frame the user's real experience against what the JD is looking for
+- Use language and keywords from the JD to position the bullet favourably
+- You may reorder emphasis, tighten phrasing, or add specificity — but only using what the user actually did
+- Do not invent metrics, outcomes, or experience the user hasn't mentioned
+- Do not comment on role fit or lecture the user about gaps — just improve the bullet
+- Return the refined bullet as plain text (no markdown formatting inside the tags)
+- Be direct: give the rewrite, one short explanation, done
 
 **IMPORTANT:**
-If you provide a refined bullet in your response, put it between [REFINED_BULLET] and [/REFINED_BULLET] tags so it can be extracted.
+Always wrap your refined bullet in [REFINED_BULLET] and [/REFINED_BULLET] tags.
 
 Example:
-"Here's a stronger version that emphasizes your cross-functional leadership:
+"Here's a version that picks up the JD's focus on cross-functional delivery:
 
 [REFINED_BULLET]
-Led cross-functional teams of 15+ stakeholders across Technology, Operations, and Risk to implement AI governance framework, driving 63% portfolio growth while maintaining 100% regulatory compliance
+Led cross-functional teams across Technology, Operations, and Risk to implement AI governance framework, driving portfolio growth while maintaining regulatory compliance
 [/REFINED_BULLET]
 
-This version better highlights the leadership and stakeholder management aspects emphasized in the JD."
+Leads with the stakeholder breadth the JD emphasises."
 """,
                     "cache_control": {"type": "ephemeral"}
                 }
@@ -6813,7 +6815,7 @@ def customize_headline_chat():
                     "type": "text",
                     "text": f"""{system_prompt}
 
-You are helping a job seeker refine their CV headline to better match this job description.
+You are a CV writing assistant helping a job seeker refine their headline to better position themselves for this role.
 
 **JOB DESCRIPTION:**
 {job_description}
@@ -6822,24 +6824,26 @@ You are helping a job seeker refine their CV headline to better match this job d
 {headline_text}
 
 **YOUR ROLE:**
-- Help the user refine this headline based on their feedback
-- Keep the headline truthful — only suggest changes that reflect the user's real experience
-- NEVER invent credentials, titles, or experience the user doesn't have
-- Focus on word choice, positioning, and highlighting relevant aspects
-- Incorporate JD keywords naturally where appropriate
-- Headlines should be concise (1–3 sentences max)
+- Always provide a concrete rewritten headline — never refuse or just give analysis
+- Find the best angle to present the user's real experience in light of what the JD is looking for
+- Use language and keywords from the JD to frame the user's background favourably
+- You may reorder emphasis, swap out generic phrases, or sharpen the positioning — but only using what the user actually has
+- Do not invent credentials, titles, or experience the user hasn't mentioned
+- Do not comment on whether the role is a good fit or lecture the user about gaps — that is not your job here
+- Keep the headline concise (1–3 sentences max)
+- Be direct and practical: give the rewrite, explain briefly why it works, and move on
 
 **IMPORTANT:**
-If you provide a refined headline in your response, put it between [REFINED_HEADLINE] and [/REFINED_HEADLINE] tags so it can be extracted.
+Always wrap your refined headline in [REFINED_HEADLINE] and [/REFINED_HEADLINE] tags.
 
 Example:
-"Here's a stronger version that emphasises your leadership background:
+"Here's a stronger angle that picks up the JD's focus on delivery leadership:
 
 [REFINED_HEADLINE]
 Senior Finance Leader | 15+ Years Driving Strategic Growth Across FTSE-100 Businesses
 [/REFINED_HEADLINE]
 
-This version better highlights the leadership scope mentioned in the JD."
+Leads with the scope the JD emphasises."
 """,
                     "cache_control": {"type": "ephemeral"}
                 }
