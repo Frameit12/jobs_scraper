@@ -7251,6 +7251,12 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     page.insert_htmlbox(rect, html)
                     return True
 
+                def _is_section_header(line):
+                    spans = [s for s in line['spans'] if s['text'].strip()]
+                    if not spans:
+                        return False
+                    return all('Bold' in s['font'] or 'bold' in s['font'] for s in spans)
+
                 def _replace_bullet_in_page(page, blocks, original_text, new_text):
                     colon = original_text.find(':')
                     search_key = original_text[:colon].strip() if colon > 0 else original_text[:40].strip()
@@ -7276,13 +7282,24 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     if sym_y is None:
                         return False
                     next_sym_y = next((y for y in bullet_sym_tops if y > sym_y + 2), None)
+                    # Sort blocks by y-position so section header detection fires before footer lines
+                    sorted_blocks = sorted(blocks, key=lambda b: b['bbox'][1])
                     bullet_bboxes = []
-                    for b in blocks:
-                        if b['type'] == 0:
-                            for line in b['lines']:
-                                y = line['bbox'][1]
-                                if sym_y - 0.5 <= y < (next_sym_y - 0.5 if next_sym_y else float('inf')):
-                                    bullet_bboxes.append(line['bbox'])
+                    done = False
+                    for b in sorted_blocks:
+                        if done or b['type'] != 0:
+                            continue
+                        for line in b['lines']:
+                            y = line['bbox'][1]
+                            if y < sym_y - 0.5:
+                                continue
+                            if next_sym_y is not None and y >= next_sym_y - 0.5:
+                                done = True
+                                break
+                            if bullet_bboxes and _is_section_header(line):
+                                done = True
+                                break
+                            bullet_bboxes.append(line['bbox'])
                     if not bullet_bboxes:
                         return False
                     bul_x0 = min(l[0] for l in bullet_bboxes) - 1
@@ -7327,15 +7344,19 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 print(f"[EXPORT-THREAD] PDF opened pages={doc.page_count} at +{_etime.time()-_t0:.2f}s")
                 headline_replaced = False
                 bullets_applied = 0
+                applied_indices = set()
                 for page in doc:
                     blocks = page.get_text('dict')['blocks']
                     if not headline_replaced:
                         if _replace_career_summary(page, blocks, selected_headline):
                             headline_replaced = True
                             blocks = page.get_text('dict')['blocks']
-                    for orig, appr in replacements:
+                    for i, (orig, appr) in enumerate(replacements):
+                        if i in applied_indices:
+                            continue
                         if _replace_bullet_in_page(page, blocks, orig, appr):
                             bullets_applied += 1
+                            applied_indices.add(i)
                             blocks = page.get_text('dict')['blocks']
 
                 print(f"[EXPORT-THREAD] PyMuPDF done: headline={'yes' if headline_replaced else 'no'} "
