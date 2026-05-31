@@ -6606,6 +6606,191 @@ def customize_cv_preview():
         return "Error loading preview", 500
 
 
+@app.route("/customize-cv/export", methods=["GET"])
+def customize_cv_export():
+    """Export customized CV as PDF or DOCX download."""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return redirect('/ai-match')
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+    fmt = request.args.get('format', 'pdf').lower()
+    if fmt not in ('pdf', 'docx'):
+        return "Invalid format", 400
+
+    try:
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return "Session not found", 404
+
+        master_template = get_user_master_template(user_id)
+        if not master_template:
+            return "Master template not found", 404
+
+        approved_bullets = cv_session.get('approved_bullets') or []
+        selected_headline = cv_session.get('selected_headline') or ''
+        bullet_analysis_by_role = cv_session.get('bullet_analysis_by_role') or {}
+
+        if not approved_bullets or not selected_headline:
+            return redirect('/customize-cv/preview')
+
+        # ── Apply replacements to template text ──────────────────────────────
+        BULLET_CHARS = '•●○◦▸▪▶·'
+
+        def _replace_bullet(text, original, replacement):
+            """Find a bullet by its cleaned text and replace it, preserving prefix."""
+            lines = text.split('\n')
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                content = stripped[1:].strip() if stripped and stripped[0] in BULLET_CHARS + '-' else stripped
+                if content == original:
+                    leading = line[:len(line) - len(line.lstrip())]
+                    bullet_char = stripped[0] if stripped and stripped[0] in BULLET_CHARS else None
+                    lines[i] = (leading + bullet_char + ' ' + replacement) if bullet_char else (leading + replacement)
+                    return '\n'.join(lines), True
+            return text, False
+
+        modified = master_template['template_text']
+
+        # Replace headline (first non-empty line)
+        lines = modified.split('\n')
+        for i, line in enumerate(lines):
+            if line.strip():
+                lines[i] = selected_headline
+                break
+        modified = '\n'.join(lines)
+
+        # Replace approved bullets
+        applied = 0
+        for bullet in approved_bullets:
+            role_key = bullet.get('role_company', '')
+            idx = bullet.get('bullet_index')
+            new_text = bullet.get('approved_text', '')
+            if not new_text:
+                continue
+            role_analysis = bullet_analysis_by_role.get(role_key, {})
+            recommended = role_analysis.get('recommended_bullets', [])
+            original_text = next(
+                (r['original_text'] for r in recommended if r.get('bullet_index') == idx),
+                None
+            )
+            if original_text and original_text != new_text:
+                modified, ok = _replace_bullet(modified, original_text, new_text)
+                if ok:
+                    applied += 1
+
+        print(f"CV export: applied {applied}/{len(approved_bullets)} bullet replacements")
+
+        job_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
+
+        # ── Generate PDF ─────────────────────────────────────────────────────
+        if fmt == 'pdf':
+            import html as html_mod
+            import weasyprint
+
+            parts = ["""<html><head><meta charset="utf-8"><style>
+            @page { margin: 2cm; size: A4; }
+            body { font-family: Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #111; }
+            .headline { font-size: 14pt; font-weight: bold; margin-bottom: 6px; }
+            .section { font-size: 11pt; font-weight: bold; border-bottom: 1px solid #bbb;
+                       margin: 14px 0 4px 0; text-transform: uppercase; letter-spacing: 0.04em; }
+            .bullet { margin: 2px 0 2px 16px; }
+            .bold  { font-weight: bold; }
+            p { margin: 2px 0; }
+            </style></head><body>"""]
+
+            is_first = True
+            for line in modified.split('\n'):
+                s = line.strip()
+                if not s:
+                    parts.append('<br style="line-height:0.4">')
+                    is_first = False
+                    continue
+                e = html_mod.escape(s)
+                if is_first:
+                    parts.append(f'<div class="headline">{e}</div>')
+                    is_first = False
+                elif s.upper() == s and len(s) < 35 and not s[0].isdigit():
+                    parts.append(f'<div class="section">{e}</div>')
+                elif s[0] in BULLET_CHARS + '-':
+                    parts.append(f'<p class="bullet">{e}</p>')
+                else:
+                    is_bold = any(
+                        kw in s for kw in ['Ltd', 'Corp', 'Inc', 'Group', 'MSc', 'BSc', 'BA ', 'MA ']
+                    )
+                    tag = 'class="bold"' if is_bold else ''
+                    parts.append(f'<p {tag}>{e}</p>')
+
+            parts.append('</body></html>')
+            pdf_bytes = weasyprint.HTML(string=''.join(parts)).write_pdf()
+
+            from flask import Response
+            return Response(
+                pdf_bytes,
+                mimetype='application/pdf',
+                headers={
+                    'Content-Disposition': f'attachment; filename="CV_{job_slug}.pdf"',
+                    'Content-Length': len(pdf_bytes),
+                }
+            )
+
+        # ── Generate DOCX ────────────────────────────────────────────────────
+        from docx import Document as DocxDocument
+        from docx.shared import Pt
+        from io import BytesIO as _BytesIO
+
+        doc = DocxDocument()
+        # Remove default empty paragraph
+        for p in doc.paragraphs:
+            p._element.getparent().remove(p._element)
+
+        is_first = True
+        for line in modified.split('\n'):
+            s = line.strip()
+            if not s:
+                continue
+            if is_first:
+                p = doc.add_paragraph()
+                run = p.add_run(s)
+                run.bold = True
+                run.font.size = Pt(14)
+                is_first = False
+            elif s.upper() == s and len(s) < 35 and not s[0].isdigit():
+                p = doc.add_paragraph()
+                run = p.add_run(s)
+                run.bold = True
+                run.font.size = Pt(11)
+            elif s[0] in BULLET_CHARS + '-':
+                doc.add_paragraph(s[1:].strip(), style='List Bullet')
+            else:
+                is_bold = any(
+                    kw in s for kw in ['Ltd', 'Corp', 'Inc', 'Group', 'MSc', 'BSc', 'BA ', 'MA ']
+                )
+                p = doc.add_paragraph()
+                run = p.add_run(s)
+                run.bold = is_bold
+
+        buf = _BytesIO()
+        doc.save(buf)
+        docx_bytes = buf.getvalue()
+
+        from flask import Response
+        return Response(
+            docx_bytes,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            headers={
+                'Content-Disposition': f'attachment; filename="CV_{job_slug}.docx"',
+                'Content-Length': len(docx_bytes),
+            }
+        )
+
+    except Exception as e:
+        print(f"Error exporting CV: {e}")
+        import traceback
+        traceback.print_exc()
+        return "Error generating export", 500
+
+
 @app.route("/api/customize-bullet-chat", methods=["POST"])
 def customize_bullet_chat():
     """Handle chat messages for bullet customization"""
