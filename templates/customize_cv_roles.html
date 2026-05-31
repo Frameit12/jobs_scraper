@@ -77,9 +77,9 @@
                         <div class="flex items-center gap-3 flex-wrap mb-1">
                             <h3 class="font-bold text-gray-900">{{ role.company }}</h3>
                             <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded font-medium">{{ role.dates }}</span>
-                            {% if role.relevance_score >= 85 %}
+                            {% if role.relevance_score >= 55 %}
                             <span class="text-xs px-2 py-0.5 rounded font-semibold" style="background:#fef3c7; color:#92400e;">High relevance</span>
-                            {% elif role.relevance_score >= 70 %}
+                            {% elif role.relevance_score >= 35 %}
                             <span class="text-xs px-2 py-0.5 rounded font-semibold bg-gray-100 text-gray-600">Good relevance</span>
                             {% else %}
                             <span class="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded font-semibold">Lower relevance</span>

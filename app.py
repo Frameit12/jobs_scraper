@@ -1851,8 +1851,10 @@ def score_roles_relevance(roles, job_description):
         jd_words -= stops
 
         overlap = words & jd_words
-        score = min(99, int((len(overlap) / max(len(jd_words), 1)) * 250))
-        score = max(30, score)
+        # Score = % of JD keywords that appear in the role, scaled to 0–99
+        # Multiplier 150 keeps scores realistic (full overlap ≈ 99%)
+        score = min(99, int((len(overlap) / max(len(jd_words), 1)) * 150))
+        # No artificial floor — show real variation so users can prioritise roles
 
         scored.append({**role, 'relevance_score': score})
 
