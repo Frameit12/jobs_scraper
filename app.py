@@ -7109,7 +7109,11 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
     from io import BytesIO as _BytesIO
     import traceback as _tb
 
+    _t0 = _etime.time()
+    print(f"[EXPORT-THREAD] started job_id={job_id} fmt={fmt} uid={user_id}")
+
     def _set_error(msg):
+        print(f"[EXPORT-THREAD] error at +{_etime.time()-_t0:.2f}s: {msg}")
         with _export_lock:
             _export_jobs[job_id] = {'status': 'error', 'created_at': _etime.time(),
                                     'user_id': user_id, 'error': msg}
@@ -7132,14 +7136,20 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
             if original_text and original_text != new_text:
                 replacements.append((original_text, new_text))
 
+        print(f"[EXPORT-THREAD] replacements built: {len(replacements)} at +{_etime.time()-_t0:.2f}s")
+
         # Fetch original CV binary
         original_cv = None
         if analysis_id:
+            print(f"[EXPORT-THREAD] fetching CV via analysis_id={analysis_id} at +{_etime.time()-_t0:.2f}s")
             cv_id = get_cv_id_for_analysis(analysis_id)
+            print(f"[EXPORT-THREAD] cv_id={cv_id} at +{_etime.time()-_t0:.2f}s")
             if cv_id:
                 original_cv = get_cv_by_id(cv_id, user_id)
+                print(f"[EXPORT-THREAD] get_cv_by_id done found={original_cv is not None} at +{_etime.time()-_t0:.2f}s")
 
         if not original_cv:
+            print(f"[EXPORT-THREAD] trying fallback CV query at +{_etime.time()-_t0:.2f}s")
             try:
                 engine = get_db_connection()
                 if engine:
@@ -7154,12 +7164,17 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                             original_cv = {'id': row[0], 'cv_name': row[1],
                                            'file_data': row[2], 'file_type': row[3],
                                            'extracted_text': row[4]}
+                            print(f"[EXPORT-THREAD] fallback CV found id={row[0]} type={row[3]} at +{_etime.time()-_t0:.2f}s")
+                        else:
+                            print(f"[EXPORT-THREAD] fallback CV query returned no rows at +{_etime.time()-_t0:.2f}s")
             except Exception as e:
-                print(f"Export thread: error fetching fallback CV: {e}")
+                print(f"[EXPORT-THREAD] fallback CV query error at +{_etime.time()-_t0:.2f}s: {e}")
 
         if not original_cv or not original_cv.get('file_data'):
             _set_error('CV not found')
             return
+
+        print(f"[EXPORT-THREAD] CV loaded file_type={original_cv.get('file_type')} size={len(bytes(original_cv['file_data']))} at +{_etime.time()-_t0:.2f}s")
 
         file_data = bytes(original_cv['file_data'])
         file_type = (original_cv.get('file_type') or '').lower().strip('.')
@@ -7305,7 +7320,9 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     page.insert_htmlbox(rect, html_bullet)
                     return True
 
+                print(f"[EXPORT-THREAD] opening PDF with PyMuPDF at +{_etime.time()-_t0:.2f}s")
                 doc = _fitz.open(stream=file_data, filetype='pdf')
+                print(f"[EXPORT-THREAD] PDF opened pages={doc.page_count} at +{_etime.time()-_t0:.2f}s")
                 headline_replaced = False
                 bullets_applied = 0
                 for page in doc:
@@ -7319,8 +7336,8 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                             bullets_applied += 1
                             blocks = page.get_text('dict')['blocks']
 
-                print(f"Export thread (PyMuPDF): headline={'yes' if headline_replaced else 'no'}, "
-                      f"bullets={bullets_applied}/{len(replacements)}")
+                print(f"[EXPORT-THREAD] PyMuPDF done: headline={'yes' if headline_replaced else 'no'} "
+                      f"bullets={bullets_applied}/{len(replacements)} at +{_etime.time()-_t0:.2f}s")
 
                 if fmt == 'pdf':
                     buf = _BytesIO()
@@ -7329,9 +7346,11 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     doc.close()
                     mimetype = 'application/pdf'
                     filename = f'CV_{job_slug}.pdf'
+                    print(f"[EXPORT-THREAD] PDF saved size={len(out_bytes)} at +{_etime.time()-_t0:.2f}s")
                 else:
                     import tempfile, os as _os
                     from pdf2docx import Converter as _PdfConverter
+                    print(f"[EXPORT-THREAD] starting pdf2docx conversion at +{_etime.time()-_t0:.2f}s")
                     with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
                         doc.save(tmp_pdf.name)
                         tmp_pdf_path = tmp_pdf.name
@@ -7343,6 +7362,7 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         cv_conv.close()
                         with open(tmp_docx_path, 'rb') as f:
                             out_bytes = f.read()
+                        print(f"[EXPORT-THREAD] pdf2docx done size={len(out_bytes)} at +{_etime.time()-_t0:.2f}s")
                     finally:
                         try: _os.unlink(tmp_pdf_path)
                         except: pass
@@ -7356,10 +7376,11 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         'status': 'done', 'created_at': _etime.time(), 'user_id': user_id,
                         'file_data': out_bytes, 'filename': filename, 'mimetype': mimetype,
                     }
+                print(f"[EXPORT-THREAD] job marked done at +{_etime.time()-_t0:.2f}s")
                 return
 
             except Exception as e:
-                print(f"Export thread PyMuPDF error: {e}")
+                print(f"[EXPORT-THREAD] PyMuPDF error at +{_etime.time()-_t0:.2f}s: {e}")
                 _tb.print_exc()
 
         if file_type in ('docx', 'doc'):
@@ -7446,7 +7467,12 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
 @app.route("/customize-cv/export-start", methods=["POST"])
 def customize_cv_export_start():
     """Start an async export job; returns job_id immediately to avoid Cloudflare timeout."""
+    import time as _etime
+    _t0 = _etime.time()
+    print(f"[EXPORT-START] route hit uid={session.get('user_id')} sid={session.get('cv_session_id')}")
+
     if 'user_id' not in session or 'cv_session_id' not in session:
+        print("[EXPORT-START] not authenticated")
         return jsonify({'error': 'Not authenticated'}), 401
 
     user_id = session['user_id']
@@ -7458,7 +7484,9 @@ def customize_cv_export_start():
         return jsonify({'error': 'Invalid format'}), 400
 
     try:
+        print(f"[EXPORT-START] calling get_cv_session at +{_etime.time()-_t0:.2f}s")
         cv_session = get_cv_session(cv_session_id)
+        print(f"[EXPORT-START] get_cv_session done at +{_etime.time()-_t0:.2f}s found={cv_session is not None}")
         if not cv_session:
             return jsonify({'error': 'Session not found'}), 404
 
@@ -7468,11 +7496,12 @@ def customize_cv_export_start():
         analysis_id = cv_session.get('analysis_id')
         job_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
 
+        print(f"[EXPORT-START] bullets={len(approved_bullets)} headline_len={len(selected_headline)} analysis_id={analysis_id}")
+
         if not approved_bullets or not selected_headline:
             return jsonify({'error': 'No approved bullets or headline in session'}), 400
 
         job_id = str(uuid.uuid4())
-        import time as _etime
         with _export_lock:
             now = _etime.time()
             stale = [k for k, v in _export_jobs.items()
@@ -7489,10 +7518,12 @@ def customize_cv_export_start():
         )
         t.start()
 
+        print(f"[EXPORT-START] thread started job_id={job_id} fmt={fmt} at +{_etime.time()-_t0:.2f}s")
         return jsonify({'job_id': job_id, 'status': 'pending'})
 
     except Exception as e:
-        print(f"Error starting export: {e}")
+        print(f"[EXPORT-START] error at +{_etime.time()-_t0:.2f}s: {e}")
+        import traceback; traceback.print_exc()
         return jsonify({'error': f'Could not start export: {str(e)}'}), 500
 
 
