@@ -8023,6 +8023,8 @@ def consolidate_cvs():
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
+    user_id = session['user_id']
+
     try:
         files = request.files.getlist('cv_files')
         if not files or len(files) == 0:
