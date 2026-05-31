@@ -7105,7 +7105,7 @@ def customize_cv_export():
 # ── Async export routes (avoids Cloudflare 100-second timeout) ───────────────
 
 def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
-                    bullet_analysis_by_role, analysis_id, job_slug):
+                    bullet_analysis_by_role, analysis_id, job_slug, selected_roles=None):
     """Background thread: generates the CV export file and stores result in _export_jobs."""
     import time as _etime
     from io import BytesIO as _BytesIO
@@ -7121,24 +7121,47 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                                     'user_id': user_id, 'error': msg}
 
     try:
-        # Build replacement list
-        replacements = []
-        for bullet in approved_bullets:
-            role_key = bullet.get('role_company', '')
-            idx = bullet.get('bullet_index')
-            new_text = bullet.get('approved_text', '')
-            if not new_text:
-                continue
-            role_analysis = bullet_analysis_by_role.get(role_key, {})
-            recommended = role_analysis.get('recommended_bullets', [])
-            original_text = next(
-                (r['original_text'] for r in recommended if r.get('bullet_index') == idx),
-                None
-            )
-            if original_text and original_text != new_text:
-                replacements.append((original_text, new_text))
+        # Determine which role keys are selected
+        selected_role_keys = set()
+        if selected_roles:
+            for role in selected_roles:
+                company = role.get('company', '')
+                if company:
+                    selected_role_keys.add(company)
 
-        print(f"[EXPORT-THREAD] replacements built: {len(replacements)} at +{_etime.time()-_t0:.2f}s")
+        # Build approved bullets lookup: (role_key, bullet_index) -> approved_text
+        approved_map = {}
+        for bullet in approved_bullets:
+            rk = bullet.get('role_company', '')
+            idx = bullet.get('bullet_index')
+            txt = bullet.get('approved_text', '')
+            if rk and txt:
+                approved_map[(rk, idx)] = txt
+
+        # Build replacements (changed text) and deletions (unapproved bullets to remove)
+        # Only process selected roles; leave non-selected role bullets unchanged
+        replacements = []
+        deletions = []
+
+        for role_key, role_data in bullet_analysis_by_role.items():
+            if selected_role_keys and role_key not in selected_role_keys:
+                continue
+            for b in role_data.get('recommended_bullets', []):
+                idx = b.get('bullet_index')
+                orig = b.get('original_text', '')
+                if not orig:
+                    continue
+                k = (role_key, idx)
+                if k in approved_map:
+                    new_txt = approved_map[k]
+                    if new_txt != orig:
+                        replacements.append((orig, new_txt))
+                    # else: approved with original text — already correct in CV, no action needed
+                else:
+                    # Not approved → mark for deletion from CV
+                    deletions.append(orig)
+
+        print(f"[EXPORT-THREAD] replacements={len(replacements)} deletions={len(deletions)} at +{_etime.time()-_t0:.2f}s")
 
         # Fetch original CV binary
         original_cv = None
@@ -7336,7 +7359,8 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     )
                     page.add_redact_annot(rect, fill=(1, 1, 1))
                     page.apply_redactions()
-                    page.insert_htmlbox(rect, html_bullet)
+                    if new_text:
+                        page.insert_htmlbox(rect, html_bullet)
                     return True
 
                 print(f"[EXPORT-THREAD] opening PDF with PyMuPDF at +{_etime.time()-_t0:.2f}s")
@@ -7344,7 +7368,9 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 print(f"[EXPORT-THREAD] PDF opened pages={doc.page_count} at +{_etime.time()-_t0:.2f}s")
                 headline_replaced = False
                 bullets_applied = 0
+                bullets_deleted = 0
                 applied_indices = set()
+                deleted_indices = set()
                 for page in doc:
                     blocks = page.get_text('dict')['blocks']
                     if not headline_replaced:
@@ -7358,9 +7384,17 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                             bullets_applied += 1
                             applied_indices.add(i)
                             blocks = page.get_text('dict')['blocks']
+                    for i, orig in enumerate(deletions):
+                        if i in deleted_indices:
+                            continue
+                        if _replace_bullet_in_page(page, blocks, orig, ''):
+                            bullets_deleted += 1
+                            deleted_indices.add(i)
+                            blocks = page.get_text('dict')['blocks']
 
                 print(f"[EXPORT-THREAD] PyMuPDF done: headline={'yes' if headline_replaced else 'no'} "
-                      f"bullets={bullets_applied}/{len(replacements)} at +{_etime.time()-_t0:.2f}s")
+                      f"replaced={bullets_applied}/{len(replacements)} deleted={bullets_deleted}/{len(deletions)} "
+                      f"at +{_etime.time()-_t0:.2f}s")
 
                 if fmt == 'pdf':
                     buf = _BytesIO()
@@ -7430,12 +7464,24 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                             for cell in row.cells:
                                 yield from cell.paragraphs
 
+                def _delete_para(para):
+                    p = para._element
+                    p.getparent().remove(p)
+
                 doc = _DocxDoc(_BytesIO(file_data))
                 applied = 0
                 for orig, appr in replacements:
                     for para in _all_paragraphs(doc):
                         if _replace_para(para, orig, appr):
                             applied += 1
+                            break
+                deleted = 0
+                for orig in deletions:
+                    for para in list(_all_paragraphs(doc)):
+                        full = "".join(r.text for r in para.runs)
+                        if orig in full or full.strip() == orig.strip():
+                            _delete_para(para)
+                            deleted += 1
                             break
                 replaced_headline = False
                 for para in _all_paragraphs(doc):
@@ -7444,7 +7490,8 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         _replace_para(para, txt, selected_headline)
                         replaced_headline = True
                         break
-                print(f"Export thread (python-docx): {applied}/{len(replacements)} bullets, "
+                print(f"Export thread (python-docx): replaced={applied}/{len(replacements)} "
+                      f"deleted={deleted}/{len(deletions)} "
                       f"headline={'yes' if replaced_headline else 'no'}")
                 buf = _BytesIO()
                 doc.save(buf)
@@ -7516,12 +7563,13 @@ def customize_cv_export_start():
         approved_bullets = cv_session.get('approved_bullets') or []
         selected_headline = cv_session.get('selected_headline') or ''
         bullet_analysis_by_role = cv_session.get('bullet_analysis_by_role') or {}
+        selected_roles = cv_session.get('selected_roles') or []
         analysis_id = cv_session.get('analysis_id')
         import unicodedata as _ud
         _raw_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
         job_slug = _ud.normalize('NFKD', _raw_slug).encode('ascii', 'ignore').decode('ascii') or 'CV'
 
-        print(f"[EXPORT-START] bullets={len(approved_bullets)} headline_len={len(selected_headline)} analysis_id={analysis_id}")
+        print(f"[EXPORT-START] bullets={len(approved_bullets)} selected_roles={len(selected_roles)} headline_len={len(selected_headline)} analysis_id={analysis_id}")
 
         if not approved_bullets or not selected_headline:
             return jsonify({'error': 'No approved bullets or headline in session'}), 400
@@ -7538,7 +7586,7 @@ def customize_cv_export_start():
         t = threading.Thread(
             target=_run_export_job,
             args=(job_id, user_id, fmt, approved_bullets, selected_headline,
-                  bullet_analysis_by_role, analysis_id, job_slug),
+                  bullet_analysis_by_role, analysis_id, job_slug, selected_roles),
             daemon=True
         )
         t.start()
