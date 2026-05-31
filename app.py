@@ -25,6 +25,7 @@ from flask import session
 import logging
 import sys
 from flask_limiter import Limiter
+import threading
 
 # Configure logging to show in Railway
 logging.basicConfig(
@@ -6353,6 +6354,38 @@ def customize_cv_roles():
         return "Error loading role selection", 500
 
 
+# Track which role analyses are in-flight to avoid duplicate concurrent AI calls
+_bullet_analysis_in_progress = set()
+_bullet_analysis_lock = threading.Lock()
+
+def _run_bullet_analysis_background(cv_session_id, role_key, current_role, job_description, user_id):
+    """Run bullet analysis in a background thread so it's not tied to an HTTP request timeout."""
+    try:
+        ai_analysis = analyze_bullets_for_role_with_ai(current_role, job_description, user_id)
+        if ai_analysis:
+            update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, ai_analysis)
+    except Exception as e:
+        print(f"Background bullet analysis error for {role_key}: {e}")
+    finally:
+        with _bullet_analysis_lock:
+            _bullet_analysis_in_progress.discard(f"{cv_session_id}:{role_key}")
+
+
+def start_bullet_analysis_if_needed(cv_session_id, role_key, current_role, job_description, user_id):
+    """Start background bullet analysis only if not already running."""
+    key = f"{cv_session_id}:{role_key}"
+    with _bullet_analysis_lock:
+        if key in _bullet_analysis_in_progress:
+            return  # Already running
+        _bullet_analysis_in_progress.add(key)
+    t = threading.Thread(
+        target=_run_bullet_analysis_background,
+        args=(cv_session_id, role_key, current_role, job_description, user_id),
+        daemon=True
+    )
+    t.start()
+
+
 @app.route("/customize-cv/bullets", methods=["GET", "POST"])
 def customize_cv_bullets():
     """Step 2b: Per-role bullet selection. ?role=N selects which role to tailor."""
@@ -6413,7 +6446,7 @@ def customize_cv_bullets():
         if not analysis:
             return "Analysis not found", 404
 
-        # Use cached analysis if available — otherwise render loading page
+        # Use cached analysis if available — otherwise kick off background analysis
         cached = (cv_session.get('bullet_analysis_by_role') or {}).get(role_key)
 
         # Previously approved bullets for this role
@@ -6426,6 +6459,8 @@ def customize_cv_bullets():
         else:
             recommended_bullets = []
             loading = True
+            # Start AI analysis in background thread (not tied to HTTP timeout)
+            start_bullet_analysis_if_needed(cv_session_id, role_key, current_role, analysis['job_description'], user_id)
 
         return render_template('customize_cv_bullets.html',
                                job_title=cv_session['job_title'],
@@ -6449,11 +6484,10 @@ def customize_cv_bullets():
 
 @app.route("/api/analyze-bullets-for-role", methods=["GET"])
 def api_analyze_bullets_for_role():
-    """Run AI bullet analysis for one role and cache the result. Called async from the bullets page."""
+    """Poll endpoint: checks if background bullet analysis is cached yet. Never triggers AI directly."""
     if 'user_id' not in session or 'cv_session_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
-    user_id = session['user_id']
     cv_session_id = session['cv_session_id']
     role_index = int(request.args.get('role', 0))
 
@@ -6466,29 +6500,15 @@ def api_analyze_bullets_for_role():
         if role_index >= len(selected_roles):
             return jsonify({'error': 'Invalid role index'}), 400
 
-        current_role = selected_roles[role_index]
-        role_key = current_role['company']
-
-        # Return from cache if already done
+        role_key = selected_roles[role_index]['company']
         cached = (cv_session.get('bullet_analysis_by_role') or {}).get(role_key)
         if cached:
-            return jsonify({'success': True, 'analysis': cached})
+            return jsonify({'success': True})
 
-        analysis = get_analysis_by_id(cv_session['analysis_id'], user_id)
-        if not analysis:
-            return jsonify({'error': 'Analysis not found'}), 404
-
-        ai_analysis = analyze_bullets_for_role_with_ai(current_role, analysis['job_description'], user_id)
-        if not ai_analysis:
-            return jsonify({'error': 'Failed to analyse bullets'}), 500
-
-        update_cv_session_bullet_analysis_by_role(cv_session_id, role_key, ai_analysis)
-        return jsonify({'success': True, 'analysis': ai_analysis})
+        return jsonify({'success': False, 'working': True})
 
     except Exception as e:
-        print(f"Error in async bullet analysis: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error checking bullet analysis cache: {e}")
         return jsonify({'error': str(e)}), 500
 
 
