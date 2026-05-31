@@ -46,12 +46,27 @@
                 <!-- Messages -->
                 <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3" x-ref="chatMessages">
                     <template x-for="(msg, i) in chatMessages" :key="i">
-                        <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                        <div :class="msg.role === 'user' ? 'flex justify-end' : 'flex flex-col items-start'">
+                            <!-- Chat bubble -->
                             <div :class="msg.role === 'user'
                                     ? 'bg-blue-600 text-white rounded-2xl rounded-br-sm px-4 py-2.5 text-sm max-w-xs'
                                     : 'bg-gray-100 text-gray-800 rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm max-w-sm'"
+                                 x-show="msg.display"
                                  x-text="msg.display">
                             </div>
+                            <!-- Inline refined headline block -->
+                            <template x-if="msg.role === 'assistant' && msg.refined_headline">
+                                <div class="w-full max-w-sm mt-2">
+                                    <div class="rounded-xl px-4 py-3" style="background:#fffbeb; border:2px solid #d97706;">
+                                        <p class="text-xs font-semibold mb-1.5" style="color:#92400e;">✎ Refined headline</p>
+                                        <p class="text-sm text-gray-800 leading-relaxed" x-text="msg.refined_headline"></p>
+                                    </div>
+                                    <button @click="useHeadlineFromChat(msg.refined_headline)"
+                                            class="mt-1.5 w-full text-sm font-semibold text-white py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition">
+                                        ✓ Use this headline
+                                    </button>
+                                </div>
+                            </template>
                         </div>
                     </template>
                     <div x-show="chatLoading" class="flex justify-start">
@@ -59,15 +74,6 @@
                             AI is thinking…
                         </div>
                     </div>
-                </div>
-
-                <!-- Approve refined version button (if available) -->
-                <div x-show="chatCurrentText !== chatOriginalText"
-                     class="px-5 py-3" style="border-top:1px solid #f0ece4; background:#fafaf8;">
-                    <button @click="approveChatVersion()"
-                            class="w-full text-sm font-semibold text-white py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 transition">
-                        ✓ Use This Refined Headline
-                    </button>
                 </div>
 
                 <!-- Input -->
@@ -330,7 +336,8 @@ function headlineSelector() {
                     this.chatMessages.push({
                         role: 'assistant',
                         content: data.response,
-                        display: displayText
+                        display: displayText,
+                        refined_headline: data.refined_headline || null
                     });
                     if (data.refined_headline) {
                         this.chatCurrentText = data.refined_headline;
@@ -346,11 +353,15 @@ function headlineSelector() {
             }
         },
 
-        approveChatVersion() {
-            this.selectedHeadline = this.chatCurrentText;
+        useHeadlineFromChat(text) {
+            this.selectedHeadline = text;
             this.selectedMatchScore = 0;
             this.closeChatModal();
             this.saveAndContinue();
+        },
+
+        approveChatVersion() {
+            this.useHeadlineFromChat(this.chatCurrentText);
         },
 
         scrollChat() {
