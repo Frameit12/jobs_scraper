@@ -3055,36 +3055,41 @@ def get_user_analyses(user_id, limit=10):
 
     try:
         with engine.connect() as conn:
-            result = conn.execute(text("""
+            # Step 1: get analyses
+            rows = conn.execute(text("""
                 SELECT ja.id, ja.job_title, ja.job_company, ja.match_score,
-                       ja.created_at, cv.cv_name,
-                       cs.id AS cv_session_id,
-                       cs.selected_headline,
-                       cs.selected_roles,
-                       cs.approved_bullets
+                       ja.created_at, cv.cv_name
                 FROM job_analyses ja
                 LEFT JOIN user_cvs cv ON ja.cv_id = cv.id
-                LEFT JOIN LATERAL (
-                    SELECT id, selected_headline, selected_roles, approved_bullets
-                    FROM cv_customization_sessions
-                    WHERE analysis_id = ja.id AND user_id = :user_id
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                ) cs ON true
                 WHERE ja.user_id = :user_id
                 ORDER BY ja.created_at DESC
                 LIMIT :limit
-            """), {"user_id": user_id, "limit": limit})
+            """), {"user_id": user_id, "limit": limit}).fetchall()
+
+            if not rows:
+                return []
+
+            analysis_ids = [r[0] for r in rows]
+
+            # Step 2: get the most recent cv_session for each analysis_id
+            session_rows = conn.execute(text("""
+                SELECT DISTINCT ON (analysis_id)
+                    id, analysis_id
+                FROM cv_customization_sessions
+                WHERE user_id = :user_id
+                  AND analysis_id = ANY(:ids)
+                ORDER BY analysis_id, created_at DESC
+            """), {"user_id": user_id, "ids": analysis_ids}).fetchall()
+
+            session_map = {r[1]: r[0] for r in session_rows}  # analysis_id -> session_id
 
             analyses = []
-            for row in result:
-                cv_session_id = row[6]
-                resume_url = None
-                if cv_session_id:
-                    resume_url = f'/customize-cv/resume/{cv_session_id}'
-
+            for row in rows:
+                analysis_id = row[0]
+                cv_session_id = session_map.get(analysis_id)
+                resume_url = f'/customize-cv/resume/{cv_session_id}' if cv_session_id else None
                 analyses.append({
-                    'id': row[0],
+                    'id': analysis_id,
                     'job_title': row[1],
                     'job_company': row[2],
                     'match_score': row[3],
@@ -3096,6 +3101,8 @@ def get_user_analyses(user_id, limit=10):
             return analyses
     except Exception as e:
         print(f"Error getting user analyses: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
@@ -7575,6 +7582,36 @@ def delete_analysis(analysis_id):
     except Exception as e:
         print(f"Error deleting analysis: {e}")
         return jsonify({'error': 'Failed to delete analysis'}), 500
+
+
+@app.route("/debug/sessions", methods=["GET"])
+def debug_sessions():
+    """Temporary diagnostic: show raw DB state for analyses and cv_sessions."""
+    if 'user_id' not in session:
+        return redirect('/login')
+    user_id = session['user_id']
+    engine = get_db_connection()
+    html = f"<h2>Debug — user_id={user_id}</h2>"
+    try:
+        with engine.connect() as conn:
+            analyses = conn.execute(text(
+                "SELECT id, job_title, job_company, created_at FROM job_analyses WHERE user_id=:u ORDER BY created_at DESC LIMIT 20"
+            ), {"u": user_id}).fetchall()
+            html += f"<h3>job_analyses ({len(analyses)} rows)</h3><table border=1><tr><th>id</th><th>job_title</th><th>company</th><th>created_at</th></tr>"
+            for r in analyses:
+                html += f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td>{r[3]}</td></tr>"
+            html += "</table>"
+
+            sessions = conn.execute(text(
+                "SELECT id, analysis_id, user_id, status, selected_headline IS NOT NULL as has_headline, created_at FROM cv_customization_sessions WHERE user_id=:u ORDER BY created_at DESC LIMIT 20"
+            ), {"u": user_id}).fetchall()
+            html += f"<h3>cv_customization_sessions ({len(sessions)} rows)</h3><table border=1><tr><th>id</th><th>analysis_id</th><th>user_id</th><th>status</th><th>has_headline</th><th>created_at</th></tr>"
+            for r in sessions:
+                html += f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td>{r[3]}</td><td>{r[4]}</td><td>{r[5]}</td></tr>"
+            html += "</table>"
+    except Exception as e:
+        html += f"<p style='color:red'>ERROR: {e}</p>"
+    return html
 
 
 @app.route("/user-guide", methods=["GET"])
