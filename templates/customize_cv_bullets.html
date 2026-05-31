@@ -129,7 +129,7 @@
     <div class="space-y-4 mb-32">
         {% for bullet in recommended_bullets %}
         <div class="bullet-card bg-white rounded-lg border-2 p-5 transition-opacity"
-             :class="approvedIndices.includes({{ loop.index0 }}) ? 'border-blue-600' : skippedIndices.includes({{ loop.index0 }}) ? 'border-gray-200 opacity-40' : 'border-gray-200'"
+             :class="approvedIndices.includes({{ loop.index0 }}) ? 'border-blue-600' : skippedIndices.includes({{ loop.index0 }}) ? 'border-gray-200 opacity-40' : 'border-gray-200'">
 
             <div class="flex items-start gap-4">
                 <!-- Rank badge -->
@@ -362,11 +362,19 @@ function bulletSelector() {
         chatLoading: false,
 
         init() {
+            const originalTexts = {
+                {% for bullet in recommended_bullets %}
+                {{ loop.index0 }}: `{{ bullet.original_text | replace('`', '\\`') | replace('\n', ' ') }}`,
+                {% endfor %}
+            };
             const saved = {{ approved_bullets_data | tojson }};
             if (saved && saved.length) {
                 for (const b of saved) {
                     this.approvedIndices.push(b.bullet_index);
                     this.approvedTexts[b.bullet_index] = b.approved_text;
+                    if (originalTexts[b.bullet_index] !== undefined && b.approved_text !== originalTexts[b.bullet_index]) {
+                        this.customisedTexts[b.bullet_index] = b.approved_text;
+                    }
                 }
             }
         },
