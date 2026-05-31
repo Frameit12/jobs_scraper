@@ -26,6 +26,11 @@ import logging
 import sys
 from flask_limiter import Limiter
 import threading
+import uuid
+
+# In-memory store for long-running background jobs (single-process Railway deployment)
+_consolidation_jobs = {}   # job_id -> {'status': pending|done|error, 'result': ..., 'error': ...}
+_consolidation_lock = threading.Lock()
 
 # Configure logging to show in Railway
 logging.basicConfig(
@@ -7805,7 +7810,7 @@ def get_started():
 
 @app.route("/consolidate-cvs", methods=["POST"])
 def consolidate_cvs():
-    """Accept multiple CV files, extract text, and use Claude to consolidate into master template"""
+    """Accept multiple CV files, extract text, kick off async Claude consolidation, return job_id."""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
@@ -7828,7 +7833,6 @@ def consolidate_cvs():
             if len(file_data) > 5 * 1024 * 1024:
                 return jsonify({'error': f'File "{file.filename}" exceeds 5MB limit'}), 400
 
-            # Extract text
             if ext == 'pdf':
                 text_content = extract_text_from_pdf(file_data)
             elif ext in ('docx', 'doc'):
@@ -7842,7 +7846,7 @@ def consolidate_cvs():
         if not extracted_texts:
             return jsonify({'error': 'Could not extract text from any of the uploaded files'}), 400
 
-        # If only one file, no consolidation needed — use it directly
+        # Single file — no AI call needed, return immediately
         if len(extracted_texts) == 1:
             return jsonify({
                 'success': True,
@@ -7850,12 +7854,18 @@ def consolidate_cvs():
                 'stats': {'files_processed': 1, 'note': 'Single file uploaded — used directly as master template'}
             })
 
-        # Build Claude consolidation prompt
-        cv_sections = ""
-        for i, item in enumerate(extracted_texts, 1):
-            cv_sections += f"\n\n--- CV VERSION {i}: {item['filename']} ---\n{item['text']}\n"
+        # Multiple files — run Claude consolidation in a background thread to avoid proxy timeout
+        job_id = str(uuid.uuid4())
+        with _consolidation_lock:
+            _consolidation_jobs[job_id] = {'status': 'pending'}
 
-        consolidation_prompt = f"""You are consolidating {len(extracted_texts)} versions of the same person's CV into one comprehensive master template.
+        def _run_consolidation(job_id, extracted_texts):
+            try:
+                cv_sections = ""
+                for i, item in enumerate(extracted_texts, 1):
+                    cv_sections += f"\n\n--- CV VERSION {i}: {item['filename']} ---\n{item['text']}\n"
+
+                consolidation_prompt = f"""You are consolidating {len(extracted_texts)} versions of the same person's CV into one comprehensive master template.
 
 YOUR GOAL: produce a COMPLETE master template that is a superset of all input CVs — nothing from any CV version should be lost except true word-for-word duplicates.
 
@@ -7906,32 +7916,63 @@ RULES — follow these exactly:
 Here are the {len(extracted_texts)} CV versions to consolidate:
 {cv_sections}
 
-Output the COMPLETE master template now. Do not truncate or stop early — include every section fully:
+Output the COMPLETE master template now. Do not truncate or stop early — include every section fully:"""
 
-        # Use Sonnet for faithful instruction-following on complex multi-CV consolidation
-        anthropic_client = get_anthropic_client()
-        message = anthropic_client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=16000,
-            messages=[{"role": "user", "content": consolidation_prompt}]
-        )
+                anthropic_client = get_anthropic_client()
+                message = anthropic_client.messages.create(
+                    model="claude-sonnet-4-6",
+                    max_tokens=16000,
+                    messages=[{"role": "user", "content": consolidation_prompt}]
+                )
+                consolidated_text = message.content[0].text
 
-        consolidated_text = message.content[0].text
+                with _consolidation_lock:
+                    _consolidation_jobs[job_id] = {
+                        'status': 'done',
+                        'consolidated_text': consolidated_text,
+                        'stats': {
+                            'files_processed': len(extracted_texts),
+                            'filenames': [item['filename'] for item in extracted_texts]
+                        }
+                    }
+            except Exception as e:
+                print(f"Background consolidation error: {e}")
+                with _consolidation_lock:
+                    _consolidation_jobs[job_id] = {'status': 'error', 'error': str(e)}
 
-        log_user_activity('cv_consolidation', f'Consolidated {len(extracted_texts)} CV files into master template')
+        t = threading.Thread(target=_run_consolidation, args=(job_id, extracted_texts), daemon=True)
+        t.start()
 
-        return jsonify({
-            'success': True,
-            'consolidated_text': consolidated_text,
-            'stats': {
-                'files_processed': len(extracted_texts),
-                'filenames': [item['filename'] for item in extracted_texts]
-            }
-        })
+        return jsonify({'job_id': job_id, 'status': 'pending'})
 
     except Exception as e:
-        print(f"Error consolidating CVs: {e}")
-        return jsonify({'error': f'Consolidation failed: {str(e)}'}), 500
+        print(f"Error starting consolidation: {e}")
+        return jsonify({'error': f'Could not start consolidation: {str(e)}'}), 500
+
+
+@app.route("/consolidate-cvs/status/<job_id>", methods=["GET"])
+def consolidate_cvs_status(job_id):
+    """Poll endpoint for async CV consolidation job status."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    with _consolidation_lock:
+        job = _consolidation_jobs.get(job_id)
+    if job is None:
+        return jsonify({'error': 'Job not found'}), 404
+    if job['status'] == 'pending':
+        return jsonify({'status': 'pending'})
+    if job['status'] == 'error':
+        # Clean up after reporting error
+        with _consolidation_lock:
+            _consolidation_jobs.pop(job_id, None)
+        return jsonify({'status': 'error', 'error': job.get('error', 'Unknown error')})
+    # Done — return result and clean up
+    result = dict(job)
+    with _consolidation_lock:
+        _consolidation_jobs.pop(job_id, None)
+    return jsonify({'status': 'done', 'success': True,
+                    'consolidated_text': result['consolidated_text'],
+                    'stats': result['stats']})
 
 
 @app.route("/prompt-settings", methods=["GET"])

@@ -628,10 +628,11 @@
 
         showState('processing');
 
-        // Animate processing steps
+        // Cycle through processing step labels while waiting
         const steps = ['ps-1','ps-2','ps-3','ps-4'];
+        let stepTimers = [];
         steps.forEach((id, i) => {
-            setTimeout(() => {
+            stepTimers.push(setTimeout(() => {
                 if (i > 0) {
                     const prev = document.getElementById(steps[i-1]);
                     prev.classList.remove('pulse');
@@ -640,8 +641,36 @@
                 const el = document.getElementById(id);
                 el.style.color = '#3a3530';
                 el.classList.add('pulse');
-            }, i * 2000);
+            }, i * 15000));
         });
+
+        function clearStepAnimations() {
+            stepTimers.forEach(t => clearTimeout(t));
+            steps.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.classList.remove('pulse'); el.style.color = '#6b7280'; }
+            });
+        }
+
+        function onError(msg) {
+            clearStepAnimations();
+            showState('upload');
+            const errEl = document.getElementById('consolidate-error');
+            errEl.textContent = msg || 'Request failed. Please try again.';
+            errEl.classList.remove('hidden');
+            setTimeout(() => errEl.classList.add('hidden'), 10000);
+        }
+
+        function onSuccess(data) {
+            clearStepAnimations();
+            document.getElementById('consolidated-textarea').value = data.consolidated_text;
+            const stats = data.stats;
+            document.getElementById('review-subtitle').textContent =
+                stats.files_processed > 1
+                ? `${stats.files_processed} files consolidated. Review and edit below before saving.`
+                : `1 file extracted. Review and edit below before saving.`;
+            showState('review');
+        }
 
         // Build FormData and POST to /consolidate-cvs
         const formData = new FormData();
@@ -653,34 +682,36 @@
             return r.json();
         })
         .then(data => {
-            steps.forEach(id => {
-                const el = document.getElementById(id);
-                el.classList.remove('pulse');
-                el.style.color = '#6b7280';
-            });
+            if (data.error) { onError(data.error); return; }
 
-            if (data.success) {
-                document.getElementById('consolidated-textarea').value = data.consolidated_text;
-                const stats = data.stats;
-                document.getElementById('review-subtitle').textContent =
-                    stats.files_processed > 1
-                    ? `${stats.files_processed} files consolidated. Review and edit below before saving.`
-                    : `1 file extracted. Review and edit below before saving.`;
-                showState('review');
-            } else {
-                showState('upload');
-                const errEl = document.getElementById('consolidate-error');
-                errEl.textContent = data.error || 'Consolidation failed. Please try again.';
-                errEl.classList.remove('hidden');
-                setTimeout(() => errEl.classList.add('hidden'), 8000);
+            // Single file: returned synchronously
+            if (data.success) { onSuccess(data); return; }
+
+            // Multiple files: poll for job completion
+            if (!data.job_id) { onError('Unexpected server response.'); return; }
+            const jobId = data.job_id;
+            let attempts = 0;
+            const maxAttempts = 120; // 4 minutes at 2s intervals
+
+            function poll() {
+                attempts++;
+                if (attempts > maxAttempts) { onError('Consolidation timed out. Please try again.'); return; }
+                fetch(`/consolidate-cvs/status/${jobId}`)
+                .then(r => r.json())
+                .then(status => {
+                    if (status.status === 'pending') {
+                        setTimeout(poll, 2000);
+                    } else if (status.status === 'done' && status.success) {
+                        onSuccess(status);
+                    } else {
+                        onError(status.error || 'Consolidation failed. Please try again.');
+                    }
+                })
+                .catch(() => setTimeout(poll, 3000)); // retry on network hiccup
             }
+            setTimeout(poll, 2000);
         })
-        .catch(err => {
-            showState('upload');
-            const errEl = document.getElementById('consolidate-error');
-            errEl.textContent = err.message || 'Request failed. Please try again.';
-            errEl.classList.remove('hidden');
-        });
+        .catch(err => onError(err.message || 'Request failed. Please try again.'));
     }
 
     // ── Save consolidated template ──
