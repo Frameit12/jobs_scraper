@@ -6852,7 +6852,7 @@ strong {{ font-weight: bold; }}
                     body_start = i
             personal_block = ''
             if personal_start is not None:
-                end = personal_end if personal_end is not None else (body_start or len(lines))
+                end = personal_end if personal_end is not None else (body_start if body_start is not None else len(lines))
                 personal_block = '\n'.join(lines[personal_start:end]).strip()
             body_block = '\n'.join(lines[body_start:]) if body_start is not None else None
             return personal_block, body_block
@@ -6908,8 +6908,8 @@ strong {{ font-weight: bold; }}
             for line in modified.split('\n'):
                 s = line.strip()
                 if not s:
-                    parts.append('<br style="line-height:0.4">')
-                    is_first = False
+                    if not is_first:  # don't emit blank lines before the headline
+                        parts.append('<br style="line-height:0.4">')
                     continue
                 e = _html_mod.escape(s)
                 if is_first:
@@ -7974,7 +7974,7 @@ def consolidate_cvs():
                      if now - v.get('created_at', now) > _CONSOLIDATION_JOB_TTL]
             for k in stale:
                 del _consolidation_jobs[k]
-            _consolidation_jobs[job_id] = {'status': 'pending', 'created_at': now}
+            _consolidation_jobs[job_id] = {'status': 'pending', 'created_at': now, 'user_id': user_id}
 
         def _run_consolidation(job_id, extracted_texts):
             try:
@@ -8046,9 +8046,11 @@ Output the COMPLETE master template now. Do not truncate or stop early — inclu
                 log_user_activity('cv_consolidation', f'Consolidated {len(extracted_texts)} CV files into master template')
                 import time as _time2
                 with _consolidation_lock:
+                    owner = _consolidation_jobs.get(job_id, {}).get('user_id')
                     _consolidation_jobs[job_id] = {
                         'status': 'done',
                         'created_at': _time2.time(),
+                        'user_id': owner,
                         'consolidated_text': consolidated_text,
                         'stats': {
                             'files_processed': len(extracted_texts),
@@ -8059,7 +8061,8 @@ Output the COMPLETE master template now. Do not truncate or stop early — inclu
                 print(f"Background consolidation error: {e}")
                 import time as _time3
                 with _consolidation_lock:
-                    _consolidation_jobs[job_id] = {'status': 'error', 'created_at': _time3.time(), 'error': str(e)}
+                    owner = _consolidation_jobs.get(job_id, {}).get('user_id')
+                    _consolidation_jobs[job_id] = {'status': 'error', 'created_at': _time3.time(), 'user_id': owner, 'error': str(e)}
 
         t = threading.Thread(target=_run_consolidation, args=(job_id, extracted_texts), daemon=True)
         t.start()
@@ -8076,10 +8079,13 @@ def consolidate_cvs_status(job_id):
     """Poll endpoint for async CV consolidation job status."""
     if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
+    user_id = session['user_id']
     with _consolidation_lock:
         job = _consolidation_jobs.get(job_id)
     if job is None:
         return jsonify({'error': 'Job not found'}), 404
+    if job.get('user_id') != user_id:
+        return jsonify({'error': 'Not found'}), 404
     if job['status'] == 'pending':
         return jsonify({'status': 'pending'})
     if job['status'] == 'error':
