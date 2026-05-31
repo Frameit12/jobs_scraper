@@ -1086,20 +1086,24 @@ We're looking for a Senior VP to lead our AI Risk team...
 
         async function loadAnalysis(analysisId) {
             try {
-                // Close sidebar on mobile
-                toggleHistorySidebar();
-
-                // Show loading state
-                const resultsSection = document.getElementById('results-section');
-                resultsSection.classList.add('active');
-                resultsSection.scrollIntoView({ behavior: 'smooth' });
-
                 const response = await fetch(`/get-analysis/${analysisId}`);
                 const result = await response.json();
 
                 if (result.success) {
-                    // Display the loaded analysis with analysis ID and CV progress
-                    displayResults(result.analysis, analysisId, result.cv_progress || null);
+                    const cvProgress = result.cv_progress || null;
+
+                    // If there's an in-progress CV session, go straight back to where they left off
+                    if (cvProgress && cvProgress.session_id) {
+                        window.location.href = `/customize-cv/resume/${cvProgress.session_id}`;
+                        return;
+                    }
+
+                    // Otherwise show the analysis results
+                    toggleHistorySidebar();
+                    const resultsSection = document.getElementById('results-section');
+                    resultsSection.classList.add('active');
+                    resultsSection.scrollIntoView({ behavior: 'smooth' });
+                    displayResults(result.analysis, analysisId, null);
                 } else {
                     alert('Error: ' + result.error);
                 }
