@@ -6634,8 +6634,30 @@ def customize_cv_export():
         if not approved_bullets or not selected_headline:
             return redirect('/customize-cv/preview')
 
-        # ── Apply replacements to template text ──────────────────────────────
+        # ── Build clean CV text from master template ─────────────────────────
         BULLET_CHARS = '•●○◦▸▪▶·'
+
+        def _strip_headline_section(template_text):
+            """
+            Master templates contain multiple headline variations at the top
+            (e.g. [VERSION 1 — ...], [VERSION 2 — ...]).
+            Strip everything before the first major CV section so the export
+            contains only the actual CV body, not all the headline options.
+            Returns body text (from first section header onwards), or None if
+            no section boundary found (simple single-headline templates).
+            """
+            import re as _re
+            BODY_MARKERS = [
+                'CORE EXPERTISE', 'EMPLOYMENT HISTORY', 'PROFESSIONAL EXPERIENCE',
+                'WORK EXPERIENCE', 'CAREER HISTORY', 'EXPERIENCE', 'EDUCATION',
+                'SKILLS', 'QUALIFICATIONS', 'EMPLOYMENT', 'PROFESSIONAL SUMMARY',
+            ]
+            for i, line in enumerate(template_text.split('\n')):
+                s = _re.sub(r'[=*_#\-]', '', line.strip()).strip().upper()
+                if any(s == m or s.startswith(m + ' ') or s.startswith(m + ':')
+                       for m in BODY_MARKERS):
+                    return '\n'.join(template_text.split('\n')[i:])
+            return None
 
         def _replace_bullet(text, original, replacement):
             """Find a bullet by its cleaned text and replace it, preserving prefix."""
@@ -6650,15 +6672,21 @@ def customize_cv_export():
                     return '\n'.join(lines), True
             return text, False
 
-        modified = master_template['template_text']
+        raw = master_template['template_text']
 
-        # Replace headline (first non-empty line)
-        lines = modified.split('\n')
-        for i, line in enumerate(lines):
-            if line.strip():
-                lines[i] = selected_headline
-                break
-        modified = '\n'.join(lines)
+        # Strip headline variations; keep only the selected headline
+        body = _strip_headline_section(raw)
+        if body is not None:
+            # Multi-version template — prepend just the one selected headline
+            modified = selected_headline + '\n\n' + body
+        else:
+            # Simple template — replace first non-empty line with selected headline
+            lines = raw.split('\n')
+            for i, line in enumerate(lines):
+                if line.strip():
+                    lines[i] = selected_headline
+                    break
+            modified = '\n'.join(lines)
 
         # Replace approved bullets
         applied = 0
