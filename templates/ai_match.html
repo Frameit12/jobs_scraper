@@ -1086,18 +1086,22 @@ We're looking for a Senior VP to lead our AI Risk team...
 
         async function loadAnalysis(analysisId) {
             try {
+                console.log('[loadAnalysis] fetching analysis id=', analysisId);
                 const response = await fetch(`/get-analysis/${analysisId}`);
                 const result = await response.json();
+                console.log('[loadAnalysis] API response:', JSON.stringify(result.cv_progress));
 
                 if (result.success) {
                     const cvProgress = result.cv_progress || null;
 
                     // If there's an in-progress CV session, go straight back to where they left off
                     if (cvProgress && cvProgress.session_id) {
+                        console.log('[loadAnalysis] cv_progress found, resuming session', cvProgress.session_id);
                         window.location.href = `/customize-cv/resume/${cvProgress.session_id}`;
                         return;
                     }
 
+                    console.log('[loadAnalysis] no cv_progress, showing analysis results');
                     // Otherwise show the analysis results
                     toggleHistorySidebar();
                     const resultsSection = document.getElementById('results-section');
@@ -1108,7 +1112,7 @@ We're looking for a Senior VP to lead our AI Risk team...
                     alert('Error: ' + result.error);
                 }
             } catch (error) {
-                console.error('Error loading analysis:', error);
+                console.error('[loadAnalysis] Error:', error);
                 alert('Failed to load analysis');
             }
         }

@@ -1875,12 +1875,23 @@ def get_cv_session(session_id):
 
 def get_cv_session_by_analysis(analysis_id, user_id):
     """Get CV customization session by analysis_id and user_id"""
+    print(f"  [get_cv_session_by_analysis] looking for analysis_id={analysis_id!r} (type={type(analysis_id).__name__}) user_id={user_id!r} (type={type(user_id).__name__})")
     engine = get_db_connection()
     if not engine:
+        print(f"  [get_cv_session_by_analysis] ERROR: no DB connection")
         return None
 
     try:
         with engine.connect() as conn:
+            # Debug: show all sessions for this user so we can compare
+            all_rows = conn.execute(text("""
+                SELECT id, user_id, analysis_id, status, created_at
+                FROM cv_customization_sessions
+                WHERE user_id = :user_id
+                ORDER BY created_at DESC
+            """), {"user_id": user_id}).fetchall()
+            print(f"  [get_cv_session_by_analysis] all sessions for user {user_id}: {[(r[0], r[1], r[2], r[3]) for r in all_rows]}")
+
             result = conn.execute(text("""
                 SELECT id, user_id, analysis_id, job_title, job_company,
                        selected_headline, bullet_analysis, approved_bullets, new_bullets,
@@ -1893,6 +1904,7 @@ def get_cv_session_by_analysis(analysis_id, user_id):
 
             row = result.fetchone()
             if row:
+                print(f"  [get_cv_session_by_analysis] FOUND session id={row[0]}, status={row[10]}, headline={bool(row[5])}")
                 return {
                     'id': row[0],
                     'user_id': row[1],
@@ -1907,10 +1919,13 @@ def get_cv_session_by_analysis(analysis_id, user_id):
                     'status': row[10],
                     'created_at': row[11]
                 }
+            print(f"  [get_cv_session_by_analysis] NOT FOUND — no row matched analysis_id={analysis_id}, user_id={user_id}")
             return None
 
     except Exception as e:
-        print(f"Error getting CV session by analysis: {e}")
+        print(f"  [get_cv_session_by_analysis] EXCEPTION: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
