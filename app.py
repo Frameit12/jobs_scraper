@@ -34,6 +34,10 @@ _consolidation_jobs = {}
 _consolidation_lock = threading.Lock()
 _CONSOLIDATION_JOB_TTL = 3600  # expire after 1 hour regardless of poll status
 
+_export_jobs = {}
+_export_lock = threading.Lock()
+_EXPORT_JOB_TTL = 3600
+
 # Configure logging to show in Railway
 logging.basicConfig(
     level=logging.INFO,
@@ -7094,6 +7098,448 @@ def customize_cv_export():
         print(f"Error exporting CV: {e}")
         _tb.print_exc()
         return "Error generating export", 500
+
+
+# ── Async export routes (avoids Cloudflare 100-second timeout) ───────────────
+
+def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
+                    bullet_analysis_by_role, analysis_id, job_slug):
+    """Background thread: generates the CV export file and stores result in _export_jobs."""
+    import time as _etime
+    from io import BytesIO as _BytesIO
+    import traceback as _tb
+
+    def _set_error(msg):
+        with _export_lock:
+            _export_jobs[job_id] = {'status': 'error', 'created_at': _etime.time(),
+                                    'user_id': user_id, 'error': msg}
+
+    try:
+        # Build replacement list
+        replacements = []
+        for bullet in approved_bullets:
+            role_key = bullet.get('role_company', '')
+            idx = bullet.get('bullet_index')
+            new_text = bullet.get('approved_text', '')
+            if not new_text:
+                continue
+            role_analysis = bullet_analysis_by_role.get(role_key, {})
+            recommended = role_analysis.get('recommended_bullets', [])
+            original_text = next(
+                (r['original_text'] for r in recommended if r.get('bullet_index') == idx),
+                None
+            )
+            if original_text and original_text != new_text:
+                replacements.append((original_text, new_text))
+
+        # Fetch original CV binary
+        original_cv = None
+        if analysis_id:
+            cv_id = get_cv_id_for_analysis(analysis_id)
+            if cv_id:
+                original_cv = get_cv_by_id(cv_id, user_id)
+
+        if not original_cv:
+            try:
+                engine = get_db_connection()
+                if engine:
+                    with engine.connect() as conn:
+                        row = conn.execute(text("""
+                            SELECT id, cv_name, file_data, file_type, extracted_text
+                            FROM user_cvs
+                            WHERE user_id = :uid AND file_data IS NOT NULL
+                            ORDER BY id DESC LIMIT 1
+                        """), {"uid": user_id}).fetchone()
+                        if row:
+                            original_cv = {'id': row[0], 'cv_name': row[1],
+                                           'file_data': row[2], 'file_type': row[3],
+                                           'extracted_text': row[4]}
+            except Exception as e:
+                print(f"Export thread: error fetching fallback CV: {e}")
+
+        if not original_cv or not original_cv.get('file_data'):
+            _set_error('CV not found')
+            return
+
+        file_data = bytes(original_cv['file_data'])
+        file_type = (original_cv.get('file_type') or '').lower().strip('.')
+
+        if file_type == 'pdf':
+            try:
+                import fitz as _fitz
+
+                def _get_bullet_sym_tops(blocks):
+                    tops = []
+                    for b in blocks:
+                        if b['type'] == 0:
+                            for line in b['lines']:
+                                for span in line['spans']:
+                                    t = span['text'].strip()
+                                    if t in ('•', '●', '○', '◦', '▸', '▪', '▶', '·') or (
+                                        len(t) == 1 and ord(t) in (8226, 9679, 9675, 9702, 9656, 9642, 9654, 183)
+                                    ):
+                                        tops.append(span['bbox'][1])
+                    return sorted(set(tops))
+
+                def _replace_career_summary(page, blocks, new_headline):
+                    SUMMARY_HEADERS = {'CAREER SUMMARY', 'PROFESSIONAL SUMMARY',
+                                       'EXECUTIVE SUMMARY', 'PROFILE', 'SUMMARY'}
+                    STOP_HEADERS = ['EMPLOYMENT HISTORY', 'PROFESSIONAL EXPERIENCE',
+                                    'WORK EXPERIENCE', 'CAREER HISTORY', 'CORE EXPERTISE',
+                                    'EDUCATION', 'SKILLS', 'QUALIFICATIONS',
+                                    'KEY ACHIEVEMENTS', 'KEY SKILLS', 'ACHIEVEMENTS']
+
+                    def _is_stop_header(txt):
+                        return any(
+                            txt == h or txt.startswith(h + ' ') or txt.startswith(h + ':')
+                            for h in STOP_HEADERS
+                        )
+
+                    summary_lines = []
+                    in_summary = False
+                    done = False
+                    for b in blocks:
+                        if done or b['type'] != 0:
+                            continue
+                        for line in b['lines']:
+                            txt = ''.join(s['text'] for s in line['spans']).strip().upper()
+                            if not in_summary:
+                                if any(h in txt for h in SUMMARY_HEADERS):
+                                    in_summary = True
+                                continue
+                            if _is_stop_header(txt):
+                                done = True
+                                break
+                            summary_lines.append(line['bbox'])
+                    if not summary_lines:
+                        return False
+                    x0 = min(l[0] for l in summary_lines) - 2
+                    y0 = min(l[1] for l in summary_lines) - 2
+                    x1 = max(l[2] for l in summary_lines) + 2
+                    y1 = max(l[3] for l in summary_lines) + 2
+                    rect = _fitz.Rect(x0, y0, x1, y1)
+                    fsize = 9
+                    for b in blocks:
+                        if b['type'] == 0:
+                            for line in b['lines']:
+                                if abs(line['bbox'][1] - summary_lines[0][1]) < 5:
+                                    for span in line['spans']:
+                                        if span['text'].strip():
+                                            fsize = span['size']
+                                            break
+                    page.add_redact_annot(rect, fill=(1, 1, 1))
+                    page.apply_redactions()
+                    html = (f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                            f'line-height:1.3;margin:0">{new_headline}</p>')
+                    page.insert_htmlbox(rect, html)
+                    return True
+
+                def _replace_bullet_in_page(page, blocks, original_text, new_text):
+                    colon = original_text.find(':')
+                    search_key = original_text[:colon].strip() if colon > 0 else original_text[:40].strip()
+                    bullet_sym_tops = _get_bullet_sym_tops(blocks)
+                    target_line_y = None
+                    for b in blocks:
+                        if b['type'] == 0:
+                            for line in b['lines']:
+                                line_text = ''.join(s['text'] for s in line['spans'])
+                                if search_key in line_text:
+                                    target_line_y = line['bbox'][1]
+                                    break
+                        if target_line_y is not None:
+                            break
+                    if target_line_y is None:
+                        return False
+                    sym_y = None
+                    for y in bullet_sym_tops:
+                        if y <= target_line_y + 6:
+                            sym_y = y
+                        else:
+                            break
+                    if sym_y is None:
+                        return False
+                    next_sym_y = next((y for y in bullet_sym_tops if y > sym_y + 2), None)
+                    bullet_bboxes = []
+                    for b in blocks:
+                        if b['type'] == 0:
+                            for line in b['lines']:
+                                y = line['bbox'][1]
+                                if sym_y - 0.5 <= y < (next_sym_y - 0.5 if next_sym_y else float('inf')):
+                                    bullet_bboxes.append(line['bbox'])
+                    if not bullet_bboxes:
+                        return False
+                    bul_x0 = min(l[0] for l in bullet_bboxes) - 1
+                    bul_y0 = sym_y
+                    bul_x1 = max(l[2] for l in bullet_bboxes) + 2
+                    bul_y1 = max(l[3] for l in bullet_bboxes) + 1
+                    rect = _fitz.Rect(bul_x0, bul_y0, bul_x1, bul_y1)
+                    fsize = 9
+                    for b in blocks:
+                        if b['type'] == 0:
+                            for line in b['lines']:
+                                if abs(line['bbox'][1] - target_line_y) < 3:
+                                    for span in line['spans']:
+                                        if span['text'].strip() and 'Symbol' not in span['font']:
+                                            fsize = span['size']
+                                            break
+                    colon_pos = new_text.find(':')
+                    if colon_pos > 0:
+                        bold_part = new_text[:colon_pos + 1]
+                        regular_part = new_text[colon_pos + 1:]
+                    else:
+                        bold_part = ''
+                        regular_part = new_text
+                    text_x0 = min(l[0] for l in bullet_bboxes if l[1] > sym_y + 2) if len(bullet_bboxes) > 1 else bul_x0 + 18
+                    text_indent_pt = round(text_x0 - bul_x0 + 1)
+                    html_bullet = (
+                        f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                        f'line-height:1.3;margin:0;padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
+                        f'&#x2022; <b>{bold_part}</b>{regular_part}</p>'
+                    ) if bold_part else (
+                        f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                        f'line-height:1.3;margin:0;padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
+                        f'&#x2022; {regular_part}</p>'
+                    )
+                    page.add_redact_annot(rect, fill=(1, 1, 1))
+                    page.apply_redactions()
+                    page.insert_htmlbox(rect, html_bullet)
+                    return True
+
+                doc = _fitz.open(stream=file_data, filetype='pdf')
+                headline_replaced = False
+                bullets_applied = 0
+                for page in doc:
+                    blocks = page.get_text('dict')['blocks']
+                    if not headline_replaced:
+                        if _replace_career_summary(page, blocks, selected_headline):
+                            headline_replaced = True
+                            blocks = page.get_text('dict')['blocks']
+                    for orig, appr in replacements:
+                        if _replace_bullet_in_page(page, blocks, orig, appr):
+                            bullets_applied += 1
+                            blocks = page.get_text('dict')['blocks']
+
+                print(f"Export thread (PyMuPDF): headline={'yes' if headline_replaced else 'no'}, "
+                      f"bullets={bullets_applied}/{len(replacements)}")
+
+                if fmt == 'pdf':
+                    buf = _BytesIO()
+                    doc.save(buf)
+                    out_bytes = buf.getvalue()
+                    doc.close()
+                    mimetype = 'application/pdf'
+                    filename = f'CV_{job_slug}.pdf'
+                else:
+                    import tempfile, os as _os
+                    from pdf2docx import Converter as _PdfConverter
+                    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_pdf:
+                        doc.save(tmp_pdf.name)
+                        tmp_pdf_path = tmp_pdf.name
+                    doc.close()
+                    tmp_docx_path = tmp_pdf_path.replace('.pdf', '.docx')
+                    try:
+                        cv_conv = _PdfConverter(tmp_pdf_path)
+                        cv_conv.convert(tmp_docx_path, start=0, end=None)
+                        cv_conv.close()
+                        with open(tmp_docx_path, 'rb') as f:
+                            out_bytes = f.read()
+                    finally:
+                        try: _os.unlink(tmp_pdf_path)
+                        except: pass
+                        try: _os.unlink(tmp_docx_path)
+                        except: pass
+                    mimetype = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    filename = f'CV_{job_slug}.docx'
+
+                with _export_lock:
+                    _export_jobs[job_id] = {
+                        'status': 'done', 'created_at': _etime.time(), 'user_id': user_id,
+                        'file_data': out_bytes, 'filename': filename, 'mimetype': mimetype,
+                    }
+                return
+
+            except Exception as e:
+                print(f"Export thread PyMuPDF error: {e}")
+                _tb.print_exc()
+
+        if file_type in ('docx', 'doc'):
+            try:
+                from docx import Document as _DocxDoc
+
+                def _replace_para(para, old, new):
+                    full = "".join(r.text for r in para.runs)
+                    if old not in full:
+                        return False
+                    new_full = full.replace(old, new, 1)
+                    if para.runs:
+                        para.runs[0].text = new_full
+                        for r in para.runs[1:]:
+                            r.text = ""
+                    else:
+                        para.text = new_full
+                    return True
+
+                def _all_paragraphs(doc):
+                    yield from doc.paragraphs
+                    for tbl in doc.tables:
+                        for row in tbl.rows:
+                            for cell in row.cells:
+                                yield from cell.paragraphs
+
+                doc = _DocxDoc(_BytesIO(file_data))
+                applied = 0
+                for orig, appr in replacements:
+                    for para in _all_paragraphs(doc):
+                        if _replace_para(para, orig, appr):
+                            applied += 1
+                            break
+                replaced_headline = False
+                for para in _all_paragraphs(doc):
+                    txt = para.text.strip()
+                    if len(txt) > 80 and not txt.isupper():
+                        _replace_para(para, txt, selected_headline)
+                        replaced_headline = True
+                        break
+                print(f"Export thread (python-docx): {applied}/{len(replacements)} bullets, "
+                      f"headline={'yes' if replaced_headline else 'no'}")
+                buf = _BytesIO()
+                doc.save(buf)
+                modified_docx = buf.getvalue()
+
+                if fmt == 'docx':
+                    with _export_lock:
+                        _export_jobs[job_id] = {
+                            'status': 'done', 'created_at': _etime.time(), 'user_id': user_id,
+                            'file_data': modified_docx,
+                            'filename': f'CV_{job_slug}.docx',
+                            'mimetype': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                        }
+                    return
+
+                import weasyprint as _weasyprint, mammoth as _mammoth
+                result = _mammoth.convert_to_html(_BytesIO(modified_docx))
+                html_doc = (f'<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+                            f'@page{{margin:2cm;size:A4}}body{{font-family:Arial,sans-serif;font-size:11pt;'
+                            f'line-height:1.5;color:#111}}</style></head><body>{result.value}</body></html>')
+                pdf_bytes = _weasyprint.HTML(string=html_doc).write_pdf()
+                with _export_lock:
+                    _export_jobs[job_id] = {
+                        'status': 'done', 'created_at': _etime.time(), 'user_id': user_id,
+                        'file_data': pdf_bytes,
+                        'filename': f'CV_{job_slug}.pdf',
+                        'mimetype': 'application/pdf',
+                    }
+                return
+
+            except Exception as e:
+                print(f"Export thread python-docx error: {e}")
+                _tb.print_exc()
+
+        _set_error('Could not generate export — original CV file not found or unsupported format')
+
+    except Exception as e:
+        print(f"Export thread unexpected error: {e}")
+        _tb.print_exc()
+        _set_error(str(e))
+
+
+@app.route("/customize-cv/export-start", methods=["POST"])
+def customize_cv_export_start():
+    """Start an async export job; returns job_id immediately to avoid Cloudflare timeout."""
+    if 'user_id' not in session or 'cv_session_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    user_id = session['user_id']
+    cv_session_id = session['cv_session_id']
+
+    data = request.get_json(silent=True) or {}
+    fmt = data.get('format', 'pdf').lower()
+    if fmt not in ('pdf', 'docx'):
+        return jsonify({'error': 'Invalid format'}), 400
+
+    try:
+        cv_session = get_cv_session(cv_session_id)
+        if not cv_session:
+            return jsonify({'error': 'Session not found'}), 404
+
+        approved_bullets = cv_session.get('approved_bullets') or []
+        selected_headline = cv_session.get('selected_headline') or ''
+        bullet_analysis_by_role = cv_session.get('bullet_analysis_by_role') or {}
+        analysis_id = cv_session.get('analysis_id')
+        job_slug = (cv_session.get('job_title') or 'CV').replace(' ', '_')[:40]
+
+        if not approved_bullets or not selected_headline:
+            return jsonify({'error': 'No approved bullets or headline in session'}), 400
+
+        job_id = str(uuid.uuid4())
+        import time as _etime
+        with _export_lock:
+            now = _etime.time()
+            stale = [k for k, v in _export_jobs.items()
+                     if now - v.get('created_at', now) > _EXPORT_JOB_TTL]
+            for k in stale:
+                del _export_jobs[k]
+            _export_jobs[job_id] = {'status': 'pending', 'created_at': now, 'user_id': user_id}
+
+        t = threading.Thread(
+            target=_run_export_job,
+            args=(job_id, user_id, fmt, approved_bullets, selected_headline,
+                  bullet_analysis_by_role, analysis_id, job_slug),
+            daemon=True
+        )
+        t.start()
+
+        return jsonify({'job_id': job_id, 'status': 'pending'})
+
+    except Exception as e:
+        print(f"Error starting export: {e}")
+        return jsonify({'error': f'Could not start export: {str(e)}'}), 500
+
+
+@app.route("/customize-cv/export-status/<job_id>", methods=["GET"])
+def customize_cv_export_status(job_id):
+    """Poll endpoint for async export job status."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    user_id = session['user_id']
+    with _export_lock:
+        job = _export_jobs.get(job_id)
+    if job is None or job.get('user_id') != user_id:
+        return jsonify({'error': 'Job not found'}), 404
+    if job['status'] == 'pending':
+        return jsonify({'status': 'pending'})
+    if job['status'] == 'error':
+        with _export_lock:
+            _export_jobs.pop(job_id, None)
+        return jsonify({'status': 'error', 'error': job.get('error', 'Unknown error')})
+    return jsonify({'status': 'done'})
+
+
+@app.route("/customize-cv/export-download/<job_id>", methods=["GET"])
+def customize_cv_export_download(job_id):
+    """Download the completed export file."""
+    if 'user_id' not in session:
+        return redirect('/ai-match')
+    user_id = session['user_id']
+    with _export_lock:
+        job = _export_jobs.get(job_id)
+    if job is None or job.get('user_id') != user_id:
+        return "Export not found or expired", 404
+    if job['status'] != 'done':
+        return "Export not ready", 400
+    file_data = job['file_data']
+    filename = job['filename']
+    mimetype = job['mimetype']
+    with _export_lock:
+        _export_jobs.pop(job_id, None)
+    return Response(
+        file_data,
+        mimetype=mimetype,
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"',
+            'Content-Length': len(file_data),
+        }
+    )
 
 
 @app.route("/api/customize-bullet-chat", methods=["POST"])
