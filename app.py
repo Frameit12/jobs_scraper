@@ -8144,10 +8144,22 @@ Output the COMPLETE master template now. Do not truncate or stop early — inclu
                 )
                 consolidated_text = message.content[0].text
 
-                log_user_activity('cv_consolidation', f'Consolidated {len(extracted_texts)} CV files into master template')
                 import time as _time2
                 with _consolidation_lock:
                     owner = _consolidation_jobs.get(job_id, {}).get('user_id')
+                # Log activity directly — no request context available in background thread
+                try:
+                    if owner:
+                        _eng = get_db_connection()
+                        if _eng:
+                            with _eng.connect() as _conn:
+                                _conn.execute(text("""
+                                    INSERT INTO user_activity (user_id, action_type, action_details, ip_address, user_agent)
+                                    VALUES (:uid, 'cv_consolidation', :details, 'background', 'background')
+                                """), {"uid": owner, "details": f'Consolidated {len(extracted_texts)} CV files into master template'})
+                                _conn.commit()
+                except Exception as _le:
+                    print(f"Activity log error in consolidation thread: {_le}")
                     _consolidation_jobs[job_id] = {
                         'status': 'done',
                         'created_at': _time2.time(),
