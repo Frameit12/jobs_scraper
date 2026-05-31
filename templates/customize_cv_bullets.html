@@ -89,39 +89,30 @@
         <p class="text-sm text-gray-500">This usually takes 20–40 seconds.</p>
     </div>
     <script>
-    (function runAnalysis() {
+    (function pollCache() {
         const roleIndex = {{ role_index }};
-        let attempt = 0;
-        const maxAttempts = 3;
+        let elapsed = 0;
+        const maxWait = 180; // seconds
 
-        function tryAnalysis() {
-            attempt++;
-            if (attempt > 1) {
-                var msg = document.getElementById('loading-msg');
-                if (msg) msg.textContent = 'Still working… (attempt ' + attempt + ' of ' + maxAttempts + ')';
-            }
+        function check() {
             fetch('/api/analyze-bullets-for-role?role=' + roleIndex)
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success) {
                         window.location.reload();
-                    } else if (attempt < maxAttempts) {
-                        setTimeout(tryAnalysis, 3000);
                     } else {
-                        document.getElementById('loading-overlay').innerHTML =
-                            '<p class="text-red-600 font-semibold text-center">Analysis failed. <a href="" class="underline">Click to retry</a></p>';
+                        elapsed += 4;
+                        if (elapsed >= maxWait) {
+                            document.getElementById('loading-overlay').innerHTML =
+                                '<p class="text-red-600 font-semibold text-center">Analysis is taking longer than expected. <a href="" class="underline">Click to retry</a></p>';
+                        } else {
+                            setTimeout(check, 4000);
+                        }
                     }
                 })
-                .catch(function() {
-                    if (attempt < maxAttempts) {
-                        setTimeout(tryAnalysis, 5000);
-                    } else {
-                        document.getElementById('loading-overlay').innerHTML =
-                            '<p class="text-red-600 font-semibold text-center">Request timed out. <a href="" class="underline">Click to retry</a></p>';
-                    }
-                });
+                .catch(function() { setTimeout(check, 5000); });
         }
-        tryAnalysis();
+        setTimeout(check, 4000);
     })();
     </script>
     {% else %}
