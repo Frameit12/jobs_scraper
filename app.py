@@ -6152,12 +6152,16 @@ def debug_template():
 @app.route("/debug-cv-export-data", methods=["GET"])
 def debug_cv_export_data():
     """Debug endpoint: dumps all CV session export data to diagnose bullet replacement/deletion issues."""
-    if 'user_id' not in session or 'cv_session_id' not in session:
+    if 'user_id' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
 
     user_id = session['user_id']
-    cv_session_id = session['cv_session_id']
-    cv_session = get_cv_session(cv_session_id)
+    # Accept sid as query param so the user can pass it directly in the URL
+    cv_session_id = request.args.get('sid') or session.get('cv_session_id')
+    if not cv_session_id:
+        return jsonify({'error': 'No cv_session_id — pass ?sid=<id> in the URL'}), 400
+
+    cv_session = get_cv_session(int(cv_session_id))
     if not cv_session:
         return jsonify({'error': 'Session not found'}), 404
 
