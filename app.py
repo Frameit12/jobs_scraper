@@ -7299,18 +7299,33 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
 
                 def _find_role_bounds_on_page(blocks, all_companies):
                     """Return {company: (y_start, y_end)} for companies visible on this page.
-                    y_end is the y of the next company header, or None if it's the last on the page."""
+                    Matches on a short distinctive prefix (words before the first ' – ' or ' - ')
+                    and only considers bold lines (role headers are bold in CVs).
+                    y_end is the y of the next role header, or None if last on this page."""
+                    def _short_key(name):
+                        for sep in (' – ', ' — ', ' - ', ' / ', ' ('):
+                            idx = name.find(sep)
+                            if idx > 0:
+                                return name[:idx].strip().upper()
+                        return name[:30].strip().upper()
+
                     company_ys = {}
                     sorted_blocks = sorted(blocks, key=lambda bk: bk['bbox'][1])
                     for bk in sorted_blocks:
                         if bk['type'] != 0:
                             continue
                         for line in bk['lines']:
-                            line_text = ''.join(s['text'] for s in line['spans']).strip()
-                            line_upper = line_text.upper()
+                            spans = [s for s in line['spans'] if s['text'].strip()]
+                            if not spans:
+                                continue
+                            has_bold = any('Bold' in s['font'] or 'bold' in s['font'] for s in spans)
+                            if not has_bold:
+                                continue
+                            line_upper = ''.join(s['text'] for s in line['spans']).strip().upper()
                             for company in all_companies:
-                                if company and company not in company_ys and company.upper() in line_upper:
-                                    company_ys[company] = line['bbox'][1]
+                                if company and company not in company_ys:
+                                    if _short_key(company) in line_upper:
+                                        company_ys[company] = line['bbox'][1]
                     sorted_hits = sorted(company_ys.items(), key=lambda x: x[1])
                     result = {}
                     for i, (company, y_start) in enumerate(sorted_hits):
@@ -7481,12 +7496,17 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         if _replace_career_summary(page, blocks, selected_headline):
                             headline_replaced = True
                             blocks = page.get_text('dict')['blocks']
-                    # Build role section y-ranges for this page to scope bullet searches
+                    # Build role section y-ranges for this page to scope bullet searches.
+                    # Only process a bullet on the page where its company header appears;
+                    # skipping entirely when the company is absent prevents cross-role
+                    # contamination (e.g. a BNP search key matching a Citibank bullet symbol).
                     role_bounds = _find_role_bounds_on_page(blocks, all_role_keys)
                     for i, (role_key, orig, appr) in enumerate(replacements):
                         if i in applied_indices:
                             continue
-                        y_range = role_bounds.get(role_key)
+                        if role_key not in role_bounds:
+                            continue  # company header not on this page — skip
+                        y_range = role_bounds[role_key]
                         if _replace_bullet_in_page(page, blocks, orig, appr, y_range=y_range):
                             bullets_applied += 1
                             applied_indices.add(i)
@@ -7495,7 +7515,9 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     for i, (role_key, orig) in enumerate(deletions):
                         if i in deleted_indices:
                             continue
-                        y_range = role_bounds.get(role_key)
+                        if role_key not in role_bounds:
+                            continue  # company header not on this page — skip
+                        y_range = role_bounds[role_key]
                         if _replace_bullet_in_page(page, blocks, orig, '', y_range=y_range):
                             bullets_deleted += 1
                             deleted_indices.add(i)
