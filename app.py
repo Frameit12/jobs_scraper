@@ -7209,9 +7209,10 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 approved_map[(rk, idx)] = txt
 
         # Build replacements (changed text) and deletions (unapproved bullets to remove)
-        # Only process selected roles; leave non-selected role bullets unchanged
-        replacements = []
-        deletions = []
+        # Each entry carries its role_key so PDF processing can scope the search
+        # to the correct role section, preventing cross-role contamination.
+        replacements = []   # list of (role_key, orig, new_txt)
+        deletions = []      # list of (role_key, orig)
 
         for role_key, role_data in bullet_analysis_by_role.items():
             if selected_role_keys and role_key not in selected_role_keys:
@@ -7225,11 +7226,11 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 if k in approved_map:
                     new_txt = approved_map[k]
                     if new_txt != orig:
-                        replacements.append((orig, new_txt))
+                        replacements.append((role_key, orig, new_txt))
                     # else: approved with original text — already correct in CV, no action needed
                 else:
                     # Not approved → mark for deletion from CV
-                    deletions.append(orig)
+                    deletions.append((role_key, orig))
 
         print(f"[EXPORT-THREAD] replacements={len(replacements)} deletions={len(deletions)} at +{_etime.time()-_t0:.2f}s")
 
@@ -7278,18 +7279,44 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
             try:
                 import fitz as _fitz
 
-                def _get_bullet_sym_tops(blocks):
+                def _get_bullet_sym_tops(blocks, y_min=None, y_max=None):
                     tops = []
                     for b in blocks:
                         if b['type'] == 0:
                             for line in b['lines']:
                                 for span in line['spans']:
+                                    sy = span['bbox'][1]
+                                    if y_min is not None and sy < y_min:
+                                        continue
+                                    if y_max is not None and sy >= y_max:
+                                        continue
                                     t = span['text'].strip()
                                     if t in ('•', '●', '○', '◦', '▸', '▪', '▶', '·') or (
                                         len(t) == 1 and ord(t) in (8226, 9679, 9675, 9702, 9656, 9642, 9654, 183)
                                     ):
-                                        tops.append(span['bbox'][1])
+                                        tops.append(sy)
                     return sorted(set(tops))
+
+                def _find_role_bounds_on_page(blocks, all_companies):
+                    """Return {company: (y_start, y_end)} for companies visible on this page.
+                    y_end is the y of the next company header, or None if it's the last on the page."""
+                    company_ys = {}
+                    sorted_blocks = sorted(blocks, key=lambda bk: bk['bbox'][1])
+                    for bk in sorted_blocks:
+                        if bk['type'] != 0:
+                            continue
+                        for line in bk['lines']:
+                            line_text = ''.join(s['text'] for s in line['spans']).strip()
+                            line_upper = line_text.upper()
+                            for company in all_companies:
+                                if company and company not in company_ys and company.upper() in line_upper:
+                                    company_ys[company] = line['bbox'][1]
+                    sorted_hits = sorted(company_ys.items(), key=lambda x: x[1])
+                    result = {}
+                    for i, (company, y_start) in enumerate(sorted_hits):
+                        y_end = sorted_hits[i + 1][1] if i + 1 < len(sorted_hits) else None
+                        result[company] = (y_start, y_end)
+                    return result
 
                 def _replace_career_summary(page, blocks, new_headline):
                     SUMMARY_HEADERS = {'CAREER SUMMARY', 'PROFESSIONAL SUMMARY',
@@ -7350,17 +7377,23 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         return False
                     return all('Bold' in s['font'] or 'bold' in s['font'] for s in spans)
 
-                def _replace_bullet_in_page(page, blocks, original_text, new_text):
+                def _replace_bullet_in_page(page, blocks, original_text, new_text, y_range=None):
                     colon = original_text.find(':')
                     search_key = original_text[:colon].strip() if colon > 0 else original_text[:40].strip()
-                    bullet_sym_tops = _get_bullet_sym_tops(blocks)
+                    y_min, y_max = y_range if y_range else (None, None)
+                    bullet_sym_tops = _get_bullet_sym_tops(blocks, y_min=y_min, y_max=y_max)
                     target_line_y = None
                     for b in blocks:
                         if b['type'] == 0:
                             for line in b['lines']:
+                                ly = line['bbox'][1]
+                                if y_min is not None and ly < y_min:
+                                    continue
+                                if y_max is not None and ly >= y_max:
+                                    continue
                                 line_text = ''.join(s['text'] for s in line['spans'])
                                 if search_key in line_text:
-                                    target_line_y = line['bbox'][1]
+                                    target_line_y = ly
                                     break
                         if target_line_y is not None:
                             break
@@ -7441,26 +7474,33 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 bullets_deleted = 0
                 applied_indices = set()
                 deleted_indices = set()
+                all_role_keys = list(bullet_analysis_by_role.keys())
                 for page in doc:
                     blocks = page.get_text('dict')['blocks']
                     if not headline_replaced:
                         if _replace_career_summary(page, blocks, selected_headline):
                             headline_replaced = True
                             blocks = page.get_text('dict')['blocks']
-                    for i, (orig, appr) in enumerate(replacements):
+                    # Build role section y-ranges for this page to scope bullet searches
+                    role_bounds = _find_role_bounds_on_page(blocks, all_role_keys)
+                    for i, (role_key, orig, appr) in enumerate(replacements):
                         if i in applied_indices:
                             continue
-                        if _replace_bullet_in_page(page, blocks, orig, appr):
+                        y_range = role_bounds.get(role_key)
+                        if _replace_bullet_in_page(page, blocks, orig, appr, y_range=y_range):
                             bullets_applied += 1
                             applied_indices.add(i)
                             blocks = page.get_text('dict')['blocks']
-                    for i, orig in enumerate(deletions):
+                            role_bounds = _find_role_bounds_on_page(blocks, all_role_keys)
+                    for i, (role_key, orig) in enumerate(deletions):
                         if i in deleted_indices:
                             continue
-                        if _replace_bullet_in_page(page, blocks, orig, ''):
+                        y_range = role_bounds.get(role_key)
+                        if _replace_bullet_in_page(page, blocks, orig, '', y_range=y_range):
                             bullets_deleted += 1
                             deleted_indices.add(i)
                             blocks = page.get_text('dict')['blocks']
+                            role_bounds = _find_role_bounds_on_page(blocks, all_role_keys)
 
                 print(f"[EXPORT-THREAD] PyMuPDF done: headline={'yes' if headline_replaced else 'no'} "
                       f"replaced={bullets_applied}/{len(replacements)} deleted={bullets_deleted}/{len(deletions)} "
@@ -7540,13 +7580,13 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
 
                 doc = _DocxDoc(_BytesIO(file_data))
                 applied = 0
-                for orig, appr in replacements:
+                for _rk, orig, appr in replacements:
                     for para in _all_paragraphs(doc):
                         if _replace_para(para, orig, appr):
                             applied += 1
                             break
                 deleted = 0
-                for orig in deletions:
+                for _rk, orig in deletions:
                     for para in list(_all_paragraphs(doc)):
                         full = "".join(r.text for r in para.runs)
                         if orig in full or full.strip() == orig.strip():
