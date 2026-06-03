@@ -7398,6 +7398,7 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     y_min, y_max = y_range if y_range else (None, None)
                     bullet_sym_tops = _get_bullet_sym_tops(blocks, y_min=y_min, y_max=y_max)
                     target_line_y = None
+                    lines_in_range = []
                     for b in blocks:
                         if b['type'] == 0:
                             for line in b['lines']:
@@ -7407,12 +7408,14 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                                 if y_max is not None and ly >= y_max:
                                     continue
                                 line_text = ''.join(s['text'] for s in line['spans'])
+                                lines_in_range.append((ly, repr(line_text[:80])))
                                 if search_key in line_text:
                                     target_line_y = ly
                                     break
                         if target_line_y is not None:
                             break
                     if target_line_y is None:
+                        print(f"[RBIP] MISS key={repr(search_key[:50])} y_range={y_range} syms={bullet_sym_tops[:5]} lines={lines_in_range[:8]}")
                         return False
                     sym_y = None
                     for y in bullet_sym_tops:
@@ -7421,6 +7424,7 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         else:
                             break
                     if sym_y is None:
+                        print(f"[RBIP] NO-SYM key={repr(search_key[:50])} target_y={target_line_y} syms={bullet_sym_tops}")
                         return False
                     next_sym_y = next((y for y in bullet_sym_tops if y > sym_y + 2), None)
                     # Sort blocks by y-position so section header detection fires before footer lines
