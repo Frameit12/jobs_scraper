@@ -7393,12 +7393,23 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     return all('Bold' in s['font'] or 'bold' in s['font'] for s in spans)
 
                 def _replace_bullet_in_page(page, blocks, original_text, new_text, y_range=None):
+                    import unicodedata as _ud
+                    from difflib import SequenceMatcher as _SM
+
+                    def _norm(t):
+                        t = _ud.normalize('NFKC', t)
+                        for lig, r in [('ﬀ','ff'),('ﬁ','fi'),('ﬂ','fl'),('ﬃ','ffi'),('ﬄ','ffl')]:
+                            t = t.replace(lig, r)
+                        return t
+
                     colon = original_text.find(':')
                     search_key = original_text[:colon].strip() if colon > 0 else original_text[:40].strip()
+                    search_key_norm = _norm(search_key)
                     y_min, y_max = y_range if y_range else (None, None)
                     bullet_sym_tops = _get_bullet_sym_tops(blocks, y_min=y_min, y_max=y_max)
                     target_line_y = None
-                    lines_in_range = []
+                    best_fuzzy_y = None
+                    best_fuzzy_score = 0
                     for b in blocks:
                         if b['type'] == 0:
                             for line in b['lines']:
@@ -7408,25 +7419,27 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                                 if y_max is not None and ly >= y_max:
                                     continue
                                 line_text = ''.join(s['text'] for s in line['spans'])
-                                lines_in_range.append((ly, repr(line_text[:80])))
-                                if search_key in line_text:
+                                line_norm = _norm(line_text)
+                                if search_key_norm in line_norm:
                                     target_line_y = ly
                                     break
+                                # Fuzzy fallback: compare against the title portion (before ':')
+                                c = line_text.find(':')
+                                if c > 0:
+                                    title_norm = _norm(line_text[:c].strip())
+                                    if title_norm:
+                                        score = _SM(None, search_key_norm.lower(), title_norm.lower()).ratio()
+                                        if score > best_fuzzy_score and score >= 0.75:
+                                            best_fuzzy_score = score
+                                            best_fuzzy_y = ly
                         if target_line_y is not None:
                             break
                     if target_line_y is None:
-                        # Log text at the first few bullet symbol positions to expose encoding mismatches
-                        sym_texts = []
-                        for sym_y_dbg in bullet_sym_tops[:3]:
-                            for b in blocks:
-                                if b['type'] == 0:
-                                    for line in b['lines']:
-                                        if abs(line['bbox'][1] - sym_y_dbg) < 15:
-                                            lt = ''.join(s['text'] for s in line['spans'])
-                                            if lt.strip():
-                                                sym_texts.append(f"y={sym_y_dbg:.0f}:{repr(lt[:60])}")
-                        print(f"[RBIP] MISS key={repr(search_key[:50])} y_range={y_range} n_lines={len(lines_in_range)} syms={bullet_sym_tops[:5]} sym_texts={sym_texts}")
-                        return False
+                        if best_fuzzy_y is not None:
+                            target_line_y = best_fuzzy_y
+                            print(f"[RBIP] FUZZY key={repr(search_key[:45])} score={best_fuzzy_score:.2f} y={target_line_y:.0f}")
+                        else:
+                            return False
                     sym_y = None
                     for y in bullet_sym_tops:
                         if y <= target_line_y + 6:
@@ -7434,7 +7447,6 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         else:
                             break
                     if sym_y is None:
-                        print(f"[RBIP] NO-SYM key={repr(search_key[:50])} target_y={target_line_y} syms={bullet_sym_tops}")
                         return False
                     next_sym_y = next((y for y in bullet_sym_tops if y > sym_y + 2), None)
                     # Sort blocks by y-position so section header detection fires before footer lines
