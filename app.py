@@ -7415,7 +7415,17 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         if target_line_y is not None:
                             break
                     if target_line_y is None:
-                        print(f"[RBIP] MISS key={repr(search_key[:50])} y_range={y_range} syms={bullet_sym_tops[:5]} lines={lines_in_range[:8]}")
+                        # Log text at the first few bullet symbol positions to expose encoding mismatches
+                        sym_texts = []
+                        for sym_y_dbg in bullet_sym_tops[:3]:
+                            for b in blocks:
+                                if b['type'] == 0:
+                                    for line in b['lines']:
+                                        if abs(line['bbox'][1] - sym_y_dbg) < 15:
+                                            lt = ''.join(s['text'] for s in line['spans'])
+                                            if lt.strip():
+                                                sym_texts.append(f"y={sym_y_dbg:.0f}:{repr(lt[:60])}")
+                        print(f"[RBIP] MISS key={repr(search_key[:50])} y_range={y_range} n_lines={len(lines_in_range)} syms={bullet_sym_tops[:5]} sym_texts={sym_texts}")
                         return False
                     sym_y = None
                     for y in bullet_sym_tops:
