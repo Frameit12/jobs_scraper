@@ -7381,8 +7381,10 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                                         if span['text'].strip():
                                             fsize = span['size']
                                             break
-                    page.add_redact_annot(rect, fill=(1, 1, 1))
-                    page.apply_redactions()
+                    # draw_rect paints in a new content stream appended AFTER all existing streams
+                    # (including Form XObject invocations), so it covers XObject text reliably.
+                    # apply_redactions only modifies existing streams, which render before XObjects.
+                    page.draw_rect(rect, color=(1, 1, 1), fill=(1, 1, 1))
                     html = (f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
                             f'line-height:1.3;margin:0">{new_headline}</p>')
                     page.insert_htmlbox(rect, html)
@@ -7406,6 +7408,10 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                                     if lt and len(lt) > 3:
                                         ch = lt[0] if lt else ''
                                         if len(lt) <= 2 or ord(ch) in (8226,9679,9675,9702,9656,9642,9654,183):
+                                            # Combined-span bullet: strip the leading bullet char and use the rest
+                                            stripped = lt[1:].strip()
+                                            if len(stripped) > 3:
+                                                candidates.append(stripped)
                                             continue
                                         candidates.append(lt)
                     # Prefer candidates with ':' in first 50 chars (bullet title format)
@@ -7524,8 +7530,7 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         f'line-height:1.3;margin:0;padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
                         f'&#x2022; {regular_part}</p>'
                     )
-                    page.add_redact_annot(rect, fill=(1, 1, 1))
-                    page.apply_redactions()
+                    page.draw_rect(rect, color=(1, 1, 1), fill=(1, 1, 1))
                     if new_text:
                         page.insert_htmlbox(rect, html_bullet)
                     return True
