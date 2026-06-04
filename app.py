@@ -7211,30 +7211,30 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
 
         print(f"[EXPORT-DIAG] approved_map keys: {list(approved_map.keys())}")
 
-        # Build replacements (changed text) and deletions (unapproved bullets to remove)
-        # Each entry carries its role_key and bullet_index so PDF processing can
-        # scope the search and use the actual PDF text (via pre-scan) rather than
-        # the AI-modified original_text.
-        replacements = []   # list of (role_key, orig, new_txt, bullet_idx)
-        deletions = []      # list of (role_key, orig, bullet_idx)
+        # Build replacements (changed text) and deletions (unapproved bullets to remove).
+        # approved_map is keyed by (role_key, display_idx) where display_idx is the
+        # 0-based position in the sorted recommended_bullets list as shown in the UI
+        # (loop.index0 in the Jinja template).  We must use enumerate() here — NOT
+        # b.get('bullet_index') — because the AI's internal bullet_index field uses a
+        # different numbering (position in role['bullets'] list) than the UI display order.
+        replacements = []   # list of (role_key, orig, new_txt, display_idx)
+        deletions = []      # list of (role_key, orig, display_idx)
 
         for role_key, role_data in bullet_analysis_by_role.items():
             if selected_role_keys and role_key not in selected_role_keys:
                 continue
-            for b in role_data.get('recommended_bullets', []):
-                idx = b.get('bullet_index')
+            for display_idx, b in enumerate(role_data.get('recommended_bullets', [])):
                 orig = b.get('original_text', '')
                 if not orig:
                     continue
-                k = (role_key, idx)
+                k = (role_key, display_idx)
                 if k in approved_map:
                     new_txt = approved_map[k]
-                    same = (new_txt == orig)
-                    print(f"[EXPORT-DIAG] REPLACE role={repr(role_key)} idx={idx} same_text={same} orig={repr(orig[:50])} new={repr(new_txt[:50])}")
-                    replacements.append((role_key, orig, new_txt, idx))
+                    print(f"[EXPORT-DIAG] REPLACE role={repr(role_key)} display_idx={display_idx} orig={repr(orig[:50])} new={repr(new_txt[:50])}")
+                    replacements.append((role_key, orig, new_txt, display_idx))
                 else:
-                    print(f"[EXPORT-DIAG] DELETE  role={repr(role_key)} idx={idx} orig={repr(orig[:50])}")
-                    deletions.append((role_key, orig, idx))
+                    print(f"[EXPORT-DIAG] DELETE  role={repr(role_key)} display_idx={display_idx} orig={repr(orig[:50])}")
+                    deletions.append((role_key, orig, display_idx))
 
         print(f"[EXPORT-THREAD] replacements={len(replacements)} deletions={len(deletions)} at +{_etime.time()-_t0:.2f}s")
 
@@ -7590,9 +7590,10 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         if role_key not in role_bounds:
                             continue  # company header not on this page — skip
                         y_range = role_bounds[role_key]
-                        # Use actual PDF text (from pre-scan) to find the bullet; fall back to orig
-                        actual = role_actual_texts.get(role_key, {}).get(bidx, orig)
-                        if _replace_bullet_in_page(page, blocks, actual, appr, y_range=y_range):
+                        # Use orig (AI's original_text) as the search key. The pre-scan used
+                        # PDF visual-order indices which don't match the AI's display-order
+                        # bullet_index, so pre-scan text was wrong; orig is always correct here.
+                        if _replace_bullet_in_page(page, blocks, orig, appr, y_range=y_range):
                             bullets_applied += 1
                             applied_indices.add(i)
                             blocks = page.get_text('dict')['blocks']
@@ -7603,8 +7604,7 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         if role_key not in role_bounds:
                             continue  # company header not on this page — skip
                         y_range = role_bounds[role_key]
-                        actual = role_actual_texts.get(role_key, {}).get(bidx, orig)
-                        if _replace_bullet_in_page(page, blocks, actual, '', y_range=y_range):
+                        if _replace_bullet_in_page(page, blocks, orig, '', y_range=y_range):
                             bullets_deleted += 1
                             deleted_indices.add(i)
                             blocks = page.get_text('dict')['blocks']
