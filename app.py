@@ -7209,6 +7209,8 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
             if rk and txt:
                 approved_map[(rk, idx)] = txt
 
+        print(f"[EXPORT-DIAG] approved_map keys: {list(approved_map.keys())}")
+
         # Build replacements (changed text) and deletions (unapproved bullets to remove)
         # Each entry carries its role_key and bullet_index so PDF processing can
         # scope the search and use the actual PDF text (via pre-scan) rather than
@@ -7227,9 +7229,11 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 k = (role_key, idx)
                 if k in approved_map:
                     new_txt = approved_map[k]
+                    same = (new_txt == orig)
+                    print(f"[EXPORT-DIAG] REPLACE role={repr(role_key)} idx={idx} same_text={same} orig={repr(orig[:50])} new={repr(new_txt[:50])}")
                     replacements.append((role_key, orig, new_txt, idx))
                 else:
-                    # Not approved → mark for deletion from CV
+                    print(f"[EXPORT-DIAG] DELETE  role={repr(role_key)} idx={idx} orig={repr(orig[:50])}")
                     deletions.append((role_key, orig, idx))
 
         print(f"[EXPORT-THREAD] replacements={len(replacements)} deletions={len(deletions)} at +{_etime.time()-_t0:.2f}s")
@@ -7560,6 +7564,9 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         role_bullet_seen[rk] = base + len(syms)
                 mapped = sum(len(v) for v in role_actual_texts.values())
                 print(f"[EXPORT-THREAD] pre-scan: {mapped} bullets mapped at +{_etime.time()-_t0:.2f}s")
+                for rk, idx_map in role_actual_texts.items():
+                    for bidx, title in sorted(idx_map.items()):
+                        print(f"[EXPORT-DIAG] pre-scan role={repr(rk)} idx={bidx} title={repr(title[:60])}")
 
                 headline_replaced = False
                 bullets_applied = 0
