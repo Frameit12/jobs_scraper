@@ -7569,26 +7569,45 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         return True
 
                     text_indent_pt = round((indent_x - sym_x0 + 1) if indent_x else 18)
-                    html_parts = []
-                    for txt in approved_texts:
-                        cp = txt.find(':')
-                        if cp > 0:
-                            b_part = txt[:cp + 1]
-                            r_part = txt[cp + 1:]
-                            html_parts.append(
-                                f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
-                                f'line-height:1.3;margin:0 0 3pt 0;'
-                                f'padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
-                                f'&#x2022; <b>{b_part}</b>{r_part}</p>'
-                            )
-                        else:
-                            html_parts.append(
-                                f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
-                                f'line-height:1.3;margin:0 0 3pt 0;'
-                                f'padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
-                                f'&#x2022; {txt}</p>'
-                            )
-                    page.insert_htmlbox(rect, ''.join(html_parts))
+                    H_orig = bul_y1 - first_sym_y
+                    rect_width = bul_x1 - sym_x0
+
+                    def _build_bullet_html(margin_bottom_pt):
+                        parts = []
+                        for txt in approved_texts:
+                            cp = txt.find(':')
+                            if cp > 0:
+                                b_part = txt[:cp + 1]
+                                r_part = txt[cp + 1:]
+                                parts.append(
+                                    f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                                    f'line-height:1.3;margin:0 0 {margin_bottom_pt:.2f}pt 0;'
+                                    f'padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
+                                    f'&#x2022; <b>{b_part}</b>{r_part}</p>'
+                                )
+                            else:
+                                parts.append(
+                                    f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                                    f'line-height:1.3;margin:0 0 {margin_bottom_pt:.2f}pt 0;'
+                                    f'padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
+                                    f'&#x2022; {txt}</p>'
+                                )
+                        return ''.join(parts)
+
+                    # Pre-measure on a scratch page to find margin that fills H_orig exactly,
+                    # eliminating the white gap left when replacement has fewer bullets than original.
+                    base_margin = 3.0
+                    _scratch = _fitz.open()
+                    _sp = _scratch.new_page()
+                    _spare, _scale = _sp.insert_htmlbox(
+                        _fitz.Rect(0, 0, rect_width, H_orig),
+                        _build_bullet_html(base_margin)
+                    )
+                    _scratch.close()
+                    if _spare > 2.0 and _scale >= 1.0:
+                        base_margin = base_margin + (_spare / len(approved_texts))
+
+                    page.insert_htmlbox(rect, _build_bullet_html(base_margin))
                     return True
 
                 print(f"[EXPORT-THREAD] opening PDF with PyMuPDF at +{_etime.time()-_t0:.2f}s")
