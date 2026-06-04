@@ -7005,7 +7005,8 @@ def customize_cv_export():
 
                         indent = round(bul_x1 - bul_x0 - (bul_x0 - min(l[0] for l in bullet_bboxes) + 1))
                         # Indent the wrapped lines to align with text start (after bullet)
-                        text_x0 = min(l[0] for l in bullet_bboxes if l[1] > sym_y + 2) if len(bullet_bboxes) > 1 else bul_x0 + 18
+                        _wrap = [l[0] for l in bullet_bboxes if l[1] > sym_y + 2]
+                        text_x0 = min(_wrap) if _wrap else bul_x0 + 18
                         text_indent_pt = round(text_x0 - bul_x0 + 1)
                         html_bullet = (
                             f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
@@ -7511,7 +7512,8 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     else:
                         bold_part = ''
                         regular_part = new_text
-                    text_x0 = min(l[0] for l in bullet_bboxes if l[1] > sym_y + 2) if len(bullet_bboxes) > 1 else bul_x0 + 18
+                    _wrap = [l[0] for l in bullet_bboxes if l[1] > sym_y + 2]
+                    text_x0 = min(_wrap) if _wrap else bul_x0 + 18
                     text_indent_pt = round(text_x0 - bul_x0 + 1)
                     html_bullet = (
                         f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
