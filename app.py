@@ -7517,6 +7517,77 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         page.insert_htmlbox(rect, html_bullet)
                     return True
 
+                def _replace_role_bullets_all(page, blocks, approved_texts, y_range):
+                    """Cover every bullet in the role with one white rect and re-insert
+                    all approved_texts as a single consistently-formatted HTML block.
+                    This prevents per-bullet gaps and font-size variation."""
+                    y_min, y_max = y_range if y_range else (None, None)
+                    bullet_sym_tops = _get_bullet_sym_tops(blocks, y_min=y_min, y_max=y_max)
+                    if not bullet_sym_tops:
+                        return False
+
+                    first_sym_y = bullet_sym_tops[0]
+                    sorted_blocks_r = sorted(blocks, key=lambda bk: bk['bbox'][1])
+
+                    # Collect every line that belongs to the bullet block
+                    all_lines = []
+                    fsize = 9
+                    indent_x = None
+                    done = False
+                    for bk in sorted_blocks_r:
+                        if done or bk['type'] != 0:
+                            continue
+                        for ln in bk['lines']:
+                            y = ln['bbox'][1]
+                            if y < first_sym_y - 0.5:
+                                continue
+                            if y_max is not None and y >= y_max:
+                                done = True
+                                break
+                            if all_lines and _is_section_header(ln):
+                                done = True
+                                break
+                            all_lines.append(ln['bbox'])
+                            for sp in ln['spans']:
+                                if sp['text'].strip() and 'Symbol' not in sp['font']:
+                                    fsize = sp['size']
+                                    if indent_x is None and abs(y - first_sym_y) > 2:
+                                        indent_x = ln['bbox'][0]
+                    if not all_lines:
+                        return False
+
+                    sym_x0 = min(l[0] for l in all_lines) - 1
+                    bul_x1 = max(l[2] for l in all_lines) + 2
+                    bul_y1 = max(l[3] for l in all_lines) + 1
+                    rect = _fitz.Rect(sym_x0, first_sym_y, bul_x1, bul_y1)
+                    page.draw_rect(rect, color=(1, 1, 1), fill=(1, 1, 1))
+
+                    if not approved_texts:
+                        return True
+
+                    text_indent_pt = round((indent_x - sym_x0 + 1) if indent_x else 18)
+                    html_parts = []
+                    for txt in approved_texts:
+                        cp = txt.find(':')
+                        if cp > 0:
+                            b_part = txt[:cp + 1]
+                            r_part = txt[cp + 1:]
+                            html_parts.append(
+                                f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                                f'line-height:1.3;margin:0 0 3pt 0;'
+                                f'padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
+                                f'&#x2022; <b>{b_part}</b>{r_part}</p>'
+                            )
+                        else:
+                            html_parts.append(
+                                f'<p style="font-family:Arial,Helvetica;font-size:{fsize:.1f}pt;'
+                                f'line-height:1.3;margin:0 0 3pt 0;'
+                                f'padding-left:{text_indent_pt}pt;text-indent:-{text_indent_pt}pt;">'
+                                f'&#x2022; {txt}</p>'
+                            )
+                    page.insert_htmlbox(rect, ''.join(html_parts))
+                    return True
+
                 print(f"[EXPORT-THREAD] opening PDF with PyMuPDF at +{_etime.time()-_t0:.2f}s")
                 doc = _fitz.open(stream=file_data, filetype='pdf')
                 print(f"[EXPORT-THREAD] PDF opened pages={doc.page_count} at +{_etime.time()-_t0:.2f}s")
@@ -7544,40 +7615,21 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     for bidx, title in sorted(idx_map.items()):
                         print(f"[EXPORT-DIAG] pre-scan role={repr(rk)} idx={bidx} title={repr(title[:60])}")
 
-                # Build replacements and deletions now that we have actual PDF bullet titles.
-                # For each role, assign approved texts to the first K pre-scan bullets (in
-                # visual/PDF order) and delete all remaining pre-scan bullets.  This avoids
-                # all AI-paraphrase vs actual-PDF-text mismatches.
-                replacements = []   # (role_key, actual_pdf_title, new_txt)
-                deletions = []      # (role_key, actual_pdf_title)
-
+                # Build approved texts per role (sorted by display_idx = user's approved order)
+                approved_txts_by_role = {}
                 for role_key in all_role_keys:
                     if selected_role_keys and role_key not in selected_role_keys:
                         continue
-                    role_approved = sorted(
+                    txts = [txt for _, txt in sorted(
                         [(idx, txt) for (rk, idx), txt in approved_map.items() if rk == role_key],
                         key=lambda x: x[0]
-                    )
-                    if not role_approved:
-                        continue
-                    actual_titles = role_actual_texts.get(role_key, {})
-                    for visual_idx in sorted(actual_titles.keys()):
-                        actual_title = actual_titles[visual_idx]
-                        if visual_idx < len(role_approved):
-                            _, new_txt = role_approved[visual_idx]
-                            print(f"[EXPORT-DIAG] REPLACE role={repr(role_key)} visual_idx={visual_idx} pdf={repr(actual_title[:40])} new={repr(new_txt[:40])}")
-                            replacements.append((role_key, actual_title, new_txt))
-                        else:
-                            print(f"[EXPORT-DIAG] DELETE  role={repr(role_key)} visual_idx={visual_idx} pdf={repr(actual_title[:40])}")
-                            deletions.append((role_key, actual_title))
-
-                print(f"[EXPORT-THREAD] replacements={len(replacements)} deletions={len(deletions)} at +{_etime.time()-_t0:.2f}s")
+                    )]
+                    if txts:
+                        approved_txts_by_role[role_key] = txts
+                        print(f"[EXPORT-DIAG] role={repr(role_key)} approved_count={len(txts)}")
 
                 headline_replaced = False
-                bullets_applied = 0
-                bullets_deleted = 0
-                applied_indices = set()
-                deleted_indices = set()
+                roles_modified = 0
                 for page in doc:
                     blocks = page.get_text('dict')['blocks']
                     if not headline_replaced:
@@ -7585,31 +7637,18 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                             headline_replaced = True
                             blocks = page.get_text('dict')['blocks']
                     role_bounds = _find_role_bounds_on_page(blocks, all_role_keys)
-                    for i, (role_key, actual_title, appr) in enumerate(replacements):
-                        if i in applied_indices:
-                            continue
+                    for role_key, txts in approved_txts_by_role.items():
                         if role_key not in role_bounds:
                             continue
                         y_range = role_bounds[role_key]
-                        if _replace_bullet_in_page(page, blocks, actual_title, appr, y_range=y_range):
-                            bullets_applied += 1
-                            applied_indices.add(i)
-                            blocks = page.get_text('dict')['blocks']
-                            role_bounds = _find_role_bounds_on_page(blocks, all_role_keys)
-                    for i, (role_key, actual_title) in enumerate(deletions):
-                        if i in deleted_indices:
-                            continue
-                        if role_key not in role_bounds:
-                            continue
-                        y_range = role_bounds[role_key]
-                        if _replace_bullet_in_page(page, blocks, actual_title, '', y_range=y_range):
-                            bullets_deleted += 1
-                            deleted_indices.add(i)
+                        if _replace_role_bullets_all(page, blocks, txts, y_range):
+                            roles_modified += 1
+                            print(f"[EXPORT-DIAG] applied role={repr(role_key)} bullets={len(txts)}")
                             blocks = page.get_text('dict')['blocks']
                             role_bounds = _find_role_bounds_on_page(blocks, all_role_keys)
 
                 print(f"[EXPORT-THREAD] PyMuPDF done: headline={'yes' if headline_replaced else 'no'} "
-                      f"replaced={bullets_applied}/{len(replacements)} deleted={bullets_deleted}/{len(deletions)} "
+                      f"roles_modified={roles_modified}/{len(approved_txts_by_role)} "
                       f"at +{_etime.time()-_t0:.2f}s")
 
                 if fmt == 'pdf':
