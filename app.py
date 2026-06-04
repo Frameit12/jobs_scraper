@@ -7227,9 +7227,7 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 k = (role_key, idx)
                 if k in approved_map:
                     new_txt = approved_map[k]
-                    if new_txt != orig:
-                        replacements.append((role_key, orig, new_txt, idx))
-                    # else: approved with original text — already correct in CV, no action needed
+                    replacements.append((role_key, orig, new_txt, idx))
                 else:
                     # Not approved → mark for deletion from CV
                     deletions.append((role_key, orig, idx))
@@ -7297,7 +7295,11 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                                         len(t) == 1 and ord(t) in (8226, 9679, 9675, 9702, 9656, 9642, 9654, 183)
                                     ):
                                         tops.append(sy)
-                    return sorted(set(tops))
+                    merged = []
+                    for t in sorted(set(tops)):
+                        if not merged or t - merged[-1] > 1.0:
+                            merged.append(t)
+                    return merged
 
                 def _find_role_bounds_on_page(blocks, all_companies):
                     """Return {company: (y_start, y_end)} for companies visible on this page.
