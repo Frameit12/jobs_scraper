@@ -7209,10 +7209,11 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 approved_map[(rk, idx)] = txt
 
         # Build replacements (changed text) and deletions (unapproved bullets to remove)
-        # Each entry carries its role_key so PDF processing can scope the search
-        # to the correct role section, preventing cross-role contamination.
-        replacements = []   # list of (role_key, orig, new_txt)
-        deletions = []      # list of (role_key, orig)
+        # Each entry carries its role_key and bullet_index so PDF processing can
+        # scope the search and use the actual PDF text (via pre-scan) rather than
+        # the AI-modified original_text.
+        replacements = []   # list of (role_key, orig, new_txt, bullet_idx)
+        deletions = []      # list of (role_key, orig, bullet_idx)
 
         for role_key, role_data in bullet_analysis_by_role.items():
             if selected_role_keys and role_key not in selected_role_keys:
@@ -7226,11 +7227,11 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 if k in approved_map:
                     new_txt = approved_map[k]
                     if new_txt != orig:
-                        replacements.append((role_key, orig, new_txt))
+                        replacements.append((role_key, orig, new_txt, idx))
                     # else: approved with original text — already correct in CV, no action needed
                 else:
                     # Not approved → mark for deletion from CV
-                    deletions.append((role_key, orig))
+                    deletions.append((role_key, orig, idx))
 
         print(f"[EXPORT-THREAD] replacements={len(replacements)} deletions={len(deletions)} at +{_etime.time()-_t0:.2f}s")
 
@@ -7392,6 +7393,26 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                         return False
                     return all('Bold' in s['font'] or 'bold' in s['font'] for s in spans)
 
+                def _get_bullet_title_at_sym(blocks, sym_y):
+                    """Return the actual PDF title text of the bullet whose symbol is at sym_y."""
+                    candidates = []
+                    for bk in blocks:
+                        if bk['type'] == 0:
+                            for ln in bk['lines']:
+                                ly = ln['bbox'][1]
+                                if abs(ly - sym_y) < 15 and ln['bbox'][0] > 55:
+                                    lt = ''.join(s['text'] for s in ln['spans']).strip()
+                                    if lt and len(lt) > 3:
+                                        ch = lt[0] if lt else ''
+                                        if len(lt) <= 2 or ord(ch) in (8226,9679,9675,9702,9656,9642,9654,183):
+                                            continue
+                                        candidates.append(lt)
+                    # Prefer candidates with ':' in first 50 chars (bullet title format)
+                    for c in candidates:
+                        if ':' in c[:50]:
+                            return c
+                    return candidates[0] if candidates else None
+
                 def _replace_bullet_in_page(page, blocks, original_text, new_text, y_range=None):
                     import unicodedata as _ud
                     from difflib import SequenceMatcher as _SM
@@ -7510,12 +7531,32 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                 print(f"[EXPORT-THREAD] opening PDF with PyMuPDF at +{_etime.time()-_t0:.2f}s")
                 doc = _fitz.open(stream=file_data, filetype='pdf')
                 print(f"[EXPORT-THREAD] PDF opened pages={doc.page_count} at +{_etime.time()-_t0:.2f}s")
+                all_role_keys = list(bullet_analysis_by_role.keys())
+
+                # Pre-scan: build actual PDF bullet text mapping so we use the real PDF
+                # text as search key rather than the AI-modified original_text.
+                # role_actual_texts[role_key][abs_bullet_index] = actual PDF title string
+                role_actual_texts = {}
+                role_bullet_seen = {}
+                for scan_pg in doc:
+                    s_blk = scan_pg.get_text('dict')['blocks']
+                    s_bnd = _find_role_bounds_on_page(s_blk, all_role_keys)
+                    for rk, (ym, yM) in s_bnd.items():
+                        syms = _get_bullet_sym_tops(s_blk, y_min=ym, y_max=yM)
+                        base = role_bullet_seen.get(rk, 0)
+                        for off, sy in enumerate(syms):
+                            title = _get_bullet_title_at_sym(s_blk, sy)
+                            if title:
+                                role_actual_texts.setdefault(rk, {})[base + off] = title
+                        role_bullet_seen[rk] = base + len(syms)
+                mapped = sum(len(v) for v in role_actual_texts.values())
+                print(f"[EXPORT-THREAD] pre-scan: {mapped} bullets mapped at +{_etime.time()-_t0:.2f}s")
+
                 headline_replaced = False
                 bullets_applied = 0
                 bullets_deleted = 0
                 applied_indices = set()
                 deleted_indices = set()
-                all_role_keys = list(bullet_analysis_by_role.keys())
                 for page in doc:
                     blocks = page.get_text('dict')['blocks']
                     if not headline_replaced:
@@ -7527,24 +7568,27 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     # skipping entirely when the company is absent prevents cross-role
                     # contamination (e.g. a BNP search key matching a Citibank bullet symbol).
                     role_bounds = _find_role_bounds_on_page(blocks, all_role_keys)
-                    for i, (role_key, orig, appr) in enumerate(replacements):
+                    for i, (role_key, orig, appr, bidx) in enumerate(replacements):
                         if i in applied_indices:
                             continue
                         if role_key not in role_bounds:
                             continue  # company header not on this page — skip
                         y_range = role_bounds[role_key]
-                        if _replace_bullet_in_page(page, blocks, orig, appr, y_range=y_range):
+                        # Use actual PDF text (from pre-scan) to find the bullet; fall back to orig
+                        actual = role_actual_texts.get(role_key, {}).get(bidx, orig)
+                        if _replace_bullet_in_page(page, blocks, actual, appr, y_range=y_range):
                             bullets_applied += 1
                             applied_indices.add(i)
                             blocks = page.get_text('dict')['blocks']
                             role_bounds = _find_role_bounds_on_page(blocks, all_role_keys)
-                    for i, (role_key, orig) in enumerate(deletions):
+                    for i, (role_key, orig, bidx) in enumerate(deletions):
                         if i in deleted_indices:
                             continue
                         if role_key not in role_bounds:
                             continue  # company header not on this page — skip
                         y_range = role_bounds[role_key]
-                        if _replace_bullet_in_page(page, blocks, orig, '', y_range=y_range):
+                        actual = role_actual_texts.get(role_key, {}).get(bidx, orig)
+                        if _replace_bullet_in_page(page, blocks, actual, '', y_range=y_range):
                             bullets_deleted += 1
                             deleted_indices.add(i)
                             blocks = page.get_text('dict')['blocks']
