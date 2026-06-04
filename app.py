@@ -7532,6 +7532,7 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                     # Collect every line that belongs to the bullet block
                     all_lines = []
                     fsize = 9
+                    fsize_set = False
                     indent_x = None
                     done = False
                     for bk in sorted_blocks_r:
@@ -7550,7 +7551,9 @@ def _run_export_job(job_id, user_id, fmt, approved_bullets, selected_headline,
                             all_lines.append(ln['bbox'])
                             for sp in ln['spans']:
                                 if sp['text'].strip() and 'Symbol' not in sp['font']:
-                                    fsize = sp['size']
+                                    if not fsize_set:
+                                        fsize = sp['size']
+                                        fsize_set = True
                                     if indent_x is None and abs(y - first_sym_y) > 2:
                                         indent_x = ln['bbox'][0]
                     if not all_lines:
